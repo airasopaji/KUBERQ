@@ -1,0 +1,848 @@
+{
+  "settings": {
+    "enableTransportLive": false,
+    "enableServicesLive": false,
+    "adminWhatsApp": "7240692736",
+    "platformName": "KuberQ",
+    "updatedAt": "2026-10-27T18:19:12.883Z"
+  },
+  "users": [
+    {
+      "id": "usr-super-admin",
+      "name": "Rohit Asopa (Super Admin)",
+      "phone": "7240692736",
+      "email": "grievance@kuberq.in",
+      "role": "admin",
+      "passwordHash": "3cd9eec3c6d430629fed0ad6254ba065:9fe1caa6f749f44e5d1f4768a440bb55bde4f0431a1aef36afbdc53e434a3238af95a84ab11d37d87d8414ae866b18cc5295250f608d9a61cfdc2a19b833ef62",
+      "active": true,
+      "createdAt": "2026-10-27T18:19:12.925Z",
+      "uniqueId": "KQA-000001"
+    },
+    {
+      "id": "usr-demo-merchant-1",
+      "name": "Rajesh Mohta",
+      "phone": "9829011223",
+      "email": "9829011223@phone.kuberq.in",
+      "role": "merchant",
+      "shopId": "shop-marwar-hw-01",
+      "passwordHash": "7219cdee6191b2b428efa4a244eefc9e:6467c3bca457d62e27e0cb16f3a90054eba26873eb607f829face691636d7fd80f4c179333df1bb7e0967e9f6c66e51582975ebf7ab94a74931596462c2d934e",
+      "active": true,
+      "createdAt": "2026-10-27T18:19:12.960Z",
+      "uniqueId": "KQM-31CD16"
+    },
+    {
+      "id": "usr-demo-merchant-2",
+      "name": "Mahendra Gehlot",
+      "phone": "9414122334",
+      "email": "9414122334@phone.kuberq.in",
+      "role": "merchant",
+      "shopId": "shop-surya-elec-02",
+      "passwordHash": "6464db2a8513b91164a8fb9f2d58c304:a757e53547de4ca032e9d4ffac96d2a1349a041fb817553a132426c35cee8396611bd8c5ebdb0ab08d5eae008937a3ae72eaa27d1710171d0ce8d4492142b761",
+      "active": true,
+      "createdAt": "2026-10-27T18:19:12.995Z",
+      "uniqueId": "KQM-A949A5"
+    },
+    {
+      "id": "usr-demo-customer-1",
+      "name": "Vikram Singh Rathore (Contractor)",
+      "phone": "9928055667",
+      "email": "9928055667@phone.kuberq.in",
+      "role": "customer",
+      "address": "Plot 42, Sardarpura C-Road, Jodhpur",
+      "pincode": "342003",
+      "gstin": "08AAACR5055K1Z2",
+      "passwordHash": "fe51ff21fcf35415c44d6a2b6f16ccd9:0af71251a812cb11cb6a91905cd8396c812cd77465661d026c58e01c734812268161d75fa0a42477b95650dcc5268d8ee3d2308ac2249a406fe156b453b4877c",
+      "active": true,
+      "createdAt": "2026-10-27T18:19:13.037Z",
+      "uniqueId": "KQC-849201"
+    }
+  ],
+  "employees": [
+    {
+      "id": "emp-demo-01",
+      "name": "Ankit Sharma",
+      "phone": "9116099887",
+      "email": "support@kuberq.in",
+      "designation": "Onboarding & Catalog Executive",
+      "status": "Active",
+      "permissions": [
+        "perm_merchants",
+        "perm_demos_faqs",
+        "perm_referrals"
+      ],
+      "passwordHash": "a13ad64ccc7a86807328d0721f704ef6:36a5c6204edf02cd7458b10ad5becd54001f92c92321a4fc0b456c573912d35ad85c1a822c54747f5ac46afe49b12b30aaa91f94385d065d0d083a30e04134d3",
+      "createdAt": "2026-10-27T18:19:13.075Z"
+    }
+  ],
+  "merchants": [
+    {
+      "id": "shop-marwar-hw-01",
+      "shop": "Marwar Hardware & Sanitary Mart",
+      "owner": "Rajesh Mohta",
+      "phone": "9829011223",
+      "city": "Jodhpur",
+      "state": "Rajasthan",
+      "stateCode": "08",
+      "category": "Hardware, Pipes & Sanitary",
+      "gstin": "08AABCM1234F1Z5",
+      "upiId": "marwarhardware@okaxis",
+      "address": "New Power House Road, Industrial Area, Jodhpur",
+      "role": "merchant",
+      "active": true,
+      "verified": true,
+      "open": true,
+      "plan": "Vyapar Pro",
+      "aiUsed": 3,
+      "aiLimit": 50,
+      "invoiceCounter": 4,
+      "refCode": "KQM-31CD16",
+      "renewsOn": "2026-11-26T18:19:13.075Z",
+      "createdAt": "2026-10-27T18:19:13.075Z",
+      "communityVerifications": 18
+    },
+    {
+      "id": "shop-surya-elec-02",
+      "shop": "Surya Electricals & Switchgear Wholesale",
+      "owner": "Mahendra Gehlot",
+      "phone": "9414122334",
+      "city": "Jodhpur",
+      "state": "Rajasthan",
+      "stateCode": "08",
+      "category": "Electrical & Electronics",
+      "gstin": "08AAECS9876B1Z9",
+      "upiId": "suryaelectricals@ybl",
+      "address": "Jalori Gate Market, Jodhpur",
+      "role": "manufacturer",
+      "active": true,
+      "verified": true,
+      "open": true,
+      "plan": "Starter (Free)",
+      "aiUsed": 1,
+      "aiLimit": 3,
+      "invoiceCounter": 1,
+      "refCode": "KQM-A949A5",
+      "renewsOn": "2026-11-26T18:19:13.075Z",
+      "createdAt": "2026-10-27T18:19:13.075Z",
+      "communityVerifications": 18
+    }
+  ],
+  "products": [
+    {
+      "id": "prd-1",
+      "shopId": "shop-marwar-hw-01",
+      "name": "Supreme PVC Pipe 1 inch (3m)",
+      "hsn": "3917",
+      "price": 185,
+      "wholesalePrice": 165,
+      "moq": 20,
+      "gstRate": 18,
+      "stock": 120,
+      "minStock": 20,
+      "taxMode": "exclusive",
+      "costPrice": 139
+    },
+    {
+      "id": "prd-2",
+      "shopId": "shop-marwar-hw-01",
+      "name": "Astral CPVC Pipe 3/4 inch (3m)",
+      "hsn": "3917",
+      "price": 340,
+      "wholesalePrice": 310,
+      "moq": 15,
+      "gstRate": 18,
+      "stock": 85,
+      "minStock": 15,
+      "taxMode": "exclusive",
+      "costPrice": 260
+    },
+    {
+      "id": "prd-3",
+      "shopId": "shop-marwar-hw-01",
+      "name": "PVC Elbow 1 inch Heavy",
+      "hsn": "3917",
+      "price": 22,
+      "wholesalePrice": 16,
+      "moq": 50,
+      "gstRate": 18,
+      "stock": 12,
+      "minStock": 30,
+      "taxMode": "exclusive",
+      "costPrice": 13
+    },
+    {
+      "id": "prd-4",
+      "shopId": "shop-marwar-hw-01",
+      "name": "Sintex Water Tank 1000L Triple Layer",
+      "hsn": "3925",
+      "price": 6800,
+      "wholesalePrice": 6350,
+      "moq": 2,
+      "gstRate": 18,
+      "stock": 8,
+      "minStock": 3,
+      "taxMode": "exclusive",
+      "costPrice": 5334
+    },
+    {
+      "id": "prd-5",
+      "shopId": "shop-marwar-hw-01",
+      "name": "JK Wall Putty 40kg Bag",
+      "hsn": "3214",
+      "price": 890,
+      "wholesalePrice": 820,
+      "moq": 10,
+      "gstRate": 18,
+      "stock": 65,
+      "minStock": 15,
+      "taxMode": "inclusive",
+      "costPrice": 689
+    },
+    {
+      "id": "prd-6",
+      "shopId": "shop-surya-elec-02",
+      "name": "Polycab FR House Wire 1.5 sqmm (90m)",
+      "hsn": "8544",
+      "price": 1490,
+      "wholesalePrice": 1380,
+      "moq": 10,
+      "gstRate": 18,
+      "stock": 50,
+      "minStock": 10,
+      "taxMode": "exclusive",
+      "costPrice": 1159
+    },
+    {
+      "id": "prd-7",
+      "shopId": "shop-surya-elec-02",
+      "name": "Havells Lifeline Wire 2.5 sqmm (90m)",
+      "hsn": "8544",
+      "price": 2380,
+      "wholesalePrice": 2210,
+      "moq": 10,
+      "gstRate": 18,
+      "stock": 40,
+      "minStock": 10,
+      "taxMode": "exclusive",
+      "costPrice": 1856
+    }
+  ],
+  "orders": [
+    {
+      "id": "KQ-2627-0004",
+      "invoiceNo": "KQ-2627-0004",
+      "shopId": "shop-marwar-hw-01",
+      "customerId": "",
+      "customer": "HARSHIT",
+      "phone": "7890745789",
+      "address": "JODHPUR",
+      "buyerGstin": "",
+      "supplyType": "intra",
+      "taxMode": "exclusive",
+      "channel": "Online QR",
+      "paymentMode": "Unmarked",
+      "udhaarSettled": true,
+      "status": "New",
+      "stockDeducted": false,
+      "items": [
+        {
+          "productId": "prd-1",
+          "name": "Supreme PVC Pipe 1 inch (3m)",
+          "hsn": "3917",
+          "qty": 1,
+          "price": 185,
+          "gstRate": 18,
+          "taxMode": "exclusive"
+        },
+        {
+          "productId": "prd-2",
+          "name": "Astral CPVC Pipe 3/4 inch (3m)",
+          "hsn": "3917",
+          "qty": 1,
+          "price": 340,
+          "gstRate": 18,
+          "taxMode": "exclusive"
+        },
+        {
+          "productId": "prd-3",
+          "name": "PVC Elbow 1 inch Heavy",
+          "hsn": "3917",
+          "qty": 1,
+          "price": 22,
+          "gstRate": 18,
+          "taxMode": "exclusive"
+        }
+      ],
+      "note": "",
+      "customAmount": 0,
+      "location": null,
+      "date": "2026-10-27T19:21:07.256Z",
+      "totals": {
+        "taxable": 547,
+        "cgst": 49.23,
+        "sgst": 49.23,
+        "igst": 0,
+        "gst": 98.46,
+        "gross": 645.46,
+        "supplyType": "intra",
+        "isBillOfSupply": false
+      },
+      "customerCode": "KQC-745789",
+      "shopCode": "KQM-31CD16",
+      "discount": 0,
+      "paidAmount": 645.46,
+      "receipts": []
+    },
+    {
+      "id": "KQ-2627-0003",
+      "invoiceNo": "KQ-2627-0003",
+      "shopId": "shop-marwar-hw-01",
+      "customerId": "",
+      "customer": "Gujarat Sanitary Traders",
+      "phone": "9898012345",
+      "address": "Ring Road, Surat, Gujarat",
+      "buyerGstin": "24AAACG1234A1Z5",
+      "supplyType": "inter",
+      "taxMode": "exclusive",
+      "channel": "Online QR",
+      "paymentMode": "Unmarked",
+      "udhaarSettled": true,
+      "status": "New",
+      "stockDeducted": false,
+      "items": [
+        {
+          "productId": "prd-1",
+          "name": "Supreme PVC Pipe 1 inch (3m)",
+          "hsn": "3917",
+          "qty": 20,
+          "price": 165,
+          "gstRate": 18,
+          "taxMode": "exclusive"
+        }
+      ],
+      "note": "",
+      "customAmount": 0,
+      "location": null,
+      "date": "2026-10-27T18:20:28.948Z",
+      "totals": {
+        "taxable": 3300,
+        "cgst": 0,
+        "sgst": 0,
+        "igst": 594,
+        "gst": 594,
+        "gross": 3894,
+        "supplyType": "inter",
+        "isBillOfSupply": false
+      },
+      "customerCode": "KQC-012345",
+      "shopCode": "KQM-31CD16",
+      "discount": 0,
+      "paidAmount": 3894,
+      "receipts": []
+    },
+    {
+      "id": "KQ-2627-0001",
+      "invoiceNo": "KQ-2627-0001",
+      "shopId": "shop-marwar-hw-01",
+      "customerId": "usr-demo-customer-1",
+      "customer": "Vikram Singh Rathore (Contractor)",
+      "phone": "9928055667",
+      "address": "Plot 42, Sardarpura C-Road, Jodhpur",
+      "buyerGstin": "08AAACR5055K1Z2",
+      "supplyType": "intra",
+      "taxMode": "exclusive",
+      "channel": "Online QR",
+      "paymentMode": "UPI",
+      "status": "Delivered",
+      "stockDeducted": true,
+      "items": [
+        {
+          "productId": "prd-1",
+          "name": "Supreme PVC Pipe 1 inch (3m)",
+          "hsn": "3917",
+          "qty": 20,
+          "price": 165,
+          "gstRate": 18,
+          "taxMode": "exclusive"
+        },
+        {
+          "productId": "prd-4",
+          "name": "Sintex Water Tank 1000L Triple Layer",
+          "hsn": "3925",
+          "qty": 1,
+          "price": 6800,
+          "gstRate": 18,
+          "taxMode": "exclusive"
+        }
+      ],
+      "note": "",
+      "customAmount": 0,
+      "date": "2026-10-26T18:19:13.075Z",
+      "customerCode": "KQC-849201",
+      "shopCode": "KQM-31CD16",
+      "merchantRatingForBuyer": 5,
+      "merchantFeedbackForBuyer": "समय पर भुगतान करने वाला विश्वसनीय ग्राहक (Timely Payer)",
+      "discount": 0,
+      "paidAmount": 0,
+      "receipts": []
+    },
+    {
+      "id": "KQ-2627-0002",
+      "invoiceNo": "KQ-2627-0002",
+      "shopId": "shop-marwar-hw-01",
+      "customer": "Bhati Builders & Developers",
+      "phone": "9784512345",
+      "address": "Pal Road, Near AIIMS, Jodhpur",
+      "buyerGstin": "",
+      "supplyType": "intra",
+      "taxMode": "exclusive",
+      "channel": "Parchi Order",
+      "paymentMode": "Credit",
+      "udhaarSettled": false,
+      "status": "New",
+      "stockDeducted": false,
+      "items": [],
+      "note": "15 Supreme 1 inch pipe\n30 PVC elbow 1 inch\n5 JK wall putty 40kg bag",
+      "customAmount": 0,
+      "date": "2026-10-27T18:19:13.075Z",
+      "customerCode": "KQC-512345",
+      "shopCode": "KQM-31CD16",
+      "discount": 0,
+      "paidAmount": 0,
+      "receipts": []
+    }
+  ],
+  "staff": [],
+  "staffinvites": [],
+  "referrals": [
+    {
+      "id": "ref-01",
+      "agentCode": "KQ-MARWAR01",
+      "referrerShopId": "shop-marwar-hw-01",
+      "shop": "Surya Electricals & Switchgear Wholesale",
+      "city": "Jodhpur",
+      "date": "2026-10-27T18:19:13.075Z",
+      "verified": true,
+      "rewardGranted": true,
+      "rewardText": "+5 Bonus AI Credits & 100 Partner Points"
+    }
+  ],
+  "loans": [
+    {
+      "id": "lead-wc-01",
+      "track": "working-capital",
+      "need": "Stock purchase (B2B Credit Line)",
+      "name": "Marwar Hardware & Sanitary Mart",
+      "phone": "9829011223",
+      "city": "Jodhpur",
+      "amount": 500000,
+      "note": "Need ₹5L CC limit before festive building season",
+      "partnerAssigned": "HDFC Business Desk - Jodhpur",
+      "commissionNote": "Est. 1.5% DSA fee (₹7,500)",
+      "status": "Contacted",
+      "consent": true,
+      "date": "2026-10-27T18:19:13.075Z"
+    }
+  ],
+  "shipments": [
+    {
+      "id": "shp-waitlist-01",
+      "from": "Jodhpur",
+      "to": "Jaipur",
+      "goods": "Sanitaryware & PVC Pipes Lot",
+      "weight": 2500,
+      "budget": 8500,
+      "budgetOpen": true,
+      "vehicle": "Tata 407",
+      "poster": "Marwar Hardware & Sanitary Mart",
+      "phone": "9829011223",
+      "requiredDate": "2026-10-29T18:19:13.075Z",
+      "status": "Waitlist",
+      "legalConsent": true,
+      "date": "2026-10-27T18:19:13.075Z",
+      "communityVerifications": 7,
+      "code": "KQT-618294"
+    }
+  ],
+  "bids": [],
+  "providers": [
+    {
+      "id": "prv-01",
+      "code": "KQSP-CA8821",
+      "name": "CA Pradeep Kothari & Associates",
+      "category": "CA, Tax & GST",
+      "subcategory": "GST Registration, GSTR-1/3B & Tax Audit",
+      "city": "Jodhpur",
+      "pincode": "342001",
+      "experienceYears": 12,
+      "communityVerifications": 16,
+      "phone": "9829088776",
+      "description": "B2B GST Audit, GSTR-1/3B filing & MSME Working Capital Project Reports in Jodhpur.",
+      "status": "Approved",
+      "date": "2026-10-27T21:16:00.711Z"
+    },
+    {
+      "id": "prv-02",
+      "code": "KQSP-AR4410",
+      "name": "Marwar Industrial Architects & Vastu",
+      "category": "Architect, Civil & Interior",
+      "subcategory": "Factory Shed, Warehouse & Showroom Design",
+      "city": "Jodhpur",
+      "pincode": "342003",
+      "experienceYears": 9,
+      "communityVerifications": 11,
+      "phone": "9414199882",
+      "description": "Industrial warehouse planning, commercial showroom layout & structural engineering.",
+      "status": "Approved",
+      "date": "2026-10-27T21:16:00.711Z"
+    }
+  ],
+  "upgrades": [],
+  "faqs": [
+    {
+      "id": "faq-01",
+      "name": "Suresh Jangid (Timber Trader)",
+      "phone": "9414077889",
+      "question": "Can we generate Inter-State IGST bills for Gujarat dealers?",
+      "answer": "Yes! Enter the buyer GSTIN starting with 24 (Gujarat) and KuberQ automatically switches CGST+SGST to 100% IGST.",
+      "answered": true,
+      "date": "2026-10-27T18:19:13.075Z"
+    }
+  ],
+  "demos": [],
+  "reviews": [
+    {
+      "id": "rev-1",
+      "targetType": "shop",
+      "targetId": "shop-marwar-hw-01",
+      "rating": 5,
+      "tags": [
+        "Genuine B2B rates",
+        "Fast GST billing"
+      ],
+      "author": "Vikram",
+      "date": "2026-10-27T18:19:13.075Z"
+    }
+  ],
+  "activity": [
+    {
+      "id": "act-6ec3ad74",
+      "shopId": "shop-marwar-hw-01",
+      "actorId": "guest",
+      "actorName": "HARSHIT",
+      "actorRole": "Buyer",
+      "recordKind": "orders",
+      "action": "Placed Order KQ-2627-0004 (₹645.46)",
+      "at": "2026-10-27T19:21:07.256Z"
+    },
+    {
+      "id": "act-c35f8100",
+      "shopId": "shop-marwar-hw-01",
+      "actorId": "guest",
+      "actorName": "Gujarat Sanitary Traders",
+      "actorRole": "Buyer",
+      "recordKind": "orders",
+      "action": "Placed Order KQ-2627-0003 (₹3894)",
+      "at": "2026-10-27T18:20:28.948Z"
+    },
+    {
+      "id": "act-1",
+      "shopId": "shop-marwar-hw-01",
+      "actorId": "usr-demo-merchant-1",
+      "actorName": "Rajesh Mohta",
+      "actorRole": "Owner",
+      "recordKind": "orders",
+      "action": "Created GST Invoice KQ-2627-0001",
+      "at": "2026-10-27T18:19:13.075Z"
+    }
+  ],
+  "adminAudit": [
+    {
+      "id": "aud-0aee4d14",
+      "actorName": "Rohit Asopa (Super Admin)",
+      "actorRole": "Super Admin",
+      "action": "Super Admin Signed In",
+      "targetId": "usr-super-admin",
+      "createdAt": "2026-11-02T16:48:36.505Z"
+    },
+    {
+      "id": "aud-1e81f83f",
+      "actorName": "Rohit Asopa (Super Admin)",
+      "actorRole": "Super Admin",
+      "action": "Super Admin Signed In",
+      "targetId": "usr-super-admin",
+      "createdAt": "2026-11-02T04:57:55.080Z"
+    },
+    {
+      "id": "aud-11cba6f2",
+      "actorName": "Ankit Sharma",
+      "actorRole": "Onboarding & Catalog Executive",
+      "action": "Sub-Admin Signed In",
+      "targetId": "emp-demo-01",
+      "createdAt": "2026-11-02T04:57:19.254Z"
+    },
+    {
+      "id": "aud-05a32200",
+      "actorName": "Rohit Asopa (Super Admin)",
+      "actorRole": "Super Admin",
+      "action": "Super Admin Signed In",
+      "targetId": "usr-super-admin",
+      "createdAt": "2026-10-29T03:34:26.340Z"
+    },
+    {
+      "id": "aud-170e7b0c",
+      "actorName": "Rohit Asopa (Super Admin)",
+      "actorRole": "Super Admin",
+      "action": "Super Admin Signed In",
+      "targetId": "usr-super-admin",
+      "createdAt": "2026-10-29T01:37:56.190Z"
+    },
+    {
+      "id": "aud-e258dd5f",
+      "actorName": "Rohit Asopa (Super Admin)",
+      "actorRole": "Super Admin",
+      "action": "Super Admin Signed In",
+      "targetId": "usr-super-admin",
+      "createdAt": "2026-10-29T01:10:12.580Z"
+    },
+    {
+      "id": "aud-18659e2b",
+      "actorName": "Rohit Asopa (Super Admin)",
+      "actorRole": "Super Admin",
+      "action": "Super Admin Signed In",
+      "targetId": "usr-super-admin",
+      "createdAt": "2026-10-27T18:36:36.350Z"
+    },
+    {
+      "id": "aud-8f124213",
+      "actorName": "Ankit Sharma",
+      "actorRole": "Onboarding & Catalog Executive",
+      "action": "Sub-Admin Signed In",
+      "targetId": "emp-demo-01",
+      "createdAt": "2026-10-27T18:20:28.940Z"
+    },
+    {
+      "id": "aud-4ae0643c",
+      "actorName": "Rohit Asopa (Super Admin)",
+      "actorRole": "Super Admin",
+      "action": "Super Admin Signed In",
+      "targetId": "usr-super-admin",
+      "createdAt": "2026-10-27T18:20:28.848Z"
+    },
+    {
+      "id": "aud-1",
+      "actorName": "System",
+      "actorRole": "Super Admin",
+      "action": "Initialized KuberQ Hardened B2B Database & Encrypted Secret Vault",
+      "targetId": "system",
+      "createdAt": "2026-10-27T18:19:13.075Z"
+    }
+  ],
+  "blocks": [],
+  "promotions": [
+    {
+      "id": "prm-01",
+      "shopId": "shop-marwar-hw-01",
+      "shop": "Marwar Hardware & Sanitary Mart",
+      "city": "Jodhpur",
+      "category": "Hardware, Pipes & Sanitary",
+      "headline": "थोक डीलर ऑफर: Supreme PVC व Sintex टैंक पर विशेष B2B छूट!",
+      "headlineEn": "B2B Dealer Offer: Special Wholesale Rates on Supreme PVC & Sintex Tanks!",
+      "offerBadge": "FLAT 12% B2B MARGIN",
+      "packagePlan": "30 Days Homepage Spotlight (₹1,499)",
+      "amount": 1499,
+      "status": "Active",
+      "phone": "9829011223",
+      "date": "2026-10-27T21:16:00.711Z"
+    },
+    {
+      "id": "prm-02",
+      "shopId": "shop-surya-elec-02",
+      "shop": "Surya Electricals & Switchgear Wholesale",
+      "city": "Jodhpur",
+      "category": "Electrical & Switchgear",
+      "headline": "Polycab व Havells FR वायर कॉइल (90m) — फैक्टरी रेट पर सीधा डिस्पैच",
+      "headlineEn": "Polycab & Havells FR Wire Coils (90m) — Direct Factory Rate Dispatch",
+      "offerBadge": "MOQ 10 COILS",
+      "packagePlan": "7 Days Featured Card (₹499)",
+      "amount": 499,
+      "status": "Active",
+      "phone": "9414122334",
+      "date": "2026-10-27T21:16:00.711Z"
+    }
+  ],
+  "reports": [],
+  "vouches": [],
+  "supplierPurchases": [
+    {
+      "id": "sp-1",
+      "shopId": "shop-1",
+      "supplierName": "Supreme Industries Ltd (Jaipur Depot)",
+      "phone": "9829044556",
+      "billNo": "SUP-2627-884",
+      "itemsSummary": "PVC Pipes 1 inch & CPVC Fittings Lot",
+      "totalAmount": 48500,
+      "paidAmount": 20000,
+      "status": "Balance Due",
+      "date": "2026-10-24T21:16:00.713Z",
+      "supplierGstin": "08AAACS1234F1Z2",
+      "gstAmount": 7398
+    }
+  ],
+  "expenses": [
+    {
+      "id": "exp-1",
+      "shopId": "shop-1",
+      "category": "हम्माली / लोडिंग-अनलोडिंग (Hammali & Loading)",
+      "amount": 450,
+      "mode": "Cash",
+      "note": "गोदाम में पाइप गाड़ी अनलोडिंग",
+      "date": "2026-10-27T21:16:00.713Z"
+    },
+    {
+      "id": "exp-2",
+      "shopId": "shop-1",
+      "category": "चाय-पानी व दुकान खर्च (Shop Refreshment)",
+      "amount": 120,
+      "mode": "Cash",
+      "note": "ग्राहक व स्टाफ चाय",
+      "date": "2026-10-27T21:16:00.713Z"
+    }
+  ],
+  "vouchers": [
+    {
+      "id": "vch-contra-1",
+      "shopId": "shop-1",
+      "voucherNo": "CNT-2627-0001",
+      "voucherType": "Contra",
+      "direction": "cash_to_bank",
+      "amount": 5000,
+      "debitAccount": "Bank / UPI A/c",
+      "creditAccount": "Cash in Drawer (गल्ला)",
+      "narration": "गल्ले से ₹5,000 नकद निकालकर बैंक खाते में जमा किए (Contra Entry)",
+      "date": "2026-10-28T16:13:22.118Z"
+    }
+  ],
+  "adminExpenses": [
+    {
+      "id": "adm-exp-1",
+      "category": "Cloud Hosting & Server (Render / Cloudflare)",
+      "amount": 1499,
+      "mode": "Bank/UPI",
+      "note": "High-availability Node.js 4500 core production cluster",
+      "date": "2026-10-31T16:45:02.535Z"
+    },
+    {
+      "id": "adm-exp-2",
+      "category": "SMS & WhatsApp Business API Gateway",
+      "amount": 650,
+      "mode": "Bank/UPI",
+      "note": "Order confirmation & OTP-less login tokens",
+      "date": "2026-11-01T16:45:02.535Z"
+    },
+    {
+      "id": "adm-exp-3",
+      "category": "AI Vision & Token Quota API (Gemini Cloud)",
+      "amount": 420,
+      "mode": "Bank/UPI",
+      "note": "Voucher & handwritten parchi smart bill extraction",
+      "date": "2026-11-02T16:45:02.535Z"
+    }
+  ],
+  "rawMaterials": [
+    {
+      "id": "rm-1",
+      "shopId": "shop-surya-elec-02",
+      "name": "EC Grade Electrolytic Copper Rods 8mm",
+      "hsn": "7408",
+      "category": "Metals & Conductors",
+      "stock": 450,
+      "unit": "Kg",
+      "unitCost": 780,
+      "supplier": "Hindustan Copper Ltd",
+      "minAlert": 100,
+      "date": "2026-11-02T16:45:02.535Z"
+    },
+    {
+      "id": "rm-2",
+      "shopId": "shop-surya-elec-02",
+      "name": "PVC Insulation Compound (Grade A FR)",
+      "hsn": "3904",
+      "category": "Polymers & Resin",
+      "stock": 1200,
+      "unit": "Kg",
+      "unitCost": 115,
+      "supplier": "Reliance Polymers",
+      "minAlert": 200,
+      "date": "2026-11-02T16:45:02.535Z"
+    },
+    {
+      "id": "rm-3",
+      "shopId": "shop-marwar-hw-01",
+      "name": "Virgin CPVC Resin Powder Grade 1",
+      "hsn": "3904",
+      "category": "Raw Polymers",
+      "stock": 800,
+      "unit": "Kg",
+      "unitCost": 140,
+      "supplier": "Finolex Resin",
+      "minAlert": 150,
+      "date": "2026-11-02T16:45:02.535Z"
+    }
+  ],
+  "jobWorkOrders": [
+    {
+      "id": "jw-001",
+      "shopId": "shop-surya-elec-02",
+      "challanNo": "JW-IN-2627-01",
+      "direction": "Inward",
+      "partyName": "Marwar Power Infrastructure Ltd",
+      "partyPhone": "9829044556",
+      "partyGstin": "08AAACM5544F1Z9",
+      "processType": "Wire Drawing & FR PVC Coating (तार ड्राइंग व कोटिंग)",
+      "sacCode": "9988",
+      "inputMaterial": "Copper Rods 8mm (500 Kg)",
+      "expectedOutput": "Single Core 2.5 sq mm FR Wire (50 Coils)",
+      "chargesPerUnit": 45,
+      "totalJobCharges": 22500,
+      "gstRate": 18,
+      "status": "Under Processing",
+      "inwardDate": "2026-10-31T16:45:02.535Z",
+      "deliveryDueDate": "2026-11-05T16:45:02.535Z"
+    },
+    {
+      "id": "jw-002",
+      "shopId": "shop-marwar-hw-01",
+      "challanNo": "JW-OUT-2627-04",
+      "direction": "Outward",
+      "partyName": "Jodhpur Precision Lathe & Die Works",
+      "partyPhone": "9414012345",
+      "partyGstin": "08AAACJ9988P1Z4",
+      "processType": "Brass Thread Cutting & Chrome Plating (थ्रेडिंग व क्रोम प्लेटिंग)",
+      "sacCode": "9988",
+      "inputMaterial": "Rough Brass Bib Cock Castings (200 Pcs)",
+      "expectedOutput": "Finished Chrome Plated Bib Cocks (200 Pcs)",
+      "chargesPerUnit": 35,
+      "totalJobCharges": 7000,
+      "gstRate": 18,
+      "status": "Material Dispatched (बाहर भेजा)",
+      "inwardDate": "2026-11-01T16:45:02.535Z",
+      "deliveryDueDate": "2026-11-04T16:45:02.535Z"
+    }
+  ],
+  "productionBatches": [
+    {
+      "id": "pb-01",
+      "shopId": "shop-surya-elec-02",
+      "batchNo": "BATCH-2627-088",
+      "productName": "Polycab FR Wire Coil 2.5 sq mm (90m)",
+      "outputQty": 40,
+      "unit": "Coils",
+      "rawMaterialsConsumed": "Copper 120 Kg + PVC 48 Kg",
+      "rawMaterialCost": 99120,
+      "laborJobCost": 3600,
+      "totalBatchCost": 102720,
+      "unitProductionCost": 2568,
+      "createdAt": "2026-10-30T16:45:02.535Z"
+    }
+  ]
+}
