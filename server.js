@@ -335,8 +335,8 @@ function getInitialDb() {
 
   return {
     settings: {
-      enableTransportLive: false, // Waitlist mode by default per B2B focus strategy
-      enableServicesLive: false,  // Waitlist mode by default per B2B focus strategy
+      enableTransportLive: true, // Live by default so Transport Directory works immediately
+      enableServicesLive: true,  // Live by default so 32-Category Services Hub works immediately
       adminWhatsApp: adminMobile,
       platformName: 'KuberQ',
       updatedAt: new Date().toISOString()
