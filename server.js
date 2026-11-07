@@ -951,6 +951,63 @@ function loadDb() {
       ];
     }
 
+    if (!Array.isArray(parsed.crmLeads) || parsed.crmLeads.length === 0) {
+      parsed.crmLeads = [
+        {
+          id: 'lead-101',
+          shopId: 'shop-marwar-hw-01',
+          buyerName: 'Rathore Infrastructure & Builders',
+          phone: '9829011223',
+          source: 'WhatsApp Inquiry',
+          expectedValue: 85000,
+          itemsInterest: 'Supreme PVC Pipes 1 inch (150 pcs) & Sintex Tank 1000L (5 pcs)',
+          stage: 'Proposal Sent',
+          followUpDate: new Date(Date.now() + 86400000 * 1).toISOString().slice(0, 10),
+          notes: 'Sent wholesale rate quotation. Follow up tomorrow morning.',
+          createdAt: new Date(Date.now() - 86400000 * 2).toISOString()
+        },
+        {
+          id: 'lead-102',
+          shopId: 'shop-marwar-hw-01',
+          buyerName: 'Shree Balaji Sanitary Traders (Pali)',
+          phone: '9414188990',
+          source: 'Store QR Catalog',
+          expectedValue: 42000,
+          itemsInterest: 'CPVC Fitting Lot & Brass Bib Cocks (Sub-dealer bulk order)',
+          stage: 'New Inquiry',
+          followUpDate: new Date(Date.now()).toISOString().slice(0, 10),
+          notes: 'Asked for MOQ sub-dealer discount on Astral CPVC.',
+          createdAt: new Date(Date.now() - 86400000 * 1).toISOString()
+        },
+        {
+          id: 'lead-103',
+          shopId: 'shop-marwar-hw-01',
+          buyerName: 'Apex Civil Contractors',
+          phone: '9928055667',
+          source: 'Direct Counter Walk-in',
+          expectedValue: 120000,
+          itemsInterest: 'Complete Plumbing & Sanitary Material for 12 Flats Site',
+          stage: 'Contacted',
+          followUpDate: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10),
+          notes: 'Site engineer visited shop, sample approved.',
+          createdAt: new Date(Date.now() - 86400000 * 4).toISOString()
+        },
+        {
+          id: 'lead-104',
+          shopId: 'shop-surya-elec-02',
+          buyerName: 'Desert Solar & Power Projects',
+          phone: '9829044556',
+          source: 'B2B Directory',
+          expectedValue: 165000,
+          itemsInterest: 'Polycab FR Wire 2.5 sq mm (60 Coils) & MCB Distribution Boxes',
+          stage: 'Proposal Sent',
+          followUpDate: new Date(Date.now() + 86400000 * 1).toISOString().slice(0, 10),
+          notes: 'Quotation shared on WhatsApp.',
+          createdAt: new Date(Date.now() - 86400000 * 2).toISOString()
+        }
+      ];
+    }
+
     return parsed;
   } catch {
     fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2));
@@ -1459,6 +1516,7 @@ async function handleApi(req, res, pathname, query) {
         payload.myRawMaterials = (db.rawMaterials || []).filter(rm => rm.shopId === user.shopId);
         payload.myJobWorkOrders = (db.jobWorkOrders || []).filter(jw => jw.shopId === user.shopId);
         payload.myProductionBatches = (db.productionBatches || []).filter(pb => pb.shopId === user.shopId);
+        payload.myCrmLeads = (db.crmLeads || []).filter(ld => ld.shopId === user.shopId);
         payload.bids = db.bids;
       } else if (user.role === 'customer') {
         payload.myOrders = db.orders.filter(o => o.customerId === user.userId || o.phone === user.phone);
@@ -1716,10 +1774,18 @@ async function handleApi(req, res, pathname, query) {
       return sendJson(res, 400, { error: 'Please add items from the catalog or write your Parchi item list.' });
     }
 
-    // Sequential Financial-Year Invoice Number (Rule 46 Compliant: KQ-2627-0001)
-    shop.invoiceCounter = (Number(shop.invoiceCounter) || 0) + 1;
-    const seqStr = String(shop.invoiceCounter).padStart(4, '0');
-    const invoiceNo = `KQ-2627-${seqStr}`;
+    const isQuotation = body.docType === 'Quotation';
+    let invoiceNo = '';
+    if (isQuotation) {
+      shop.quotationCounter = (Number(shop.quotationCounter) || 0) + 1;
+      const qSeq = String(shop.quotationCounter).padStart(4, '0');
+      invoiceNo = `QT-2627-${qSeq}`;
+    } else {
+      // Sequential Financial-Year Invoice Number (Rule 46 Compliant: KQ-2627-0001)
+      shop.invoiceCounter = (Number(shop.invoiceCounter) || 0) + 1;
+      const seqStr = String(shop.invoiceCounter).padStart(4, '0');
+      invoiceNo = `KQ-2627-${seqStr}`;
+    }
 
     const processedItems = [];
     for (const item of rawItems) {
@@ -1762,10 +1828,10 @@ async function handleApi(req, res, pathname, query) {
     }
 
     const isWalkIn = channel === 'Walk-in' && (user?.shopId === shopId || user?.role === 'admin');
-    const status = isWalkIn ? 'Delivered' : 'New';
+    const status = isQuotation ? 'Quotation' : (isWalkIn ? 'Delivered' : 'New');
 
-    // Auto-deduct stock immediately if Walk-in Invoice
-    if (isWalkIn) {
+    // Auto-deduct stock immediately if Walk-in Invoice (NOT for Quotation until converted!)
+    if (isWalkIn && !isQuotation) {
       for (const line of processedItems) {
         const p = db.products.find(pr => pr.id === line.productId && pr.shopId === shopId);
         if (p) p.stock = Math.max(0, Number(p.stock) - Number(line.qty));
@@ -1779,6 +1845,8 @@ async function handleApi(req, res, pathname, query) {
     const newOrder = {
       id: invoiceNo,
       invoiceNo,
+      docType: isQuotation ? 'Quotation' : 'Tax Invoice',
+      validUntil: isQuotation ? sanitizeString(body.validUntil || new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 10), 20) : undefined,
       shopId,
       shopCode,
       customerId: user?.role === 'customer' ? user.userId : (matchedBuyerUser?.id || ''),
@@ -1792,9 +1860,9 @@ async function handleApi(req, res, pathname, query) {
       channel,
       paymentMode,
       discount: Math.max(0, Number(body.discount) || 0),
-      udhaarSettled: paymentMode !== 'Credit',
+      udhaarSettled: isQuotation ? true : (paymentMode !== 'Credit'),
       status,
-      stockDeducted: isWalkIn,
+      stockDeducted: isWalkIn && !isQuotation,
       items: processedItems,
       note,
       customAmount: Math.max(0, Number(body.customAmount) || 0),
@@ -1805,10 +1873,10 @@ async function handleApi(req, res, pathname, query) {
 
     const totals = calculateOrderTotals(newOrder, db.products.filter(p => p.shopId === shopId), shop);
     newOrder.totals = totals;
-    newOrder.paidAmount = paymentMode === 'Credit'
+    newOrder.paidAmount = isQuotation ? 0 : (paymentMode === 'Credit'
       ? Math.min(totals.gross, Math.max(0, Number(body.paidAmount) || 0))
-      : totals.gross;
-    if (paymentMode === 'Credit' && newOrder.paidAmount > 0) {
+      : totals.gross);
+    if (!isQuotation && paymentMode === 'Credit' && newOrder.paidAmount > 0) {
       newOrder.receipts.push({
         amount: newOrder.paidAmount,
         mode: sanitizeString(body.advanceMode || 'Cash', 20),
@@ -1818,7 +1886,7 @@ async function handleApi(req, res, pathname, query) {
     }
 
     db.orders.unshift(newOrder);
-    const mirroredPurchase = syncOrderToBuyerPurchaseLedger(newOrder, shop);
+    const mirroredPurchase = !isQuotation ? syncOrderToBuyerPurchaseLedger(newOrder, shop) : null;
     db.activity.unshift({
       id: 'act-' + crypto.randomUUID().slice(0, 8),
       shopId,
@@ -1826,7 +1894,7 @@ async function handleApi(req, res, pathname, query) {
       actorName: user?.name || customerName,
       actorRole: isWalkIn ? 'Merchant' : 'Buyer',
       recordKind: 'orders',
-      action: `${isWalkIn ? 'Generated GST/Estimate Bill' : 'Placed Order'} ${invoiceNo} (₹${totals.gross})${mirroredPurchase ? ` · Auto-Mirrored to Buyer Shop Purchase Ledger` : ''}`,
+      action: `${isQuotation ? 'Generated Quotation/Estimate' : (isWalkIn ? 'Generated GST/Estimate Bill' : 'Placed Order')} ${invoiceNo} (₹${totals.gross})${mirroredPurchase ? ` · Auto-Mirrored to Buyer Shop Purchase Ledger` : ''}`,
       at: new Date().toISOString()
     });
 
@@ -1914,8 +1982,38 @@ async function handleApi(req, res, pathname, query) {
     }
 
     const shop = db.merchants.find(m => m.id === order.shopId);
+
+    // 1-Click Quotation / Estimate -> Official GST Tax Invoice Conversion!
+    if (body.convertToTaxInvoice && shop && (order.docType === 'Quotation' || order.status === 'Quotation' || String(order.invoiceNo || '').startsWith('QT-'))) {
+      shop.invoiceCounter = (Number(shop.invoiceCounter) || 0) + 1;
+      const seqStr = String(shop.invoiceCounter).padStart(4, '0');
+      const newInvNo = `KQ-2627-${seqStr}`;
+      order.convertedFromQuotation = order.invoiceNo;
+      order.id = newInvNo;
+      order.invoiceNo = newInvNo;
+      order.docType = 'Tax Invoice';
+      order.status = 'Delivered';
+      if (body.paymentMode) {
+        order.paymentMode = sanitizeString(body.paymentMode, 20);
+      } else if (order.paymentMode === 'Unmarked') {
+        order.paymentMode = 'Credit';
+      }
+      order.udhaarSettled = order.paymentMode !== 'Credit';
+      order.paidAmount = order.paymentMode === 'Credit' ? 0 : (order.totals?.gross || 0);
+      if (!order.stockDeducted) {
+        for (const line of order.items || []) {
+          const prod = db.products.find(p => p.id === line.productId && p.shopId === order.shopId);
+          if (prod) prod.stock = Math.max(0, Number(prod.stock) - Number(line.qty));
+        }
+        order.stockDeducted = true;
+      }
+      order.date = new Date().toISOString();
+    }
+
     order.totals = calculateOrderTotals(order, db.products.filter(p => p.shopId === order.shopId), shop);
-    if (shop) syncOrderToBuyerPurchaseLedger(order, shop);
+    if (shop && order.docType !== 'Quotation' && order.status !== 'Quotation') {
+      syncOrderToBuyerPurchaseLedger(order, shop);
+    }
 
     db.activity.unshift({
       id: 'act-' + crypto.randomUUID().slice(0, 8),
@@ -2378,6 +2476,53 @@ Additional text context: ${rawText}`;
       });
       saveDb();
       return sendJson(res, 200, { ok: true, item });
+    }
+
+    if (kind === 'add_crm_lead') {
+      const buyerName = sanitizeString(body.buyerName || '', 100);
+      if (!buyerName) return sendJson(res, 400, { error: 'Buyer / Party Name is required.' });
+      const lead = {
+        id: 'lead-' + crypto.randomUUID().slice(0, 8),
+        shopId: user.shopId,
+        buyerName,
+        phone: String(body.phone || '').replace(/\D/g, '').slice(-10),
+        source: sanitizeString(body.source || 'Direct Counter Walk-in', 50),
+        expectedValue: Math.max(0, Number(body.expectedValue) || 0),
+        itemsInterest: sanitizeString(body.itemsInterest || 'General Wholesale Inquiry', 200),
+        stage: sanitizeString(body.stage || 'New Inquiry', 40),
+        followUpDate: sanitizeString(body.followUpDate || new Date(Date.now() + 86400000).toISOString().slice(0, 10), 20),
+        notes: sanitizeString(body.notes || '', 240),
+        createdAt: new Date().toISOString()
+      };
+      if (!Array.isArray(db.crmLeads)) db.crmLeads = [];
+      db.crmLeads.unshift(lead);
+      db.activity.unshift({
+        id: 'act-' + crypto.randomUUID().slice(0, 8),
+        shopId: user.shopId,
+        actor: user.name,
+        action: `Added CRM Lead: ${lead.buyerName} (₹${lead.expectedValue} · ${lead.stage})`,
+        createdAt: new Date().toISOString()
+      });
+      saveDb();
+      return sendJson(res, 200, { ok: true, lead });
+    }
+
+    if (kind === 'update_crm_lead_stage') {
+      if (!Array.isArray(db.crmLeads)) db.crmLeads = [];
+      const lead = db.crmLeads.find(l => l.id === body.id && l.shopId === user.shopId);
+      if (!lead) return sendJson(res, 404, { error: 'Lead not found.' });
+      if (body.stage) lead.stage = sanitizeString(body.stage, 40);
+      if (body.followUpDate) lead.followUpDate = sanitizeString(body.followUpDate, 20);
+      if (body.notes !== undefined) lead.notes = sanitizeString(body.notes, 240);
+      saveDb();
+      return sendJson(res, 200, { ok: true, lead });
+    }
+
+    if (kind === 'delete_crm_lead') {
+      if (!Array.isArray(db.crmLeads)) db.crmLeads = [];
+      db.crmLeads = db.crmLeads.filter(l => !(l.id === body.id && l.shopId === user.shopId));
+      saveDb();
+      return sendJson(res, 200, { ok: true });
     }
 
     return sendJson(res, 400, { error: 'Invalid ledger operation.' });
