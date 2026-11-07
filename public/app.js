@@ -6,14 +6,25 @@
  */
 
 const state = {
-  lang: localStorage.getItem('kuberq_lang') || 'hi',
+  lang: localStorage.getItem('kuberq_lang') || 'en',
   token: localStorage.getItem('kuberq_token') || '',
   route: window.location.pathname || '/',
   query: Object.fromEntries(new URLSearchParams(window.location.search)),
   data: {
     settings: { enableTransportLive: false, enableServicesLive: false, adminWhatsApp: '' },
     user: null,
-    merchants: [],
+    merchants: [
+      {
+        id: 'MQM-31CD16',
+        shop: 'Marwar Hardware & Sanitary Mart',
+        city: 'Jodhpur',
+        state: 'Rajasthan',
+        category: 'Hardware & Sanitary',
+        phone: '9414123456',
+        refCode: 'KQM-31CD16',
+        communityVerifications: 14
+      }
+    ],
     products: [],
     reviews: [],
     faqs: [],
@@ -34,6 +45,7 @@ const state = {
     myRawMaterials: [],
     myJobWorkOrders: [],
     myProductionBatches: [],
+    myCrmLeads: [],
     bids: [],
     adminData: null
   },
@@ -41,6 +53,10 @@ const state = {
   merchantTab: 'Dashboard',
   merchantMoreSubTab: 'QR Standee',
   mfgSubTab: 'raw_materials',
+  invoiceDocType: 'Tax Invoice',
+  invoiceValidUntil: '',
+  udhaarAgeBucket: 'ALL',
+  aiManagerMessages: [],
   customerTab: 'Directory',
   sidebarCollapsed: false,
   sidebarMobileOpen: false,
@@ -207,6 +223,13 @@ async function apiFetch(url, options = {}) {
 }
 
 async function bootstrap() {
+  // 1. Instant optimistic render so user sees the interface in 0ms without waiting for network
+  if (!state.selectedShopId && state.data.merchants.length > 0) {
+    state.selectedShopId = state.data.merchants[0].id;
+  }
+  document.documentElement.lang = state.lang;
+  render();
+
   try {
     const data = await apiFetch('/api/bootstrap');
     state.data = { ...state.data, ...data };
@@ -660,6 +683,36 @@ function renderFooter() {
   `;
 }
 
+function renderMobileBottomNav() {
+  const u = state.data.user;
+  const merchantTarget = !u ? '/auth' : (u.role === 'admin' || u.role === 'employee' ? '/admin' : '/merchant');
+  const supportPhone = state.data.settings?.adminWhatsApp || '9414123456';
+  const isHome = state.route === '/';
+  const isOrder = state.route === '/order';
+  const isMerchant = state.route === '/merchant' || state.route === '/admin' || state.route === '/auth';
+
+  return `
+    <nav class="mobile-bottom-nav mobile-only no-print" aria-label="Mobile Navigation">
+      <button type="button" class="mobile-nav-btn ${isHome ? 'active' : ''}" onclick="navigate('/')">
+        <span class="mobile-nav-icon">🏠</span>
+        <span class="mobile-nav-label">${tr('Home', 'होम')}</span>
+      </button>
+      <button type="button" class="mobile-nav-btn ${isOrder ? 'active' : ''}" onclick="navigate('/order', { shop: state.selectedShopId || (state.data.merchants[0]?.id || '') })">
+        <span class="mobile-nav-icon">🛒</span>
+        <span class="mobile-nav-label">${tr('Order', 'ऑर्डर')}</span>
+      </button>
+      <button type="button" class="mobile-nav-btn ${isMerchant ? 'active' : ''}" onclick="navigate('${merchantTarget}')">
+        <span class="mobile-nav-icon">🏪</span>
+        <span class="mobile-nav-label">${tr('Merchant', 'व्यापारी')}</span>
+      </button>
+      <a class="mobile-nav-btn" href="https://wa.me/91${supportPhone}?text=${encodeURIComponent(state.lang === 'hi' ? 'नमस्ते KuberQ, मुझे सहायता चाहिए।' : 'Hello KuberQ, I need assistance.')}" target="_blank" rel="noreferrer">
+        <span class="mobile-nav-icon">💬</span>
+        <span class="mobile-nav-label">${tr('Help', 'सहायता')}</span>
+      </a>
+    </nav>
+  `;
+}
+
 // ============================================================================
 // 1. HOMEPAGE (`/`) — INTERACTIVE HERO BACKGROUND, CLEAR B2B WRITE-UP & STORE CARDS
 // ============================================================================
@@ -674,8 +727,35 @@ function renderHome() {
       <div class="hero-bg-overlay"></div>
 
       <div class="container hero-content-layer">
-        <!-- Interactive Industry Scene Tabs (Click to switch background or auto-plays) -->
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+        <!-- MOBILE-ONLY MINIMALIST HERO (Clean, Customer-Centric, Instant Action) -->
+        <div class="mobile-only mobile-hero-clean">
+          <div class="mobile-badge-pill">
+            ⚡ ${tr('Smart B2B Business & Order Desk', 'स्मार्ट B2B व्यापार व ऑर्डर')}
+          </div>
+          <h1 class="mobile-hero-heading">
+            ${tr('Fast B2B Billing, Live Stock & Direct Orders', 'दुकान का पक्का बिल, स्टॉक और सीधा ऑर्डर')}
+          </h1>
+          <p class="mobile-hero-sub">
+            ${tr(
+              'Hardware, Sanitary, Electrical & All Traders — 10-Second Simple Solution.',
+              'हार्डवेयर, सेनेटरी, इलेक्ट्रिकल व सभी व्यापारियों के लिए 10-सेकंड आसान समाधान।'
+            )}
+          </p>
+
+          <div class="mobile-cta-stack">
+            <button type="button" class="btn btn-gold mobile-btn-action" onclick="navigate('/order', { shop: '${shops[0]?.id || ''}' })">
+              🛍️ ${tr('Place Order from Shop (Customer)', 'दुकान से सीधा ऑर्डर करें (ग्राहक)')}
+            </button>
+            <button type="button" class="btn btn-primary mobile-btn-action" onclick="navigate(state.data.user ? '/merchant' : '/auth')">
+              🏪 ${tr('Merchant Portal & Billing (Free Trial)', 'व्यापारी पोर्टल व बिलिंग (निःशुल्क ट्रायल)')}
+            </button>
+          </div>
+        </div>
+
+        <!-- DESKTOP-ONLY RICH INTERACTIVE HERO -->
+        <div class="desktop-only">
+          <!-- Interactive Industry Scene Tabs (Click to switch background or auto-plays) -->
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
           <div class="hero-scene-tabs" style="margin-bottom:0">
             ${HERO_SCENES.map((sc, i) => `
               <button type="button" class="hero-scene-tab ${i === (state.heroSceneIdx || 0) ? 'active' : ''}" onclick="setHeroScene(${i})">
@@ -866,8 +946,40 @@ function renderHome() {
           </div>
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
+  <!-- MOBILE-ONLY 4-GRID QUICK ACTIONS (Swiggy / Khatabook style) -->
+  <section class="container mobile-only" style="padding:16px 14px 4px">
+    <div class="mobile-quick-grid">
+      <div class="mobile-quick-card" onclick="navigate('/order', { shop: '${shops[0]?.id || ''}' })">
+        <div class="mobile-quick-icon" style="background:#eff6ff;color:#2563EB">🛍️</div>
+        <div class="mobile-quick-title">${tr('Store Catalog', 'दुकान कैटलॉग')}</div>
+        <div class="mobile-quick-desc">${tr('Order directly from store', 'सामान चुनें व सीधा ऑर्डर दें')}</div>
+      </div>
+
+      <div class="mobile-quick-card" onclick="navigate(state.data.user ? '/merchant' : '/auth')">
+        <div class="mobile-quick-icon" style="background:#fef3c7;color:#d97706">🧾</div>
+        <div class="mobile-quick-title">${tr('5-Sec Billing', '5-सेकंड बिलिंग')}</div>
+        <div class="mobile-quick-desc">${tr('GST & Wholesale invoices', 'पक्का GST व थोक बिल')}</div>
+      </div>
+
+      <div class="mobile-quick-card" onclick="navigate(state.data.user ? '/merchant' : '/auth')">
+        <div class="mobile-quick-icon" style="background:#f0fdf4;color:#16a34a">📒</div>
+        <div class="mobile-quick-title">${tr('Udhaar Khata', 'उधार खाता')}</div>
+        <div class="mobile-quick-desc">${tr('WhatsApp reminders', 'WhatsApp तगादा व हिसाब')}</div>
+      </div>
+
+      <div class="mobile-quick-card" onclick="navigate(state.data.user ? '/merchant' : '/auth')">
+        <div class="mobile-quick-icon" style="background:#fdf2f8;color:#db2777">📸</div>
+        <div class="mobile-quick-title">${tr('AI Scanner', 'AI पर्ची स्कैनर')}</div>
+        <div class="mobile-quick-desc">${tr('Bill photo to stock', 'फोटो से तुरंत स्टॉक व बिल')}</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DESKTOP-ONLY IN-DEPTH FEATURES & 3-STEP WORKFLOW -->
+  <div class="desktop-only">
     <!-- CORE FEATURES SECTION (Exact 4-Card Grid + Hover Lift Micro-Interaction) -->
     <section class="container" style="padding:42px 24px 20px">
       <div class="section-heading">
@@ -990,6 +1102,7 @@ function renderHome() {
         </div>
       </div>
     </section>
+  </div> <!-- end of desktop-only in-depth features & steps -->
 
     <!-- SPONSORED SPOTLIGHT SHOWCASE (Paid Promotions Banner — Pointer 7) -->
     ${(state.data.promotions || []).length > 0 ? `
@@ -1073,27 +1186,36 @@ function renderHome() {
                 </p>
               </div>
 
-              <!-- Interactive QR Preview & "डेमो कैटलॉग देखें" Button -->
-              <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:#f8fafc;padding:16px 18px;border-radius:14px;border:1.5px solid #cbd5e1">
-                <div style="display:flex;align-items:center;gap:14px">
-                  <div style="border:2px solid #94a3b8;border-radius:10px;overflow:hidden;line-height:0;background:#fff;flex-shrink:0">
-                    ${renderVisualQrSvg(shopQrUrl, 70)}
+              <!-- Desktop: Interactive QR Preview & "डेमो कैटलॉग देखें" Button -->
+              <div class="desktop-only" style="background:#f8fafc;padding:16px 18px;border-radius:14px;border:1.5px solid #cbd5e1">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+                  <div style="display:flex;align-items:center;gap:14px">
+                    <div style="border:2px solid #94a3b8;border-radius:10px;overflow:hidden;line-height:0;background:#fff;flex-shrink:0">
+                      ${renderVisualQrSvg(shopQrUrl, 70)}
+                    </div>
+                    <div style="font-size:0.96rem;color:#0f172a;line-height:1.45;max-width:260px">
+                      <strong style="display:block;color:#2563EB">
+                        ${tr('Scan to see how the shop looks to a customer', 'स्कैन करके देखें ग्राहक को दुकान कैसी दिखेगी')}
+                      </strong>
+                      <span style="font-family:monospace;color:#475569;font-weight:700;font-size:0.88rem">
+                        ID: ${esc(m.refCode)}
+                      </span>
+                    </div>
                   </div>
-                  <div style="font-size:0.96rem;color:#0f172a;line-height:1.45;max-width:260px">
-                    <strong style="display:block;color:#2563EB">
-                      ${tr('Scan to see how the shop looks to a customer', 'स्कैन करके देखें ग्राहक को दुकान कैसी दिखेगी')}
-                    </strong>
-                    <span style="font-family:monospace;color:#475569;font-weight:700;font-size:0.88rem">
-                      ID: ${esc(m.refCode)}
-                    </span>
-                  </div>
-                </div>
 
-                <div>
-                  <button class="btn btn-primary" style="padding:12px 22px;font-size:1.02rem" onclick="navigate('/order', { shop: '${m.id}' })">
-                    ${tr('View Demo Catalog →', 'डेमो कैटलॉग देखें →')}
-                  </button>
+                  <div>
+                    <button class="btn btn-primary" style="padding:12px 22px;font-size:1.02rem" onclick="navigate('/order', { shop: '${m.id}' })">
+                      ${tr('View Demo Catalog →', 'डेमो कैटलॉग देखें →')}
+                    </button>
+                  </div>
                 </div>
+              </div>
+
+              <!-- Mobile: Direct 1-Tap Customer Button -->
+              <div class="mobile-only" style="margin-top:8px">
+                <button type="button" class="btn btn-primary mobile-btn-action" onclick="navigate('/order', { shop: '${m.id}' })">
+                  🛒 ${tr('View Products & Place Order →', 'सामान देखें व सीधा ऑर्डर करें →')}
+                </button>
               </div>
 
               <!-- Community Verify / Vouch Bar (Clean Front Card — Report moved inside Store Page) -->
@@ -1829,8 +1951,15 @@ function renderOrderPage() {
 // ============================================================================
 function renderMerchantCustomerUdhaarOnly(shop) {
   const allOrders = state.data.myOrders || [];
-  const creditOrders = allOrders.filter(o => o.status !== 'Rejected' && o.status !== 'Sales Return' && o.paymentMode === 'Credit' && !o.udhaarSettled);
+  const creditOrders = allOrders.filter(o => o.status !== 'Rejected' && o.status !== 'Sales Return' && o.status !== 'Quotation' && o.docType !== 'Quotation' && o.paymentMode === 'Credit' && !o.udhaarSettled);
   const partyMap = new Map();
+  const buckets = {
+    b0_30: { amount: 0, count: 0 },
+    b31_60: { amount: 0, count: 0 },
+    b61_90: { amount: 0, count: 0 },
+    b90_plus: { amount: 0, count: 0 }
+  };
+
   for (const o of creditOrders) {
     const key = o.phone || o.customer;
     const cCode = o.customerCode || ('KQC-' + String(o.phone || '849201').slice(-6));
@@ -1838,18 +1967,87 @@ function renderMerchantCustomerUdhaarOnly(shop) {
     const paid = Math.min(gross, Math.max(0, Number(o.paidAmount) || 0));
     const due = Math.max(0, gross - paid);
     if (due <= 0) continue;
-    const cur = partyMap.get(key) || { customer: o.customer, customerCode: cCode, phone: o.phone, grossTotal: 0, paidTotal: 0, total: 0, orders: [] };
+
+    const orderTs = new Date(o.date || o.createdAt || Date.now()).getTime();
+    const daysOld = Math.max(0, Math.floor((Date.now() - (isNaN(orderTs) ? Date.now() : orderTs)) / 86400000));
+    let bucketKey = '0-30';
+    if (daysOld > 90) {
+      bucketKey = '90+';
+      buckets.b90_plus.amount += due;
+      buckets.b90_plus.count++;
+    } else if (daysOld > 60) {
+      bucketKey = '61-90';
+      buckets.b61_90.amount += due;
+      buckets.b61_90.count++;
+    } else if (daysOld > 30) {
+      bucketKey = '31-60';
+      buckets.b31_60.amount += due;
+      buckets.b31_60.count++;
+    } else {
+      bucketKey = '0-30';
+      buckets.b0_30.amount += due;
+      buckets.b0_30.count++;
+    }
+
+    const cur = partyMap.get(key) || { customer: o.customer, customerCode: cCode, phone: o.phone, grossTotal: 0, paidTotal: 0, total: 0, maxDaysOld: 0, bucketKey: '0-30', orders: [] };
     cur.grossTotal += gross;
     cur.paidTotal += paid;
     cur.total += due;
-    cur.orders.push(o);
+    if (daysOld >= cur.maxDaysOld) {
+      cur.maxDaysOld = daysOld;
+      cur.bucketKey = bucketKey;
+    }
+    cur.orders.push({ ...o, daysOld, bucketKey });
     partyMap.set(key, cur);
   }
-  const parties = [...partyMap.values()];
-  const totalBalance = parties.reduce((s, p) => s + p.total, 0);
+
+  const allParties = [...partyMap.values()];
+  const activeFilter = state.udhaarAgeBucket || 'ALL';
+  const parties = activeFilter === 'ALL' ? allParties : allParties.filter(p => p.bucketKey === activeFilter);
+  const totalBalance = allParties.reduce((s, p) => s + p.total, 0);
 
   return `
     <div style="display:grid;gap:20px">
+      <!-- AGING DEBTORS RADAR (30 / 60 / 90+ Days Recovery Analysis) -->
+      <div class="erp-card" style="background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%);color:#ffffff;border:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+          <div>
+            <span class="badge badge-gold">📡 ${tr('AGING RECEIVABLES RADAR (30/60/90+ DAYS)', 'उधार वसूली एजिंग रडार (30/60/90+ दिन विश्लेषण)')}</span>
+            <h3 style="color:#ffffff;margin:6px 0 2px">${tr('Smart Aging Debtors Radar & Priority Recovery', 'बकायेदारों का समय-आधारित वर्गीकरण एवं त्वरित वसूली रडार')}</h3>
+            <p style="font-size:0.82rem;color:#cbd5e1;margin:0">${tr('Click any aging bucket below to filter parties and send urgency-matched WhatsApp reminders.', 'किसी भी समय-श्रेणी (Bucket) पर क्लिक करके बकायेदारों को फ़िल्टर करें व तात्कालिकता अनुसार WhatsApp रिमाइंडर भेजें।')}</p>
+          </div>
+          <button class="btn btn-sm ${activeFilter === 'ALL' ? 'btn-gold' : 'btn-ghost'}" style="${activeFilter === 'ALL' ? '' : 'color:#fff;border-color:rgba(255,255,255,0.3)'}" onclick="state.udhaarAgeBucket='ALL';render()">
+            🔄 ${tr('Show All', 'सभी देखें')} (${fmtINR(totalBalance)})
+          </button>
+        </div>
+
+        <div class="grid grid-4" style="gap:12px">
+          <div onclick="state.udhaarAgeBucket='0-30';render()" style="cursor:pointer;background:${activeFilter === '0-30' ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.07)'};border:2px solid ${activeFilter === '0-30' ? '#4ade80' : 'rgba(74,222,128,0.35)'};border-radius:12px;padding:12px">
+            <div style="font-size:0.78rem;color:#86efac;font-weight:700">🟢 ${tr('0 - 30 Days (Current)', '0 - 30 दिन (नया उधार)')}</div>
+            <div style="font-size:1.35rem;font-weight:900;color:#ffffff;margin:4px 0">${fmtINR(buckets.b0_30.amount)}</div>
+            <div style="font-size:0.74rem;color:#cbd5e1">${buckets.b0_30.count} ${tr('bills · Standard cycle', 'बिल · सामान्य अवधि')}</div>
+          </div>
+
+          <div onclick="state.udhaarAgeBucket='31-60';render()" style="cursor:pointer;background:${activeFilter === '31-60' ? 'rgba(250,204,21,0.25)' : 'rgba(255,255,255,0.07)'};border:2px solid ${activeFilter === '31-60' ? '#facc15' : 'rgba(250,204,21,0.35)'};border-radius:12px;padding:12px">
+            <div style="font-size:0.78rem;color:#fde047;font-weight:700">🟡 ${tr('31 - 60 Days (Attention)', '31 - 60 दिन (ध्यान दें)')}</div>
+            <div style="font-size:1.35rem;font-weight:900;color:#ffffff;margin:4px 0">${fmtINR(buckets.b31_60.amount)}</div>
+            <div style="font-size:0.74rem;color:#cbd5e1">${buckets.b31_60.count} ${tr('bills · Follow-up needed', 'बिल · रिमाइंडर भेजें')}</div>
+          </div>
+
+          <div onclick="state.udhaarAgeBucket='61-90';render()" style="cursor:pointer;background:${activeFilter === '61-90' ? 'rgba(249,115,22,0.25)' : 'rgba(255,255,255,0.07)'};border:2px solid ${activeFilter === '61-90' ? '#fb923c' : 'rgba(251,146,60,0.35)'};border-radius:12px;padding:12px">
+            <div style="font-size:0.78rem;color:#fdba74;font-weight:700">🟠 ${tr('61 - 90 Days (Urgent)', '61 - 90 दिन (अति आवश्यक)')}</div>
+            <div style="font-size:1.35rem;font-weight:900;color:#ffffff;margin:4px 0">${fmtINR(buckets.b61_90.amount)}</div>
+            <div style="font-size:0.74rem;color:#cbd5e1">${buckets.b61_90.count} ${tr('bills · Priority call', 'बिल · तुरंत तकादा करें')}</div>
+          </div>
+
+          <div onclick="state.udhaarAgeBucket='90+';render()" style="cursor:pointer;background:${activeFilter === '90+' ? 'rgba(239,68,68,0.28)' : 'rgba(255,255,255,0.07)'};border:2px solid ${activeFilter === '90+' ? '#f87171' : 'rgba(248,113,113,0.4)'};border-radius:12px;padding:12px">
+            <div style="font-size:0.78rem;color:#fca5a5;font-weight:700">🔴 ${tr('90+ Days (Critical Risk)', '90+ दिन (गंभीर जोखिम)')}</div>
+            <div style="font-size:1.35rem;font-weight:900;color:#fca5a5;margin:4px 0">${fmtINR(buckets.b90_plus.amount)}</div>
+            <div style="font-size:0.74rem;color:#cbd5e1">${buckets.b90_plus.count} ${tr('bills · Immediate recovery', 'बिल · तत्काल वसूली')}</div>
+          </div>
+        </div>
+      </div>
+
       <div class="erp-card">
         <div class="erp-card-header">
           <div>
@@ -1862,14 +2060,14 @@ function renderMerchantCustomerUdhaarOnly(shop) {
 
         ${parties.length === 0 ? `
           <div style="text-align:center;padding:36px 12px;background:#f8fafc;border-radius:10px">
-            <p style="font-size:1.1rem;font-weight:700;color:#16a34a">🎉 ${tr('Zero pending Udhaar! All customer bills are settled.', 'शून्य उधारी! सभी ग्राहकों के बिल चुकता हैं।')}</p>
+            <p style="font-size:1.1rem;font-weight:700;color:#16a34a">🎉 ${tr('Zero pending Udhaar in this bucket! All customer bills are settled.', 'इस श्रेणी में कोई बकाया उधारी नहीं है!')}</p>
           </div>
         ` : `
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>${tr('Party / Customer Unique ID', 'ग्राहक / यूनिक ID')}</th>
+                  <th>${tr('Party / Customer & Aging Status', 'ग्राहक / यूनिक ID व एजिंग स्थिति')}</th>
                   <th>${tr('Bills & Partial Paid', 'बिल एवं आंशिक भुगतान')}</th>
                   <th>${tr('Net Balance Due', 'शुद्ध शेष उधारी')}</th>
                   <th>${tr('Receive Partial / Full Payment', 'आंशिक / पूर्ण वसूली')}</th>
@@ -1879,15 +2077,20 @@ function renderMerchantCustomerUdhaarOnly(shop) {
               <tbody>
                 ${parties.map(p => {
                   const upiLink = shop.upiId ? `upi://pay?pa=${encodeURIComponent(shop.upiId)}&pn=${encodeURIComponent(shop.shop)}&am=${p.total}&cu=INR` : '';
-                  const remMsg = `नमस्ते *${p.customer}* जी (${p.customerCode}),\n*${shop.shop}* से आपका कुल उधारी विवरण:\nकुल बिल: ₹${p.grossTotal} | पूर्व जमा: ₹${p.paidTotal}\n*शुद्ध शेष राशि: ₹${p.total}*\n${upiLink ? `💳 UPI भुगतान लिंक: ${upiLink}` : 'कृपया दुकान काउंटर पर भुगतान करें।'}`;
+                  const urgencyPrefix = p.maxDaysOld > 60
+                    ? `⚠️ *अति-आवश्यक भुगतान अनुस्मारक (${p.maxDaysOld} दिन से लंबित)*\n`
+                    : (p.maxDaysOld > 30 ? `🔔 *भुगतान अनुस्मारक (${p.maxDaysOld} दिन)*\n` : '');
+                  const remMsg = `${urgencyPrefix}नमस्ते *${p.customer}* जी (${p.customerCode}),\n*${shop.shop}* से आपका कुल उधारी विवरण:\nकुल बिल: ₹${p.grossTotal} | पूर्व जमा: ₹${p.paidTotal}\n*शुद्ध शेष राशि: ₹${p.total}*\n${upiLink ? `💳 तुरंत UPI भुगतान लिंक: ${upiLink}` : 'कृपया शीघ्र भुगतान कर सहयोग करें।'}`;
                   const firstOrd = p.orders[0];
+                  const ageBadgeColor = p.bucketKey === '90+' ? '#dc2626' : (p.bucketKey === '61-90' ? '#ea580c' : (p.bucketKey === '31-60' ? '#ca8a04' : '#16a34a'));
                   return `
                     <tr>
                       <td>
                         <b>${esc(p.customer)}</b>
-                        <div style="display:flex;gap:4px;align-items:center;margin-top:3px">
+                        <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-top:4px">
                           <span class="badge badge-primary" style="font-family:monospace;font-size:0.7rem">${esc(p.customerCode)}</span>
                           <span class="text-muted" style="font-size:0.76rem">📱 ${esc(p.phone)}</span>
+                          <span style="background:${ageBadgeColor};color:#fff;font-size:0.68rem;font-weight:700;padding:2px 7px;border-radius:999px">⏱️ ${p.maxDaysOld}d (${p.bucketKey}d)</span>
                         </div>
                       </td>
                       <td>
@@ -2044,17 +2247,87 @@ function renderMerchantExpensesOnly(shop) {
   const totalExpenses = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
   const allOrders = state.data.myOrders || [];
-  const cashSales = allOrders.filter(o => o.status !== 'Rejected' && o.status !== 'Sales Return' && o.paymentMode === 'Cash')
+  const validOrders = allOrders.filter(o => o.status !== 'Rejected' && o.status !== 'Sales Return' && o.status !== 'Quotation' && o.docType !== 'Quotation');
+  const grossRevenue = validOrders.reduce((s, o) => s + (Number(o.totals?.gross) || 0), 0);
+  const taxableSales = validOrders.reduce((s, o) => s + (Number(o.totals?.taxable) || Number(o.totals?.gross) || 0), 0);
+
+  const products = state.data.products.filter(p => p.shopId === shop.id);
+  let totalCogs = 0;
+  for (const o of validOrders) {
+    for (const item of o.items || []) {
+      const p = products.find(pr => pr.id === item.productId || pr.name === item.name);
+      const unitCost = p && p.costPrice ? Number(p.costPrice) : Math.round((Number(item.price) || 0) * 0.82);
+      totalCogs += unitCost * (Number(item.qty) || 1);
+    }
+  }
+  const grossMargin = Math.max(0, taxableSales - totalCogs);
+  const netOperatingProfit = grossMargin - totalExpenses;
+
+  const cashSales = validOrders.filter(o => o.paymentMode === 'Cash')
     .reduce((s, o) => s + (Number(o.totals?.gross) || 0), 0);
-  const upiSales = allOrders.filter(o => o.status !== 'Rejected' && o.status !== 'Sales Return' && o.paymentMode === 'UPI')
+  const upiSales = validOrders.filter(o => o.paymentMode === 'UPI')
     .reduce((s, o) => s + (Number(o.totals?.gross) || 0), 0);
   const cashExpenses = expenses.filter(e => e.mode === 'Cash').reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const upiExpenses = expenses.filter(e => e.mode === 'UPI').reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const cashInDrawer = Math.max(0, cashSales - cashExpenses);
   const bankUpiBalance = Math.max(0, upiSales - upiExpenses);
 
+  const maxBar = Math.max(1, grossRevenue, totalExpenses, Math.abs(netOperatingProfit));
+  const revPct = Math.min(100, Math.round((grossRevenue / maxBar) * 100));
+  const expPct = Math.min(100, Math.round((totalExpenses / maxBar) * 100));
+  const netPct = Math.min(100, Math.round((Math.max(0, netOperatingProfit) / maxBar) * 100));
+
   return `
     <div style="display:grid;gap:20px">
+      <!-- Real-Time Net Operating Profit Engine & Visual Comparison -->
+      <div class="erp-card" style="background:linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);color:#ffffff;border:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+          <div>
+            <span class="badge badge-gold">📈 ${tr('REAL-TIME NET PROFIT ENGINE (P&L)', 'वास्तविक शुद्ध मुनाफ़ा एवं लाभ-हानि इंजन')}</span>
+            <h3 style="color:#ffffff;margin:6px 0 2px">${tr('Revenue vs Cost of Goods vs Operating Expenses = Net Profit', 'कुल बिक्री - माल की लागत - दैनिक दुकान खर्चे = शुद्ध बचत (Net Profit)')}</h3>
+          </div>
+          <div style="text-align:right">
+            <span style="font-size:0.76rem;color:#93c5fd;display:block">${tr('Net Operating Profit (शुद्ध मुनाफ़ा)', 'शुद्ध व्यापारिक मुनाफ़ा')}</span>
+            <span style="font-size:1.75rem;font-weight:900;color:${netOperatingProfit >= 0 ? '#4ade80' : '#f87171'}">${fmtINR(netOperatingProfit)}</span>
+          </div>
+        </div>
+
+        <div class="grid grid-4" style="gap:12px;margin-bottom:14px">
+          <div style="background:rgba(255,255,255,0.08);padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.15)">
+            <div style="font-size:0.75rem;color:#cbd5e1">${tr('Gross Sales Revenue', 'कुल बिक्री (Sales)')}</div>
+            <div style="font-size:1.2rem;font-weight:800;color:#ffffff">${fmtINR(grossRevenue)}</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.08);padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.15)">
+            <div style="font-size:0.75rem;color:#cbd5e1">${tr('Gross Margin (Sales - COGS)', 'सकल मार्जिन (Gross Profit)')}</div>
+            <div style="font-size:1.2rem;font-weight:800;color:#fde047">${fmtINR(grossMargin)}</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.08);padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.15)">
+            <div style="font-size:0.75rem;color:#cbd5e1">${tr('Operating Expenses', 'दुकान के कुल खर्चे')}</div>
+            <div style="font-size:1.2rem;font-weight:800;color:#fca5a5">− ${fmtINR(totalExpenses)}</div>
+          </div>
+          <div style="background:rgba(34,197,94,0.18);padding:10px 12px;border-radius:10px;border:1px solid rgba(74,222,128,0.4)">
+            <div style="font-size:0.75rem;color:#86efac">${tr('Net Operating Profit', 'शुद्ध मुनाफ़ा (Net Profit)')}</div>
+            <div style="font-size:1.2rem;font-weight:900;color:#4ade80">${fmtINR(netOperatingProfit)}</div>
+          </div>
+        </div>
+
+        <!-- Visual Comparison Bars -->
+        <div style="background:rgba(15,23,42,0.55);padding:12px 14px;border-radius:10px;display:grid;gap:8px;font-size:0.78rem">
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span>📊 ${tr('Gross Revenue', 'कुल बिक्री')}</span><b>${fmtINR(grossRevenue)}</b></div>
+            <div style="height:8px;background:rgba(255,255,255,0.12);border-radius:999px;overflow:hidden"><div style="width:${revPct}%;height:100%;background:#38bdf8;border-radius:999px"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span>💸 ${tr('Operating Expenses', 'दैनिक खर्चे')}</span><b>${fmtINR(totalExpenses)}</b></div>
+            <div style="height:8px;background:rgba(255,255,255,0.12);border-radius:999px;overflow:hidden"><div style="width:${expPct}%;height:100%;background:#f87171;border-radius:999px"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span>🏆 ${tr('Net Operating Profit', 'शुद्ध बचत / मुनाफ़ा')}</span><b>${fmtINR(netOperatingProfit)}</b></div>
+            <div style="height:8px;background:rgba(255,255,255,0.12);border-radius:999px;overflow:hidden"><div style="width:${netPct}%;height:100%;background:#4ade80;border-radius:999px"></div></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Cash vs Bank Reconcile Header -->
       <div class="grid grid-2">
         <div class="erp-card" style="background:#f0fdf4;border-color:#86efac">
@@ -2091,11 +2364,13 @@ function renderMerchantExpensesOnly(shop) {
             <div class="form-group-clean">
               <label>${tr('Expense Category', 'खर्च का प्रकार')} *</label>
               <select class="select" id="exp-cat">
+                <option value="दुकान किराया (Shop Rent)">दुकान किराया (Shop Rent)</option>
+                <option value="बिजली बिल व यूटिलिटी (Electricity & Utilities)">बिजली बिल व यूटिलिटी (Electricity Bill)</option>
+                <option value="स्टाफ वेतन व चाय-नाश्ता (Staff Salary & Tea)">स्टाफ वेतन व चाय-नाश्ता (Staff & Tea)</option>
+                <option value="स्थानीय भाड़ा / ट्रांसपोर्ट (Logistics & Transport)">स्थानीय भाड़ा / ट्रांसपोर्ट (Freight)</option>
+                <option value="पैकिंग व कार्टन खर्च (Packaging & Boxes)">पैकिंग व कार्टन खर्च (Packaging)</option>
                 <option value="हम्माली / उतराई-चढ़ाई (Hammali & Loading)">हम्माली / उतराई-चढ़ाई (Hammali)</option>
-                <option value="स्थानीय भाड़ा / ट्रांसपोर्ट (Local Freight)">स्थानीय भाड़ा / ऑटो/टेंपो (Freight)</option>
-                <option value="चाय-पानी व दुकान नाश्ता (Tea & Refreshment)">चाय-पानी व दुकान नाश्ता (Tea & Water)</option>
-                <option value="बिजली बिल / दुकान किराया (Electricity / Rent)">बिजली बिल / दुकान रखरखाव</option>
-                <option value="स्टाफ वेतन / दैनिक दिहाड़ी (Staff Salary)">स्टाफ वेतन / दैनिक मजदूरी</option>
+                <option value="दुकान रखरखाव व अन्य (Maintenance & Other)">दुकान रखरखाव व अन्य (Maintenance)</option>
               </select>
             </div>
             <div class="form-group-clean">
@@ -2388,12 +2663,14 @@ function renderMerchantPortal() {
 
   const navItems = [
     ['Dashboard', '📊', tr('Dashboard & Overview', 'डैशबोर्ड एवं आज का सारांश'), ''],
+    ['AI Manager', '🤖', tr('AI Business Manager (Ask Data)', 'AI बिज़नेस मैनेजर (डेटा से पूछें)'), '883s AI'],
+    ['CRM Pipeline', '📋', tr('Leads & Quotations (Kanban)', 'B2B लीड्स व कोटेशन पाइपलाइन'), 'CRM'],
     ['Billing', '🧾', tr('Quick 5-Sec & GST Billing', 'त्वरित 5-सेकंड व GST बिलिंग'), ''],
     ['Inventory', '📦', tr('Stock & AI Scanner', 'स्टॉक व AI बारकोड स्कैनर'), ''],
     ['Manufacturing', '🏭', tr('Manufacturing & Job-Work', 'निर्माता व जॉब-वर्क (MSME)'), 'New'],
-    ['Udhaar', '📒', tr('Customer Udhaar Khata', 'ग्राहक उधार खाता व लेजर'), pendingCount ? String(pendingCount) : ''],
+    ['Udhaar', '📒', tr('Customer Udhaar Khata', 'ग्राहक उधार खाता व एजिंग रडार'), pendingCount ? String(pendingCount) : ''],
     ['Purchases', '🛒', tr('Supplier Purchases & ITC', 'सप्लायर खरीद एवं ITC क्रेडिट'), ''],
-    ['Expenses', '💸', tr('Daily Expenses & Cash Drawer', 'दैनिक व्यापार खर्चे व रोकड़'), ''],
+    ['Expenses', '💸', tr('Expenses & Net Profit (P&L)', 'खर्चे व शुद्ध मुनाफ़ा (Net Profit)'), ''],
     ['Reports', '📄', tr('GSTR-3B & Party Ledgers', 'GSTR-3B टैक्स व पार्टी लेजर'), 'CA Ready'],
     ['Staff', '👥', tr('Shop Staff & RBAC', 'दुकान स्टाफ एवं अनुमतियां'), ''],
     ['Standee', '📢', tr('QR Standee & Promo', 'QR स्टैंडी व व्यापार प्रचार'), ''],
@@ -2412,6 +2689,18 @@ function renderMerchantPortal() {
     bannerSubtitle = tr('Live counter of revenue, cash/credit orders, profit margin and recent customer bills', 'आज की कुल बिक्री, नकद/उधार विभाजन, अनुमानित लाभ एवं नए ऑर्डर्स');
     bannerActionHtml = `<button class="btn btn-gold btn-sm" onclick="state.merchantTab='Billing';render()">+ ${tr('New GST Invoice', 'नया GST बिल बनाएं')}</button>`;
     contentHtml = renderMerchantDashboard(shop);
+  } else if (curTab === 'AI Manager') {
+    bannerIcon = '🤖';
+    bannerTitle = tr('AI Digital Business Manager ("Ask Your Data Anything")', 'AI डिजिटल बिज़नेस मैनेजर (अपने व्यापारिक डेटा से सीधे बात करें)');
+    bannerSubtitle = tr('Natural language insights, live KPI charts & Zero-Direct-Mutation Action Proposals with Owner Approval', 'नेचुरल लैंग्वेज सवाल-जवाब, लाइव KPI चार्ट्स एवं ओनर-अप्रूवल सुरक्षा के साथ ड्राफ्ट प्रस्ताव');
+    bannerActionHtml = `<button class="btn btn-ghost btn-sm" style="color:#ffffff;border-color:rgba(255,255,255,0.4)" onclick="state.merchantTab='Dashboard';render()">← ${tr('Back to Dashboard', 'डैशबोर्ड पर लौटें')}</button>`;
+    contentHtml = renderMerchantAiBusinessManager(shop);
+  } else if (curTab === 'CRM Pipeline') {
+    bannerIcon = '📋';
+    bannerTitle = tr('B2B Leads Pipeline (Kanban) & Quotation Engine', 'B2B लीड्स सेल्स पाइपलाइन (Kanban) एवं कोटेशन इंजन');
+    bannerSubtitle = tr('Track inquiries from New -> Proposal -> Won, and convert Quotations to GST Invoices in 1 click', 'नई पूछताछ से डील पक्की होने तक ट्रैक करें एवं कोटेशन को 1-क्लिक में पक्के GST बिल में बदलें');
+    bannerActionHtml = `<button class="btn btn-gold btn-sm" onclick="state.invoiceDocType='Quotation';state.merchantTab='Billing';render()">+ ${tr('New Quotation (QT)', '+ नया कोटेशन बनाएं')}</button>`;
+    contentHtml = renderMerchantCrmPipeline(shop);
   } else if (curTab === 'Billing') {
     bannerIcon = '🧾';
     bannerTitle = tr('5-Second Quick Billing & GST Invoices', 'त्वरित 5-सेकंड एवं पक्का GST बिल काउंटर');
@@ -2926,8 +3215,11 @@ function renderMerchantInvoiceBuilder(shop) {
 
   const billDiscount = Math.max(0, Number(state.invoiceBuyer.discount) || 0);
   const grandTotal = Math.max(0, (totalTaxable + totalGst) - billDiscount);
+  const isQuoteMode = state.invoiceDocType === 'Quotation';
   const nextSeq = String((Number(shop.invoiceCounter) || 0) + 1).padStart(4, '0');
-  const previewInvNo = `KQ-2627-${nextSeq}`;
+  const nextQtSeq = String((Number(shop.quotationCounter) || 0) + 1).padStart(4, '0');
+  const previewInvNo = isQuoteMode ? `QT-2627-${nextQtSeq}` : `KQ-2627-${nextSeq}`;
+  const activeQuotations = (state.data.myOrders || []).filter(o => o.docType === 'Quotation' || o.status === 'Quotation' || String(o.invoiceNo || '').startsWith('QT-'));
 
   return `
     <div style="display:grid;gap:20px">
@@ -2969,11 +3261,24 @@ function renderMerchantInvoiceBuilder(shop) {
         </form>
       </div>
 
+      <!-- Document Mode Toggle: Official GST Invoice vs Formal Quotation / Estimate -->
+      <div class="card no-print" style="padding:12px 16px;background:#0f172a;color:#fff;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn btn-sm ${!isQuoteMode ? 'btn-gold' : 'btn-ghost'}" style="${!isQuoteMode ? '' : 'color:#fff;border-color:rgba(255,255,255,0.3)'}" onclick="state.invoiceDocType='Tax Invoice';render()">
+            🧾 ${tr('1. Official GST Tax Invoice (KQ-2627)', '1. पक्का GST टैक्स इनवॉइस (KQ-2627)')}
+          </button>
+          <button type="button" class="btn btn-sm ${isQuoteMode ? 'btn-gold' : 'btn-ghost'}" style="${isQuoteMode ? '' : 'color:#fff;border-color:rgba(255,255,255,0.3)'}" onclick="state.invoiceDocType='Quotation';render()">
+            📝 ${tr('2. Formal Quotation / Estimate (QT-2627 · 1-Click Convert)', '2. कोटेशन / कच्चा अनुमान (QT-2627 · 1-क्लिक बिल रूपांतरण)')}
+          </button>
+        </div>
+        <span style="font-size:0.8rem;color:#93c5fd">${isQuoteMode ? tr('Quotation mode: Stock is NOT deducted until converted to GST Invoice', 'कोटेशन मोड: जब तक पक्के बिल में न बदलें, स्टॉक नहीं घटेगा') : tr('Invoice mode: Auto-deducts stock & updates party ledger', 'इनवॉइस मोड: स्टॉक स्वतः घटेगा व लेजर अपडेट होगा')}</span>
+      </div>
+
       <div class="grid grid-2">
         <!-- Left: Full Rule-46 GST / Estimate Invoice Entry Form (Hidden when printing) -->
         <div class="card no-print">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-          <h3>🧾 ${hasGstin ? tr('Rule-46 GST / IGST Tax Invoice', 'GST / IGST टैक्स इनवॉइस') : tr('Estimate / Bill of Supply (Non-GST)', 'एस्टीमेट / बिल ऑफ़ सप्लाई')}</h3>
+          <h3>${isQuoteMode ? `📝 ${tr('Formal Quotation / Estimate Builder', 'कोटेशन / अनुमानित कच्चा बिल निर्माता')}` : `🧾 ${hasGstin ? tr('Rule-46 GST / IGST Tax Invoice', 'GST / IGST टैक्स इनवॉइस') : tr('Estimate / Bill of Supply (Non-GST)', 'एस्टीमेट / बिल ऑफ़ सप्लाई')}`}</h3>
           <span class="badge badge-gold">${previewInvNo}</span>
         </div>
 
@@ -3085,7 +3390,9 @@ function renderMerchantInvoiceBuilder(shop) {
         </div>
 
         <button type="button" class="btn btn-gold" style="width:100%;margin-top:16px;font-size:0.95rem" onclick="saveAndPrintWalkInInvoice('${shop.id}')">
-          💾🖨️ ${tr('Save Bill to Ledger, Deduct Stock & Print Invoice', 'बिल बही-खाते में सेव करें, स्टॉक घटाएँ और प्रिंट करें')}
+          ${isQuoteMode
+            ? `📝🖨️ ${tr('Save Formal Quotation (No Stock Deduction) & Print', 'कोटेशन सेव करें (बिना स्टॉक घटाए) और प्रिंट करें')}`
+            : `💾🖨️ ${tr('Save Bill to Ledger, Deduct Stock & Print Invoice', 'बिल बही-खाते में सेव करें, स्टॉक घटाएँ और प्रिंट करें')}`}
         </button>
       </div>
 
@@ -3098,15 +3405,15 @@ function renderMerchantInvoiceBuilder(shop) {
             <p style="font-size:0.78rem">Phone: ${esc(shop.phone)} ${hasGstin ? `| GSTIN: <b>${esc(shop.gstin)}</b>` : ''}</p>
           </div>
           <div style="text-align:right">
-            <p style="font-weight:800;font-size:0.95rem">${hasGstin ? (isInterState ? 'INTER-STATE TAX INVOICE' : 'TAX INVOICE') : 'BILL OF SUPPLY / ESTIMATE'}</p>
+            <p style="font-weight:800;font-size:0.95rem">${isQuoteMode ? 'FORMAL QUOTATION / PROFORMA ESTIMATE' : (hasGstin ? (isInterState ? 'INTER-STATE TAX INVOICE' : 'TAX INVOICE') : 'BILL OF SUPPLY / ESTIMATE')}</p>
             <p style="font-size:0.8rem">No: <b>${previewInvNo}</b></p>
             <p style="font-size:0.78rem">Date: ${new Date().toLocaleDateString('en-IN')}</p>
           </div>
         </div>
 
         <div style="padding:10px 0;border-bottom:1px solid var(--border-subtle);font-size:0.8rem">
-          <p><b>Bill To:</b> ${esc(state.invoiceBuyer.name || 'Walk-in Cash Customer')} ${state.invoiceBuyer.phone ? `(${esc(state.invoiceBuyer.phone)})` : ''}</p>
-          <p><b>Buyer GSTIN:</b> ${esc(buyerGstin || 'Unregistered (B2C)')} | <b>Payment:</b> ${esc(state.invoiceBuyer.paymentMode)}</p>
+          <p><b>${isQuoteMode ? 'Quotation For:' : 'Bill To:'}</b> ${esc(state.invoiceBuyer.name || 'Walk-in Cash Customer')} ${state.invoiceBuyer.phone ? `(${esc(state.invoiceBuyer.phone)})` : ''}</p>
+          <p><b>Buyer GSTIN:</b> ${esc(buyerGstin || 'Unregistered (B2C)')} | <b>Mode:</b> ${isQuoteMode ? 'Quotation / Estimate' : esc(state.invoiceBuyer.paymentMode)}</p>
         </div>
 
         <table style="margin:12px 0;font-size:0.78rem">
@@ -3146,14 +3453,292 @@ function renderMerchantInvoiceBuilder(shop) {
               : `<p>CGST: <b>${fmtINR(totalGst / 2)}</b> | SGST: <b>${fmtINR(totalGst / 2)}</b></p>`
           ) : ''}
           ${billDiscount > 0 ? `<p style="color:#16a34a">Discount (छूट): <b>− ${fmtINR(billDiscount)}</b></p>` : ''}
-          <p style="font-size:1.15rem;margin-top:6px"><b>Grand Total: ${fmtINR(grandTotal)}</b></p>
-          ${state.invoiceBuyer.paymentMode === 'Credit' && Number(state.invoiceBuyer.paidAmount) > 0 ? `
+          <p style="font-size:1.15rem;margin-top:6px"><b>${isQuoteMode ? 'Estimated Total:' : 'Grand Total:'} ${fmtINR(grandTotal)}</b></p>
+          ${!isQuoteMode && state.invoiceBuyer.paymentMode === 'Credit' && Number(state.invoiceBuyer.paidAmount) > 0 ? `
             <p style="font-size:0.8rem;color:#dc2626">Paid Now: <b>${fmtINR(state.invoiceBuyer.paidAmount)}</b> | Balance Udhaar Due: <b>${fmtINR(Math.max(0, grandTotal - Number(state.invoiceBuyer.paidAmount)))}</b></p>
           ` : ''}
           ${shop.upiId ? `<p style="font-size:0.75rem;margin-top:4px">Pay via UPI: <b>${esc(shop.upiId)}</b></p>` : ''}
         </div>
         <p style="text-align:center;font-size:0.7rem;margin-top:14px;opacity:0.75">Generated on KuberQ B2B Trade OS</p>
       </div>
+      </div>
+
+      <!-- Active Quotations / Estimates Register (1-Click Convert to GST Tax Invoice) -->
+      <div class="erp-card no-print">
+        <div class="erp-card-header">
+          <div>
+            <span class="badge badge-gold">📝 ${tr('QUOTATION & ESTIMATE REGISTER (1-CLICK CONVERT)', 'कोटेशन व कच्चा अनुमान रजिस्टर (1-क्लिक में पक्का GST बिल बनाएँ)')}</span>
+            <h3 style="margin-top:6px">${tr('Active Quotations — Convert to Official GST Tax Invoice in 1 Click', 'जारी किए गए कोटेशन — 1 क्लिक में पक्के GST बिल और लेजर में बदलें')}</h3>
+          </div>
+          <span class="badge badge-primary">${activeQuotations.length} ${tr('Quotations', 'कोटेशन')}</span>
+        </div>
+        ${activeQuotations.length === 0 ? `
+          <p class="text-muted" style="font-size:0.86rem;margin:0">${tr('No active quotations yet. Switch to "2. Formal Quotation" above to create one.', 'अभी कोई कोटेशन नहीं है। ऊपर "2. Formal Quotation" चुनकर नया कोटेशन बनाएँ।')}</p>
+        ` : `
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>${tr('Quotation No & Date', 'कोटेशन संख्या व दिनांक')}</th>
+                  <th>${tr('Party / Customer', 'पार्टी / ग्राहक')}</th>
+                  <th>${tr('Items', 'सामान विवरण')}</th>
+                  <th>${tr('Estimated Amount', 'अनुमानित राशि')}</th>
+                  <th>${tr('1-Click Convert / Share', '1-क्लिक पक्का बिल / शेयर')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${activeQuotations.map(q => {
+                  const qGross = Number(q.totals?.gross) || 0;
+                  const waQuoteMsg = `📝 *Quotation / Estimate from ${shop.shop}*\nQuotation No: *${q.invoiceNo}*\nParty: ${q.customer}\nEstimated Total: *₹${qGross}*\nValid Until: ${q.validUntil || '7 Days'}`;
+                  return `
+                    <tr>
+                      <td><b>${esc(q.invoiceNo)}</b><div class="text-muted" style="font-size:0.74rem">${new Date(q.date).toLocaleDateString('en-IN')}</div></td>
+                      <td><b>${esc(q.customer)}</b><div class="text-muted" style="font-size:0.74rem">📱 ${esc(q.phone)}</div></td>
+                      <td style="font-size:0.8rem">${(q.items || []).map(i => `${esc(i.name)} × ${i.qty}`).join(', ') || esc(q.note || '—')}</td>
+                      <td><b style="color:#2563EB;font-size:1rem">${fmtINR(qGross)}</b></td>
+                      <td>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap">
+                          <button type="button" class="btn btn-gold btn-sm" onclick="convertQuotationToTaxInvoice('${q.id}')">
+                            ⚡ ${tr('Convert to GST Invoice', '1-क्लिक पक्का GST बिल बनाएँ')}
+                          </button>
+                          <a class="btn btn-primary btn-sm" target="_blank" rel="noreferrer" href="https://wa.me/91${q.phone}?text=${encodeURIComponent(waQuoteMsg)}">
+                            📲 ${tr('Share Quote', 'कोटेशन भेजें')}
+                          </a>
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+// ============================================================================
+// B2B LEADS & SALES PIPELINE (VISUAL KANBAN BOARD + QUOTATION ENGINE)
+// ============================================================================
+function renderMerchantCrmPipeline(shop) {
+  const leads = state.data.myCrmLeads || [];
+  const stages = [
+    { key: 'New Inquiry', labelEn: 'New Inquiry', labelHi: 'नई पूछताछ', color: '#2563EB', bg: '#eff6ff', icon: '🟢' },
+    { key: 'Contacted', labelEn: 'Contacted', labelHi: 'बातचीत हुई', color: '#0284c7', bg: '#f0f9ff', icon: '🔵' },
+    { key: 'Proposal Sent', labelEn: 'Proposal / Quote Sent', labelHi: 'कोटेशन भेजा', color: '#d97706', bg: '#fffbeb', icon: '🟣' },
+    { key: 'Won', labelEn: 'Won / Converted', labelHi: 'डील पक्की (Won)', color: '#16a34a', bg: '#f0fdf4', icon: '🏆' },
+    { key: 'Lost', labelEn: 'Lost / Dropped', labelHi: 'ड्रॉप / बंद', color: '#64748b', bg: '#f8fafc', icon: '⚪' }
+  ];
+
+  const totalPipelineValue = leads.filter(l => l.stage !== 'Lost').reduce((s, l) => s + (Number(l.expectedValue) || 0), 0);
+  const wonValue = leads.filter(l => l.stage === 'Won').reduce((s, l) => s + (Number(l.expectedValue) || 0), 0);
+  const activeQuotations = (state.data.myOrders || []).filter(o => o.docType === 'Quotation' || o.status === 'Quotation' || String(o.invoiceNo || '').startsWith('QT-'));
+
+  return `
+    <div style="display:grid;gap:20px">
+      <!-- Top Pipeline KPIs -->
+      <div class="grid grid-4" style="gap:12px">
+        <div class="erp-card" style="padding:14px;border-left:4px solid #2563EB">
+          <div style="font-size:0.78rem;color:#64748b;font-weight:700">${tr('Total Active Pipeline Value', 'कुल सक्रिय लीड्स मूल्य')}</div>
+          <div style="font-size:1.45rem;font-weight:900;color:#0f172a;margin-top:4px">${fmtINR(totalPipelineValue)}</div>
+          <div style="font-size:0.74rem;color:#2563EB">${leads.length} ${tr('B2B inquiries tracked', 'व्यापारिक पूछताछ')}</div>
+        </div>
+        <div class="erp-card" style="padding:14px;border-left:4px solid #d97706">
+          <div style="font-size:0.78rem;color:#64748b;font-weight:700">${tr('Proposals / Quotations Sent', 'भेजे गए कोटेशन')}</div>
+          <div style="font-size:1.45rem;font-weight:900;color:#d97706;margin-top:4px">${leads.filter(l => l.stage === 'Proposal Sent').length + activeQuotations.length}</div>
+          <div style="font-size:0.74rem;color:#92400e">${tr('Ready for 1-click GST billing', '1-क्लिक बिलिंग हेतु तैयार')}</div>
+        </div>
+        <div class="erp-card" style="padding:14px;border-left:4px solid #16a34a">
+          <div style="font-size:0.78rem;color:#64748b;font-weight:700">${tr('Won / Converted Deals', 'पक्की हुई डील (Won)')}</div>
+          <div style="font-size:1.45rem;font-weight:900;color:#16a34a;margin-top:4px">${fmtINR(wonValue)}</div>
+          <div style="font-size:0.74rem;color:#15803d">${leads.filter(l => l.stage === 'Won').length} ${tr('deals converted', 'सफल आर्डर')}</div>
+        </div>
+        <div class="erp-card" style="padding:14px;border-left:4px solid #7c3aed">
+          <div style="font-size:0.78rem;color:#64748b;font-weight:700">${tr('Pending Follow-Up Tasks', 'आज के फॉलो-अप रिमाइंडर')}</div>
+          <div style="font-size:1.45rem;font-weight:900;color:#7c3aed;margin-top:4px">${leads.filter(l => l.stage !== 'Won' && l.stage !== 'Lost').length}</div>
+          <div style="font-size:0.74rem;color:#6d28d9">${tr('1-click WhatsApp follow-up', '1-क्लिक WhatsApp संपर्क')}</div>
+        </div>
+      </div>
+
+      <!-- Add New B2B Lead / Inquiry Form -->
+      <div class="erp-card">
+        <div class="erp-card-header">
+          <div>
+            <span class="badge badge-primary">📋 ${tr('ADD NEW B2B INQUIRY / LEAD', 'नई B2B व्यापारिक पूछताछ / लीड जोड़ें')}</span>
+            <h3 style="margin-top:6px">${tr('Capture Contractor, Dealer or Institutional Inquiry', 'ठेकेदार, सब-डीलर या बड़े ग्राहक की पूछताछ व फॉलो-अप तिथि दर्ज करें')}</h3>
+          </div>
+        </div>
+        <form onsubmit="addCrmLeadForm(event)">
+          <div class="grid grid-4" style="gap:10px">
+            <div>
+              <label class="form-label">${tr('Buyer / Company Name', 'ग्राहक / फर्म का नाम')} *</label>
+              <input class="input" id="crm-name" required placeholder="${tr('e.g. Rathore Builders', 'उदा: राठौड़ बिल्डर्स')}" />
+            </div>
+            <div>
+              <label class="form-label">${tr('10-Digit Mobile (WhatsApp)', 'मोबाइल नंबर')} *</label>
+              <input class="input" id="crm-phone" required maxlength="10" placeholder="98290XXXXX" />
+            </div>
+            <div>
+              <label class="form-label">${tr('Expected Order Value (₹)', 'अनुमानित ऑर्डर राशि (₹)')} *</label>
+              <input class="input" type="number" id="crm-val" required min="100" placeholder="50000" />
+            </div>
+            <div>
+              <label class="form-label">${tr('Lead Source & Follow-Up Date', 'स्रोत व फॉलो-अप दिनांक')}</label>
+              <div style="display:flex;gap:6px">
+                <select class="select" id="crm-source">
+                  <option value="WhatsApp Inquiry">WhatsApp</option>
+                  <option value="Store QR Catalog">QR Catalog</option>
+                  <option value="Direct Counter Walk-in">Walk-in</option>
+                  <option value="Transport / Referral">Referral</option>
+                </select>
+                <input class="input" type="date" id="crm-date" value="${new Date(Date.now() + 86400000).toISOString().slice(0, 10)}" />
+              </div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:10px;align-items:end">
+            <div>
+              <label class="form-label">${tr('Items Required & Notes', 'माँगा गया सामान व विशेष नोट')}</label>
+              <input class="input" id="crm-items" placeholder="${tr('e.g. 100 PVC Pipes 1 inch, 4 Sintex Tanks — asked for sub-dealer rate', 'उदा: 100 पीवीसी पाइप, 4 सिंटेक्स टैंक — थोक रेट कोटेशन देना है')}" />
+            </div>
+            <button type="submit" class="btn btn-gold">+ ${tr('Add Lead to Kanban', '+ पाइपलाइन में जोड़ें')}</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- 5-Stage Visual Kanban Board -->
+      <div class="erp-card" style="overflow-x:auto">
+        <div class="erp-card-header">
+          <div>
+            <span class="badge badge-gold">📊 ${tr('INTERACTIVE KANBAN SALES PIPELINE', 'विजुअल कानबान सेल्स पाइपलाइन (Kanban Board)')}</span>
+            <h3 style="margin-top:6px">${tr('Move Leads Across Stages or Convert Directly to Quotation / GST Invoice', 'लीड्स को अगले चरण में बढ़ाएँ या 1-क्लिक में कोटेशन / पक्का बिल बनाएँ')}</h3>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(5, minmax(235px, 1fr));gap:12px;min-width:1180px">
+          ${stages.map((st, stIdx) => {
+            const stageLeads = leads.filter(l => l.stage === st.key);
+            const stageSum = stageLeads.reduce((s, l) => s + (Number(l.expectedValue) || 0), 0);
+            return `
+              <div style="background:${st.bg};border:1.5px solid #cbd5e1;border-top:4px solid ${st.color};border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:10px;min-height:320px">
+                <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:8px">
+                  <span style="font-weight:800;font-size:0.84rem;color:${st.color}">${st.icon} ${state.lang === 'hi' ? st.labelHi : st.labelEn} (${stageLeads.length})</span>
+                  <span style="font-size:0.75rem;font-weight:700;color:#0f172a">${fmtINR(stageSum)}</span>
+                </div>
+
+                ${stageLeads.length === 0 ? `
+                  <div style="text-align:center;padding:30px 8px;color:#94a3b8;font-size:0.78rem;border:1px dashed #cbd5e1;border-radius:8px">
+                    ${tr('No leads in this stage', 'इस चरण में कोई लीड नहीं')}
+                  </div>
+                ` : stageLeads.map(ld => {
+                  const prevStage = stIdx > 0 ? stages[stIdx - 1].key : null;
+                  const nextStage = stIdx < stages.length - 1 ? stages[stIdx + 1].key : null;
+                  const waFollowMsg = `नमस्ते *${ld.buyerName}* जी,\n*${shop.shop}* से आपके सामान (*${ld.itemsInterest}*) के कोटेशन/ऑर्डर के संबंध में संपर्क कर रहे हैं। कृपया बताएं कब डिस्पैच करना है?`;
+                  return `
+                    <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:10px;box-shadow:0 2px 6px rgba(15,23,42,0.05);display:grid;gap:6px">
+                      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px">
+                        <b style="font-size:0.88rem;color:#0f172a">${esc(ld.buyerName)}</b>
+                        <span style="background:#eff6ff;color:#2563EB;font-weight:800;font-size:0.76rem;padding:2px 6px;border-radius:6px">${fmtINR(ld.expectedValue)}</span>
+                      </div>
+                      <div style="font-size:0.76rem;color:#475569;line-height:1.35">${esc(ld.itemsInterest)}</div>
+                      <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.7rem;color:#64748b">
+                        <span>📌 ${esc(ld.source)}</span>
+                        <span>📅 ${esc(ld.followUpDate || 'Today')}</span>
+                      </div>
+                      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;padding-top:6px;border-top:1px dashed #e2e8f0">
+                        ${prevStage ? `<button type="button" class="btn btn-ghost btn-sm" style="padding:3px 7px;font-size:0.7rem" title="Move Back" onclick="moveCrmLeadStage('${ld.id}', '${prevStage}')">←</button>` : ''}
+                        ${nextStage ? `<button type="button" class="btn btn-primary btn-sm" style="padding:3px 8px;font-size:0.7rem" onclick="moveCrmLeadStage('${ld.id}', '${nextStage}')">${tr('Next Stage →', 'अगला चरण →')}</button>` : ''}
+                        <button type="button" class="btn btn-gold btn-sm" style="padding:3px 8px;font-size:0.7rem" onclick="prefillQuotationFromLead('${esc(ld.buyerName)}', '${esc(ld.phone)}', '${esc(ld.itemsInterest)}', ${Number(ld.expectedValue) || 0})">
+                          📝 ${tr('Quote / Bill', 'कोटेशन/बिल')}
+                        </button>
+                        <a class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:0.7rem" target="_blank" rel="noreferrer" href="https://wa.me/91${ld.phone}?text=${encodeURIComponent(waFollowMsg)}">📲 WA</a>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ============================================================================
+// 🤖 AI DIGITAL BUSINESS MANAGER ("ASK YOUR DATA ANYTHING" — 883s FEATURE)
+// WITH DYNAMIC KPI CHARTS & ZERO-DIRECT-MUTATION OWNER APPROVAL PROPOSALS
+// ============================================================================
+function renderMerchantAiBusinessManager(shop) {
+  const u = state.data.user || {};
+  const isOwner = u.role === 'merchant' || u.role === 'manufacturer' || u.role === 'admin';
+  const messages = state.aiManagerMessages && state.aiManagerMessages.length > 0
+    ? state.aiManagerMessages
+    : [
+        {
+          id: 'welcome-ai',
+          role: 'assistant',
+          time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+          html: renderAiManagerInsightCard('welcome', shop)
+        }
+      ];
+
+  return `
+    <div style="display:grid;gap:18px">
+      <!-- Security & Architecture Banner -->
+      <div class="erp-card" style="background:linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);color:#ffffff;border:none;padding:16px 20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(250,204,21,0.18);border:1px solid rgba(250,204,21,0.45);color:#fde047;padding:3px 10px;border-radius:999px;font-size:0.74rem;font-weight:800;margin-bottom:6px">
+              🛡️ ZERO DIRECT MUTATION SAFETY INVARIANT ACTIVE
+            </div>
+            <h3 style="color:#ffffff;margin:0;font-size:1.25rem">🤖 ${tr('AI Digital Business Manager — "Ask Your Data Anything"', 'AI डिजिटल बिज़नेस मैनेजर — अपने व्यापार के डेटा से हिंदी या अंग्रेज़ी में कुछ भी पूछें')}</h3>
+            <p style="color:#cbd5e1;font-size:0.82rem;margin:4px 0 0">
+              ${tr(
+                'Ask in Hindi or English for live KPI charts, debtor aging, top items, or net profit. If you ask to create a bill, expense, or lead, AI generates an Action Proposal Card that executes ONLY after Owner approval.',
+                'बिक्री, उधार, मुनाफ़े या स्टॉक के बारे में पूछें और चैट के अंदर ही लाइव चार्ट्स व टेबल पाएं। बिल या खर्च बनाने का कहने पर AI पहले "अनुमोदन प्रस्ताव कार्ड (Action Proposal Card)" बनाएगा जो केवल ओनर की मंजूरी पर ही सेव होगा।'
+              )}
+            </p>
+          </div>
+          <span class="badge badge-primary" style="font-size:0.8rem;padding:6px 12px">
+            ${isOwner ? '👑 Owner Approval Authority' : '🔒 Staff View (Read-Only AI)'}
+          </span>
+        </div>
+
+        <!-- 1-Tap Quick Query & Action Proposal Chips -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.15)">
+          <button type="button" class="btn btn-sm btn-gold" onclick="askAiBusinessManager('sales_summary')">📊 ${tr("Today's & Total Sales", 'आज व कुल बिक्री')}</button>
+          <button type="button" class="btn btn-sm btn-ghost" style="color:#fff;border-color:rgba(255,255,255,0.35)" onclick="askAiBusinessManager('pending_udhaar')">💰 ${tr('Pending Udhaar & Aging', 'बकाया उधार व एजिंग रडार')}</button>
+          <button type="button" class="btn btn-sm btn-ghost" style="color:#fff;border-color:rgba(255,255,255,0.35)" onclick="askAiBusinessManager('profit_expenses')">📈 ${tr('Expenses vs Net Profit', 'खर्च बनाम शुद्ध मुनाफ़ा')}</button>
+          <button type="button" class="btn btn-sm btn-ghost" style="color:#fff;border-color:rgba(255,255,255,0.35)" onclick="askAiBusinessManager('top_stock')">📦 ${tr('Top Items & Low Stock', 'टॉप सामान व कम स्टॉक')}</button>
+          <button type="button" class="btn btn-sm btn-ghost" style="color:#fde047;border-color:#fde047" onclick="askAiBusinessManager('draft_bill_sharma')">⚡ ${tr('Draft Proposal: ₹2,500 Bill for Sharma Ji', 'प्रस्ताव: शर्मा जी का ₹2,500 बिल बनाएँ')}</button>
+          <button type="button" class="btn btn-sm btn-ghost" style="color:#86efac;border-color:#86efac" onclick="askAiBusinessManager('draft_expense_elec')">⚡ ${tr('Draft Proposal: ₹1,200 Electricity Expense', 'प्रस्ताव: ₹1,200 बिजली बिल खर्च जोड़ें')}</button>
+        </div>
+      </div>
+
+      <!-- Interactive Chat Stream with Dynamic KPI Cards, Charts & Proposal Cards -->
+      <div class="erp-card" style="background:#f8fafc;display:flex;flex-direction:column;gap:14px;min-height:420px;max-height:620px;overflow-y:auto;padding:18px" id="ai-mgr-chat-box">
+        ${messages.map(m => `
+          <div style="display:flex;flex-direction:column;align-items:${m.role === 'user' ? 'flex-end' : 'flex-start'}">
+            <div style="max-width:${m.role === 'user' ? '75%' : '96%'};width:${m.role === 'user' ? 'auto' : '100%'};background:${m.role === 'user' ? '#2563EB' : '#ffffff'};color:${m.role === 'user' ? '#ffffff' : '#0f172a'};padding:14px 16px;border-radius:14px;border:${m.role === 'user' ? 'none' : '1.5px solid #cbd5e1'};box-shadow:0 2px 8px rgba(15,23,42,0.06)">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px;font-size:0.72rem;opacity:0.8">
+                <b>${m.role === 'user' ? `👤 ${esc(u.name || 'Merchant')}` : '🤖 KuberQ AI Business Manager'}</b>
+                <span>${esc(m.time || '')}</span>
+              </div>
+              <div>${m.html}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- Natural Language Chat Input Bar -->
+      <div class="erp-card" style="padding:14px 16px">
+        <form onsubmit="submitAiBusinessManagerPrompt(event)" style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center">
+          <input class="input" id="ai-mgr-input" placeholder="${tr('Ask anything in Hindi or English (e.g. "आज की बिक्री?", "किसका उधार बाकी है?", "Create bill for Verma Traders Rs 4500")...', 'हिंदी या अंग्रेज़ी में पूछें (उदा: "आज की कुल बिक्री?", "किसका उधार बाकी है?", "शर्मा जी के लिए 3500 का बिल बनाओ")...')}" style="font-size:0.95rem;padding:12px 14px" />
+          <button type="submit" class="btn btn-primary" style="padding:12px 22px;font-size:0.95rem">
+            🚀 ${tr('Ask AI Manager', 'AI से पूछें')}
+          </button>
+        </form>
       </div>
     </div>
   `;
@@ -5715,16 +6300,19 @@ window.saveAndPrintWalkInInvoice = async function(shopId) {
     if (validLines.length === 0) {
       return showToast('Please enter at least 1 item name and rate.', 'error');
     }
+    const isQuote = state.invoiceDocType === 'Quotation';
     const payload = {
       shopId,
       customer: state.invoiceBuyer.name || 'Walk-in Buyer',
       phone: state.invoiceBuyer.phone || '9999999999',
       address: state.data.myShop?.city || 'Counter Sale',
       buyerGstin: state.invoiceBuyer.gstin,
-      paymentMode: state.invoiceBuyer.paymentMode,
+      paymentMode: isQuote ? 'Quotation' : state.invoiceBuyer.paymentMode,
       discount: Number(state.invoiceBuyer.discount || 0),
-      paidAmount: Number(state.invoiceBuyer.paidAmount || 0),
+      paidAmount: isQuote ? 0 : Number(state.invoiceBuyer.paidAmount || 0),
       supplyType: state.invoiceBuyer.supplyType === 'auto' ? undefined : state.invoiceBuyer.supplyType,
+      docType: state.invoiceDocType || 'Tax Invoice',
+      validUntil: state.invoiceValidUntil || '',
       channel: 'Walk-in',
       items: validLines
     };
@@ -5733,11 +6321,469 @@ window.saveAndPrintWalkInInvoice = async function(shopId) {
       body: JSON.stringify(payload)
     });
     await bootstrap();
-    showToast(`Saved ${res.order.invoiceNo} to ledger & updated stock!`);
+    if (isQuote) {
+      showToast(tr(`Quotation ${res.order.invoiceNo} saved! Convert it to Tax Invoice anytime in 1 click.`, `कोटेशन ${res.order.invoiceNo} सुरक्षित! किसी भी समय 1-क्लिक में टैक्स इनवॉइस में बदलें।`));
+    } else {
+      showToast(`Saved ${res.order.invoiceNo} to ledger & updated stock!`);
+    }
     setTimeout(() => window.print(), 250);
   } catch (err) {
     showToast(err.message, 'error');
   }
+};
+
+window.convertQuotationToTaxInvoice = async function(orderId) {
+  try {
+    const res = await apiFetch('/api/merchant/order-update', {
+      method: 'POST',
+      body: JSON.stringify({ orderId, convertToTaxInvoice: true })
+    });
+    await bootstrap();
+    showToast(tr(`✅ Converted Quotation to Official GST Invoice ${res.order.invoiceNo} & synced stock/ledger!`, `✅ कोटेशन को आधिकारिक GST इनवॉइस ${res.order.invoiceNo} में बदल दिया गया और स्टॉक/खाता अपडेट हो गया!`));
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.addCrmLeadForm = async function(e) {
+  e.preventDefault();
+  try {
+    const payload = {
+      kind: 'add_crm_lead',
+      buyerName: document.getElementById('crm-name')?.value.trim() || '',
+      contactPerson: document.getElementById('crm-contact')?.value.trim() || '',
+      phone: document.getElementById('crm-phone')?.value.trim() || '',
+      city: document.getElementById('crm-city')?.value.trim() || '',
+      source: document.getElementById('crm-source')?.value || 'WhatsApp Inquiry',
+      itemsInterest: document.getElementById('crm-items')?.value.trim() || '',
+      expectedValue: Number(document.getElementById('crm-val')?.value || 0),
+      stage: document.getElementById('crm-stage')?.value || 'New Inquiry',
+      followUpDate: document.getElementById('crm-date')?.value || ''
+    };
+    await apiFetch('/api/merchant/ledger', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    await bootstrap();
+    showToast(tr('✅ B2B Lead added to Sales Pipeline!', '✅ B2B लीड सेल्स पाइपलाइन में जोड़ दी गई!'));
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.moveCrmLeadStage = async function(id, stage) {
+  try {
+    await apiFetch('/api/merchant/ledger', {
+      method: 'POST',
+      body: JSON.stringify({ kind: 'update_crm_lead_stage', id, stage })
+    });
+    await bootstrap();
+    showToast(tr(`Lead moved to "${stage}"`, `लीड को "${stage}" चरण में ले जाया गया`));
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.prefillQuotationFromLead = function(buyerName, phone, itemsInterest, expectedValue) {
+  state.invoiceDocType = 'Quotation';
+  state.invoiceBuyer = {
+    ...state.invoiceBuyer,
+    name: buyerName || '',
+    phone: phone || '',
+    paymentMode: 'Quotation',
+    paidAmount: 0
+  };
+  if (itemsInterest) {
+    state.invoiceLines = [
+      {
+        productId: '',
+        name: itemsInterest,
+        hsn: '8471',
+        qty: 1,
+        price: Number(expectedValue || 0) || 1000,
+        gstRate: 18,
+        taxMode: 'exclusive'
+      }
+    ];
+  }
+  state.merchantTab = 'Billing';
+  render();
+  showToast(tr(`📋 Pre-filled Quotation for ${buyerName}! Review and click Save & Print Quotation.`, `📋 ${buyerName} के लिए कोटेशन भर दिया गया है! जांचें और सेव व प्रिंट दबाएं।`));
+};
+
+// ============================================================================
+// AI DIGITAL BUSINESS MANAGER (883s "ASK YOUR DATA ANYTHING" + ZERO DIRECT MUTATION)
+// ============================================================================
+function renderAiManagerInsightCard(queryType, shop, customPayload = null) {
+  const fmt = (n) => Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  const myOrders = state.data.orders.filter(o => o.shopId === shop.id);
+  const activeOrders = myOrders.filter(o => o.status !== 'Rejected' && o.status !== 'Cancelled' && o.docType !== 'Quotation' && o.status !== 'Quotation');
+  const myProducts = state.data.products.filter(p => p.shopId === shop.id);
+  const myUdhaar = state.data.myCustomerUdhaar || [];
+  const myExpenses = state.data.myExpenses || [];
+  const myLeads = state.data.myCrmLeads || [];
+
+  const grossRev = activeOrders.reduce((s, o) => s + Number(o.amount || 0), 0);
+  const totalProfitBeforeExp = activeOrders.reduce((s, o) => s + Number(o.estimatedProfit || Math.round((o.amount || 0) * 0.16)), 0);
+  const totalExpenses = myExpenses.reduce((s, x) => s + Number(x.amount || 0), 0);
+  const netOperatingProfit = totalProfitBeforeExp - totalExpenses;
+  const totalUdhaar = myUdhaar.reduce((s, c) => s + Number(c.balance || 0), 0);
+
+  if (queryType === 'PROPOSAL_CARD' && customPayload) {
+    const pId = customPayload.proposalId || ('prop_' + Date.now());
+    const encoded = encodeURIComponent(JSON.stringify(customPayload));
+    return `
+      <div id="${pId}" style="border:2px solid #2563EB;background:#EFF6FF;border-radius:12px;padding:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+          <span class="badge" style="background:#1D4ED8;color:#FFFFFF;font-weight:700">🛡️ ${tr('ACTION PROPOSAL CARD (AWAITING OWNER APPROVAL)', 'कार्य प्रस्ताव कार्ड (स्वामी की स्वीकृति प्रतीक्षित)')}</span>
+          <span style="font-size:0.74rem;color:#1E40AF;font-weight:600">${tr('Zero Direct Mutation Invariant Active', 'शून्य प्रत्यक्ष परिवर्तन सुरक्षा नियम सक्रिय')}</span>
+        </div>
+        <div style="font-weight:700;font-size:0.98rem;color:#0F172A;margin-bottom:6px">${esc(customPayload.title)}</div>
+        <p style="font-size:0.84rem;color:#334155;margin:0 0 12px">${esc(customPayload.summary)}</p>
+        <div style="background:#FFFFFF;border:1px solid #BFDBFE;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:0.82rem;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
+          ${(customPayload.fields || []).map(f => `
+            <div>
+              <div style="font-size:0.7rem;color:#64748B;text-transform:uppercase">${esc(f.label)}</div>
+              <div style="font-weight:700;color:#0F172A">${esc(f.value)}</div>
+            </div>
+          `).join('')}
+        </div>
+        <div class="proposal-actions" style="display:flex;gap:10px;flex-wrap:wrap">
+          <button type="button" class="btn btn-gold btn-sm" style="background:#16A34A;border-color:#16A34A;color:#FFFFFF" onclick="approveAiProposal('${pId}', '${customPayload.actionType}', '${encoded}')">
+            ✔ ${tr('Approve & Execute in Database', 'स्वीकृत करें और डेटाबेस में दर्ज करें')}
+          </button>
+          <button type="button" class="btn btn-outline btn-sm" style="color:#DC2626;border-color:#FECACA" onclick="discardAiProposal('${pId}')">
+            ✕ ${tr('Discard Proposal', 'प्रस्ताव निरस्त करें')}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  if (queryType === 'UDHAAR_AGING' || queryType === 'pending_udhaar') {
+    const nowMs = Date.now();
+    const buckets = { b30: 0, b60: 0, b90: 0, b90plus: 0 };
+    myUdhaar.forEach(c => {
+      const bal = Number(c.balance || 0);
+      if (bal <= 0) return;
+      const d = c.lastDate ? Math.max(0, Math.floor((nowMs - new Date(c.lastDate).getTime()) / 86400000)) : 12;
+      if (d <= 30) buckets.b30 += bal;
+      else if (d <= 60) buckets.b60 += bal;
+      else if (d <= 90) buckets.b90 += bal;
+      else buckets.b90plus += bal;
+    });
+    return `
+      <div>
+        <div style="font-weight:700;font-size:0.96rem;color:#0F172A;margin-bottom:8px">
+          📒 ${tr('Receivables & Aging Debtors Analysis', 'बकाया उधार और समय-आधारित (Aging) विश्लेषण')}
+        </div>
+        <p style="font-size:0.84rem;color:#334155;margin:0 0 12px">
+          ${tr(
+            `Total market credit pending is ₹${fmt(totalUdhaar)} across ${myUdhaar.filter(x => x.balance > 0).length} parties. Critical 60+ days overdue is ₹${fmt(buckets.b90 + buckets.b90plus)}.`,
+            `बाजार में कुल बकाया उधार ₹${fmt(totalUdhaar)} है (${myUdhaar.filter(x => x.balance > 0).length} पार्टियां)। 60+ दिन से अधिक का गंभीर बकाया ₹${fmt(buckets.b90 + buckets.b90plus)} है।`
+          )}
+        </p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px">
+          <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:8px">
+            <div style="font-size:0.72rem;color:#166534;font-weight:700">🟢 0–30 Days</div>
+            <div style="font-size:1.05rem;font-weight:800;color:#15803D">₹${fmt(buckets.b30)}</div>
+          </div>
+          <div style="background:#FEFCE8;border:1px solid #FEF08A;border-radius:8px;padding:8px">
+            <div style="font-size:0.72rem;color:#854D0E;font-weight:700">🟡 31–60 Days</div>
+            <div style="font-size:1.05rem;font-weight:800;color:#B45309">₹${fmt(buckets.b60)}</div>
+          </div>
+          <div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:8px">
+            <div style="font-size:0.72rem;color:#9A3412;font-weight:700">🟠 61–90 Days</div>
+            <div style="font-size:1.05rem;font-weight:800;color:#EA580C">₹${fmt(buckets.b90)}</div>
+          </div>
+          <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:8px">
+            <div style="font-size:0.72rem;color:#991B1B;font-weight:700">🔴 90+ Days</div>
+            <div style="font-size:1.05rem;font-weight:800;color:#DC2626">₹${fmt(buckets.b90plus)}</div>
+          </div>
+        </div>
+        <button class="btn btn-outline btn-xs" onclick="state.merchantTab='CustomerUdhaar';render()">
+          📲 ${tr('Open Aging Radar & Send WhatsApp Reminders', 'एजिंग रडार खोलें और WhatsApp रिमाइंडर भेजें')} →
+        </button>
+      </div>
+    `;
+  }
+
+  if (queryType === 'TOP_ITEMS' || queryType === 'top_stock') {
+    const sorted = [...myProducts].sort((a, b) => (Number(a.stock || 0)) - (Number(b.stock || 0)));
+    const lowStock = myProducts.filter(p => Number(p.stock || 0) <= 10);
+    return `
+      <div>
+        <div style="font-weight:700;font-size:0.96rem;color:#0F172A;margin-bottom:8px">
+          📦 ${tr('Inventory Health, Margin & Low-Stock Alert', 'स्टॉक स्वास्थ्य, मार्जिन और कम-स्टॉक चेतावनी')}
+        </div>
+        <p style="font-size:0.84rem;color:#334155;margin:0 0 10px">
+          ${tr(
+            `You have ${myProducts.length} active SKUs in catalog. ${lowStock.length} items are running low on stock (≤10 units).`,
+            `आपके कैटलॉग में ${myProducts.length} उत्पाद हैं। ${lowStock.length} उत्पादों का स्टॉक कम (≤10 इकाई) है।`
+          )}
+        </p>
+        <div style="overflow-x:auto">
+          <table class="data-table" style="font-size:0.8rem">
+            <thead>
+              <tr>
+                <th>${tr('Product', 'उत्पाद')}</th>
+                <th>${tr('Cost', 'लागत')}</th>
+                <th>${tr('Sale Rate', 'बिक्री दर')}</th>
+                <th>${tr('Unit Margin', 'प्रति इकाई लाभ')}</th>
+                <th>${tr('Stock', 'स्टॉक')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sorted.slice(0, 5).map(p => {
+                const margin = Number(p.price || 0) - Number(p.costPrice || Math.round(p.price * 0.82));
+                return `
+                  <tr>
+                    <td><strong>${esc(p.name)}</strong></td>
+                    <td>₹${fmt(p.costPrice || Math.round(p.price * 0.82))}</td>
+                    <td>₹${fmt(p.price)}</td>
+                    <td style="color:#16A34A;font-weight:700">+₹${fmt(margin)}</td>
+                    <td><span class="badge ${p.stock <= 10 ? 'badge-red' : 'badge-green'}">${p.stock}</span></td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  // Default: DAILY_SUMMARY / Net Profit P&L overview with visual bars
+  const maxBar = Math.max(grossRev, totalProfitBeforeExp, totalExpenses, Math.abs(netOperatingProfit), 1);
+  return `
+    <div>
+      <div style="font-weight:700;font-size:0.96rem;color:#0F172A;margin-bottom:6px">
+        📊 ${tr('Executive Financial Summary & Net Operating Profit', 'कार्यकारी वित्तीय सारांश और शुद्ध परिचालन लाभ')} — ${esc(shop.shop || shop.name)}
+      </div>
+      <p style="font-size:0.84rem;color:#334155;margin:0 0 12px">
+        ${tr(
+          `Based on ${activeOrders.length} active GST bills and ${myExpenses.length} expense vouchers, your Net Operating Profit is ₹${fmt(netOperatingProfit)} (${grossRev > 0 ? ((netOperatingProfit / grossRev) * 100).toFixed(1) : '0.0'}% net margin).`,
+          `${activeOrders.length} सक्रिय GST बिलों और ${myExpenses.length} खर्च वाउचरों के आधार पर, आपका शुद्ध परिचालन लाभ (Net Profit) ₹${fmt(netOperatingProfit)} (${grossRev > 0 ? ((netOperatingProfit / grossRev) * 100).toFixed(1) : '0.0'}% शुद्ध मार्जिन) है।`
+        )}
+      </p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin-bottom:14px">
+        <div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:10px">
+          <div style="font-size:0.72rem;color:#1D4ED8;font-weight:700">${tr('GROSS REVENUE', 'कुल बिक्री आय')}</div>
+          <div style="font-size:1.15rem;font-weight:800;color:#1E3A8A">₹${fmt(grossRev)}</div>
+          <div style="height:5px;background:#DBEAFE;border-radius:99px;margin-top:6px"><div style="height:100%;width:100%;background:#2563EB;border-radius:99px"></div></div>
+        </div>
+        <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:10px">
+          <div style="font-size:0.72rem;color:#15803D;font-weight:700">${tr('GROSS MARGIN', 'सकल मार्जिन')}</div>
+          <div style="font-size:1.15rem;font-weight:800;color:#166534">₹${fmt(totalProfitBeforeExp)}</div>
+          <div style="height:5px;background:#DCFCE7;border-radius:99px;margin-top:6px"><div style="height:100%;width:${Math.min(100, Math.round((totalProfitBeforeExp / maxBar) * 100))}%;background:#16A34A;border-radius:99px"></div></div>
+        </div>
+        <div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:10px">
+          <div style="font-size:0.72rem;color:#B91C1C;font-weight:700">${tr('SHOP EXPENSES', 'दुकान के खर्चे')}</div>
+          <div style="font-size:1.15rem;font-weight:800;color:#DC2626">-₹${fmt(totalExpenses)}</div>
+          <div style="height:5px;background:#FEE2E2;border-radius:99px;margin-top:6px"><div style="height:100%;width:${Math.min(100, Math.round((totalExpenses / maxBar) * 100))}%;background:#DC2626;border-radius:99px"></div></div>
+        </div>
+        <div style="background:#F8FAFC;border:2px solid ${netOperatingProfit >= 0 ? '#16A34A' : '#DC2626'};border-radius:10px;padding:10px">
+          <div style="font-size:0.72rem;color:#0F172A;font-weight:700">${tr('NET PROFIT', 'शुद्ध मुनाफा')}</div>
+          <div style="font-size:1.15rem;font-weight:800;color:${netOperatingProfit >= 0 ? '#15803D' : '#DC2626'}">${netOperatingProfit >= 0 ? '+' : '-'}₹${fmt(Math.abs(netOperatingProfit))}</div>
+          <div style="font-size:0.7rem;color:#64748B;margin-top:4px">${myLeads.length} ${tr('Active CRM Leads', 'सक्रिय लीड्स')}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+window.askAiBusinessManager = function(chipKey) {
+  const shop = state.data.myShop;
+  if (!shop) return;
+  const nowStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  let userText = '';
+  let html = '';
+
+  if (chipKey === 'DAILY_SUMMARY' || chipKey === 'sales_summary' || chipKey === 'profit_expenses') {
+    userText = tr('Show me today’s total sales, expenses & Net Operating Profit summary.', 'आज की कुल बिक्री, खर्च और शुद्ध मुनाफे (Net Profit) का विवरण दिखाएं।');
+    html = renderAiManagerInsightCard('DAILY_SUMMARY', shop);
+  } else if (chipKey === 'UDHAAR_AGING' || chipKey === 'pending_udhaar') {
+    userText = tr('Whose Udhaar payment is overdue by 60+ days?', 'किन पार्टियों का उधार 60+ दिनों से बाकी है?');
+    html = renderAiManagerInsightCard('UDHAAR_AGING', shop);
+  } else if (chipKey === 'TOP_ITEMS' || chipKey === 'top_stock') {
+    userText = tr('Show me top margin products and low-stock alerts.', 'सबसे अधिक मार्जिन वाले उत्पाद और कम स्टॉक की चेतावनी दिखाएं।');
+    html = renderAiManagerInsightCard('TOP_ITEMS', shop);
+  } else if (chipKey === 'PROPOSE_INVOICE' || chipKey === 'draft_bill_sharma') {
+    userText = tr('Prepare a GST Bill / Quotation of ₹2,500 for Sharma Traders.', 'शर्मा ट्रेडर्स के लिए ₹2,500 का बिल / कोटेशन तैयार करें।');
+    html = renderAiManagerInsightCard('PROPOSAL_CARD', shop, {
+      proposalId: 'prop_' + Date.now(),
+      actionType: 'CREATE_QUOTATION',
+      title: tr('Create Formal Quotation (QT-2627) for Sharma Traders (₹2,500)', 'शर्मा ट्रेडर्स के लिए औपचारिक कोटेशन (QT-2627) बनाएं (₹2,500)'),
+      summary: tr('AI has prepared a draft quotation. Per the Zero Direct Mutation safety rule, database records will only be created when you click Approve & Execute.', 'AI ने ड्राफ्ट कोटेशन तैयार कर लिया है। सुरक्षा नियम के अनुसार, जब आप "स्वीकृत करें" दबाएंगे तभी डेटाबेस में एंट्री होगी।'),
+      fields: [
+        { label: tr('Party Name', 'पार्टी का नाम'), value: 'Sharma Traders' },
+        { label: tr('Document Type', 'दस्तावेज़ प्रकार'), value: 'Formal Quotation (QT-2627)' },
+        { label: tr('Amount (Incl. GST)', 'राशि (GST सहित)'), value: '₹2,500' },
+        { label: tr('Stock Impact', 'स्टॉक प्रभाव'), value: '0 (Locked until Invoice Conversion)' }
+      ],
+      payload: {
+        shopId: shop.id,
+        customer: 'Sharma Traders',
+        phone: '9829011223',
+        docType: 'Quotation',
+        paymentMode: 'Quotation',
+        items: [{ name: 'B2B Assorted Wholesale Lot', hsn: '8471', qty: 1, price: 2500, gstRate: 18, taxMode: 'inclusive' }]
+      }
+    });
+  } else if (chipKey === 'PROPOSE_EXPENSE' || chipKey === 'draft_expense_elec') {
+    userText = tr('Log ₹1,200 Electricity Bill Expense for today.', 'आज का ₹1,200 बिजली बिल खर्च दर्ज करें।');
+    html = renderAiManagerInsightCard('PROPOSAL_CARD', shop, {
+      proposalId: 'prop_' + Date.now(),
+      actionType: 'ADD_EXPENSE',
+      title: tr('Log Operating Expense Voucher (₹1,200)', 'परिचालन खर्च वाउचर दर्ज करें (₹1,200)'),
+      summary: tr('This will record ₹1,200 under Electricity & Utility and automatically recalculate your Real-Time Net Operating Profit.', 'यह बिजली और उपयोगिता श्रेणी में ₹1,200 दर्ज करेगा और आपके शुद्ध मुनाफे (Net Profit) की स्वतः गणना करेगा।'),
+      fields: [
+        { label: tr('Category', 'श्रेणी'), value: 'Electricity & Utility' },
+        { label: tr('Amount', 'राशि'), value: '₹1,200' },
+        { label: tr('Payment Mode', 'भुगतान माध्यम'), value: 'UPI' },
+        { label: tr('Note', 'विवरण'), value: 'Monthly Shop Electricity Bill' }
+      ],
+      payload: {
+        kind: 'add_expense',
+        category: 'Electricity & Utility',
+        amount: 1200,
+        paymentMode: 'UPI',
+        date: new Date().toISOString().slice(0, 10),
+        note: 'Monthly Shop Electricity Bill (AI Assisted)'
+      }
+    });
+  }
+
+  state.aiManagerMessages.push({ role: 'user', time: nowStr, html: esc(userText) });
+  state.aiManagerMessages.push({ role: 'assistant', time: nowStr, html });
+  render();
+};
+
+window.submitAiBusinessManagerPrompt = function(e) {
+  e.preventDefault();
+  const input = document.getElementById('ai-mgr-input');
+  const text = (input?.value || '').trim();
+  if (!text) return;
+  const shop = state.data.myShop;
+  if (!shop) return;
+
+  const fmt = (n) => Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+  const nowStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  state.aiManagerMessages.push({ role: 'user', time: nowStr, html: esc(text) });
+  const lower = text.toLowerCase();
+  const numMatch = text.match(/(\d[\d,]*)/);
+  const amountVal = numMatch ? Number(numMatch[1].replace(/,/g, '')) : 1500;
+
+  let responseHtml = '';
+  // Check if user is asking for a mutation / action (bill, quote, expense, lead)
+  if (lower.includes('बिल') || lower.includes('bill') || lower.includes('invoice') || lower.includes('quote') || lower.includes('quotation') || lower.includes('कोटेशन') || lower.includes('बनाओ') || lower.includes('create')) {
+    const isQuote = lower.includes('quote') || lower.includes('quotation') || lower.includes('कोटेशन');
+    let partyName = 'Walk-in B2B Party';
+    const forMatch = text.match(/(?:for|to|के लिए)\s+([A-Za-z\u0900-\u097F\s]{2,25})/i);
+    if (forMatch && forMatch[1]) {
+      partyName = forMatch[1].replace(/(?:का|की|के|bill|invoice|quote|quotation|बनाओ)$/i, '').trim() || 'Sharma Traders';
+    } else if (lower.includes('शर्मा') || lower.includes('sharma')) {
+      partyName = 'Sharma Traders';
+    } else if (lower.includes('अग्रवाल') || lower.includes('agrawal') || lower.includes('agarwal')) {
+      partyName = 'Agrawal Brothers';
+    }
+    responseHtml = renderAiManagerInsightCard('PROPOSAL_CARD', shop, {
+      proposalId: 'prop_' + Date.now(),
+      actionType: isQuote ? 'CREATE_QUOTATION' : 'CREATE_INVOICE',
+      title: isQuote
+        ? tr(`Create Quotation for ${partyName} (₹${fmt(amountVal)})`, `${partyName} के लिए कोटेशन बनाएं (₹${fmt(amountVal)})`)
+        : tr(`Create GST Tax Invoice for ${partyName} (₹${fmt(amountVal)})`, `${partyName} के लिए GST टैक्स इनवॉइस बनाएं (₹${fmt(amountVal)})`),
+      summary: tr('AI parsed your instruction and created a safe Action Proposal Card. Click Approve & Execute to commit to ledger.', 'AI ने आपके निर्देश के अनुसार सुरक्षित कार्य प्रस्ताव कार्ड तैयार किया है। खाते में दर्ज करने के लिए "स्वीकृत करें" दबाएं।'),
+      fields: [
+        { label: tr('Party Name', 'पार्टी का नाम'), value: partyName },
+        { label: tr('Document Type', 'दस्तावेज़'), value: isQuote ? 'Quotation (QT-2627)' : 'Tax Invoice (KQ-2627)' },
+        { label: tr('Amount', 'राशि'), value: `₹${fmt(amountVal)}` },
+        { label: tr('Safety Check', 'सुरक्षा जांच'), value: 'Owner Approval Required' }
+      ],
+      payload: {
+        shopId: shop.id,
+        customer: partyName,
+        phone: '9829011223',
+        docType: isQuote ? 'Quotation' : 'Tax Invoice',
+        paymentMode: isQuote ? 'Quotation' : 'UPI',
+        paidAmount: isQuote ? 0 : amountVal,
+        items: [{ name: 'As per Order / B2B Supply', hsn: '8471', qty: 1, price: amountVal, gstRate: 18, taxMode: 'inclusive' }]
+      }
+    });
+  } else if (lower.includes('खर्च') || lower.includes('खर्चा') || lower.includes('expense') || lower.includes('भाड़ा') || lower.includes('freight') || lower.includes('rent')) {
+    responseHtml = renderAiManagerInsightCard('PROPOSAL_CARD', shop, {
+      proposalId: 'prop_' + Date.now(),
+      actionType: 'ADD_EXPENSE',
+      title: tr(`Record Shop Expense Voucher (₹${fmt(amountVal)})`, `दुकान खर्च वाउचर दर्ज करें (₹${fmt(amountVal)})`),
+      summary: tr('Review the expense details below and click Approve & Execute to deduct from Net Operating Profit.', 'नीचे खर्च का विवरण जांचें और शुद्ध मुनाफे में समायोजित करने के लिए "स्वीकृत करें" दबाएं।'),
+      fields: [
+        { label: tr('Category', 'श्रेणी'), value: 'Transport / Operations' },
+        { label: tr('Amount', 'राशि'), value: `₹${fmt(amountVal)}` },
+        { label: tr('Note', 'विवरण'), value: text }
+      ],
+      payload: {
+        kind: 'add_expense',
+        category: 'Transport / Freight',
+        amount: amountVal,
+        paymentMode: 'Cash',
+        date: new Date().toISOString().slice(0, 10),
+        note: text
+      }
+    });
+  } else if (lower.includes('उधार') || lower.includes('udhaar') || lower.includes('बकाया') || lower.includes('due') || lower.includes('aging') || lower.includes('overdue')) {
+    responseHtml = renderAiManagerInsightCard('UDHAAR_AGING', shop);
+  } else if (lower.includes('स्टॉक') || lower.includes('stock') || lower.includes('सामान') || lower.includes('item') || lower.includes('product') || lower.includes('margin')) {
+    responseHtml = renderAiManagerInsightCard('TOP_ITEMS', shop);
+  } else {
+    responseHtml = renderAiManagerInsightCard('DAILY_SUMMARY', shop);
+  }
+
+  state.aiManagerMessages.push({ role: 'assistant', time: nowStr, html: responseHtml });
+  render();
+};
+
+window.approveAiProposal = async function(proposalId, actionType, encodedData) {
+  try {
+    if (state.activeStaffRole !== 'Owner') {
+      return showToast(tr('Only Store Owner can approve & execute AI Action Proposals!', 'केवल दुकान के स्वामी (Owner) ही AI कार्य प्रस्ताव को स्वीकृत कर सकते हैं!'), 'error');
+    }
+    const parsed = JSON.parse(decodeURIComponent(encodedData));
+    if (actionType === 'CREATE_INVOICE' || actionType === 'CREATE_QUOTATION') {
+      const res = await apiFetch('/api/orders/create', {
+        method: 'POST',
+        body: JSON.stringify(parsed.payload)
+      });
+      await bootstrap();
+      showToast(tr(`✅ Executed! Created ${res.order.invoiceNo} for ${res.order.customer}.`, `✅ निष्पादित! ${res.order.customer} के लिए ${res.order.invoiceNo} बना दिया गया।`));
+    } else if (actionType === 'ADD_EXPENSE') {
+      await apiFetch('/api/merchant/ledger', {
+        method: 'POST',
+        body: JSON.stringify(parsed.payload)
+      });
+      await bootstrap();
+      showToast(tr('✅ Executed! Expense voucher saved & Net Profit updated.', '✅ निष्पादित! खर्च वाउचर सुरक्षित हो गया और शुद्ध मुनाफा अपडेट हो गया।'));
+    }
+    const cardEl = document.getElementById(proposalId);
+    if (cardEl) {
+      const actionsEl = cardEl.querySelector('.proposal-actions');
+      if (actionsEl) {
+        actionsEl.innerHTML = `<span class="badge badge-green">✔ ${tr('Approved & Executed by Owner', 'स्वामी द्वारा स्वीकृत एवं निष्पादित')}</span>`;
+      }
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.discardAiProposal = function(proposalId) {
+  const cardEl = document.getElementById(proposalId);
+  if (cardEl) {
+    const actionsEl = cardEl.querySelector('.proposal-actions');
+    if (actionsEl) {
+      actionsEl.innerHTML = `<span class="badge badge-red">✕ ${tr('Proposal Discarded (Zero DB Changes)', 'प्रस्ताव निरस्त (डेटाबेस में कोई बदलाव नहीं)')}</span>`;
+    }
+  }
+  showToast(tr('Action proposal discarded safely.', 'कार्य प्रस्ताव सुरक्षित रूप से निरस्त कर दिया गया।'));
 };
 
 window.updateOrderField = async function(orderId, fields) {
@@ -7738,7 +8784,7 @@ function render() {
   if (isEnterpriseView) {
     root.innerHTML = `${pageHtml}${state.demoModalOpen ? renderDemoModal() : ''}${state.reportModal ? renderReportModal() : ''}${state.orderReviewModal ? renderOrderReviewModal() : ''}${state.customerBillModal ? renderCustomerBillModal() : ''}${state.partyLedgerModalKey ? renderPartyLedgerModal() : ''}${state.aiModalOpen ? (state.data.myShop ? renderAiScannerModal(state.data.myShop) : '') : ''}${extraModals}`;
   } else {
-    root.innerHTML = `${renderHeader()}<main>${pageHtml}</main>${renderFooter()}${state.demoModalOpen ? renderDemoModal() : ''}${state.reportModal ? renderReportModal() : ''}${state.orderReviewModal ? renderOrderReviewModal() : ''}${state.customerBillModal ? renderCustomerBillModal() : ''}${state.partyLedgerModalKey ? renderPartyLedgerModal() : ''}${extraModals}`;
+    root.innerHTML = `${renderHeader()}<main>${pageHtml}</main>${renderFooter()}${renderMobileBottomNav()}${state.demoModalOpen ? renderDemoModal() : ''}${state.reportModal ? renderReportModal() : ''}${state.orderReviewModal ? renderOrderReviewModal() : ''}${state.customerBillModal ? renderCustomerBillModal() : ''}${state.partyLedgerModalKey ? renderPartyLedgerModal() : ''}${extraModals}`;
   }
 }
 

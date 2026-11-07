@@ -1559,7 +1559,225 @@ tr:hover td {
   font-weight: 700;
 }
 
-@media (max-width: 600px) {
+/* ============================================================================
+   RESPONSIVE UTILITY CLASSES (Desktop vs Mobile-First)
+   ============================================================================ */
+.desktop-only {
+  display: block;
+}
+
+.mobile-only {
+  display: none !important;
+}
+
+/* Mobile-First Clean Hero & Actions */
+.mobile-hero-clean {
+  text-align: center;
+  padding: 10px 4px 14px;
+}
+
+.mobile-badge-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fde047;
+  background: rgba(250, 204, 21, 0.16);
+  border: 1px solid rgba(250, 204, 21, 0.4);
+  padding: 5px 14px;
+  border-radius: 999px;
+  margin-bottom: 12px;
+}
+
+.mobile-hero-heading {
+  font-size: 1.48rem;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.34;
+  margin: 0 0 10px;
+}
+
+.mobile-hero-sub {
+  font-size: 0.88rem;
+  color: #cbd5e1;
+  line-height: 1.5;
+  margin: 0 0 18px;
+  font-weight: 400;
+}
+
+.mobile-cta-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.mobile-btn-action {
+  width: 100%;
+  padding: 14px 18px;
+  font-size: 1rem;
+  font-weight: 700;
+  border-radius: 12px;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+/* Mobile 4-Tile Quick Grid */
+.mobile-quick-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 12px 0 16px;
+}
+
+.mobile-quick-card {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.mobile-quick-card:active {
+  transform: scale(0.97);
+  background: #f8fafc;
+  border-color: #2563EB;
+}
+
+.mobile-quick-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 1.4rem;
+  margin-bottom: 8px;
+}
+
+.mobile-quick-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.mobile-quick-desc {
+  font-size: 0.74rem;
+  color: #64748b;
+  margin-top: 3px;
+  line-height: 1.3;
+}
+
+/* Mobile Bottom Sticky Navigation */
+.mobile-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 62px;
+  background: #0f172a;
+  border-top: 1.5px solid #1e293b;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 9998;
+  padding: 4px 8px;
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.28);
+}
+
+.mobile-nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  padding: 4px 10px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-width: 58px;
+  transition: all 0.15s ease;
+}
+
+.mobile-nav-btn:hover,
+.mobile-nav-btn.active {
+  color: #60a5fa;
+}
+
+.mobile-nav-btn.active .mobile-nav-icon {
+  transform: scale(1.15);
+}
+
+.mobile-nav-icon {
+  font-size: 1.25rem;
+  line-height: 1.2;
+  transition: transform 0.15s ease;
+}
+
+.mobile-nav-label {
+  margin-top: 2px;
+  line-height: 1;
+}
+
+/* Comprehensive Breakpoint for Mobile (< 768px) */
+@media (max-width: 768px) {
+  .desktop-only {
+    display: none !important;
+  }
+  .mobile-only {
+    display: block !important;
+  }
+  .mobile-flex {
+    display: flex !important;
+  }
+  .mobile-grid {
+    display: grid !important;
+  }
+  
+  /* Hide desktop horizontal nav strip on mobile for a clean header */
+  .site-header .nav-links {
+    display: none !important;
+  }
+  
+  .site-header .nav-bar {
+    padding: 10px 16px;
+    justify-content: space-between;
+  }
+  
+  /* Compact mobile container padding */
+  .container {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  
+  /* Compact mobile hero stage */
+  .hero-interactive-stage {
+    padding: 20px 0 24px;
+  }
+  
+  /* Body bottom padding so bottom bar never obscures content */
+  body {
+    padding-bottom: 74px !important;
+  }
+  
+  /* Elevate floating action hub above mobile bottom bar */
+  .floating-action-hub {
+    bottom: 76px !important;
+    right: 14px !important;
+  }
+
   .order-item-card {
     flex-direction: column;
     align-items: flex-start;
@@ -1568,9 +1786,5 @@ tr:hover td {
     width: 100%;
     justify-content: space-between;
     margin-top: 6px;
-  }
-  .floating-action-hub {
-    bottom: 16px;
-    right: 16px;
   }
 }
