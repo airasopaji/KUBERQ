@@ -11,7 +11,7 @@ const state = {
   route: window.location.pathname || '/',
   query: Object.fromEntries(new URLSearchParams(window.location.search)),
   data: {
-    settings: { enableTransportLive: false, enableServicesLive: false, adminWhatsApp: '' },
+    settings: { enableTransportLive: true, enableServicesLive: true, adminWhatsApp: '' },
     user: null,
     merchants: [
       {
@@ -3733,8 +3733,11 @@ function renderMerchantAiBusinessManager(shop) {
 
       <!-- Natural Language Chat Input Bar -->
       <div class="erp-card" style="padding:14px 16px">
-        <form onsubmit="submitAiBusinessManagerPrompt(event)" style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center">
+        <form onsubmit="submitAiBusinessManagerPrompt(event)" style="display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center">
           <input class="input" id="ai-mgr-input" placeholder="${tr('Ask anything in Hindi or English (e.g. "आज की बिक्री?", "किसका उधार बाकी है?", "Create bill for Verma Traders Rs 4500")...', 'हिंदी या अंग्रेज़ी में पूछें (उदा: "आज की कुल बिक्री?", "किसका उधार बाकी है?", "शर्मा जी के लिए 3500 का बिल बनाओ")...')}" style="font-size:0.95rem;padding:12px 14px" />
+          <button type="button" class="btn btn-outline" style="padding:12px 14px" title="${tr('Speak in Hindi or English', 'बोलकर पूछें (Voice)')}" onclick="startAiVoiceInput('ai-mgr-input')">
+            🎤 ${tr('Voice', 'बोलें')}
+          </button>
           <button type="submit" class="btn btn-primary" style="padding:12px 22px;font-size:0.95rem">
             🚀 ${tr('Ask AI Manager', 'AI से पूछें')}
           </button>
@@ -6414,24 +6417,69 @@ window.prefillQuotationFromLead = function(buyerName, phone, itemsInterest, expe
 // ============================================================================
 // AI DIGITAL BUSINESS MANAGER (883s "ASK YOUR DATA ANYTHING" + ZERO DIRECT MUTATION)
 // ============================================================================
+function getActiveAiShop() {
+  return state.data.myShop || state.data.merchants?.[0] || { id: 'MQM-31CD16', shop: 'Marwar Hardware & Sanitary Mart', city: 'Jodhpur' };
+}
+
 function renderAiManagerInsightCard(queryType, shop, customPayload = null) {
   const fmt = (n) => Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
-  const myOrders = state.data.orders.filter(o => o.shopId === shop.id);
+  const targetShop = shop || getActiveAiShop();
+  const rawOrders = (state.data.myOrders && state.data.myOrders.length > 0)
+    ? state.data.myOrders
+    : (state.data.adminData?.orders || [
+        { id: 'KQ-2627-101', shopId: targetShop.id, customer: 'Sharma Traders', phone: '9829011223', amount: 48500, paidAmount: 28500, estimatedProfit: 7760, paymentMode: 'Credit', status: 'Delivered', date: new Date(Date.now() - 68 * 86400000).toISOString() },
+        { id: 'KQ-2627-102', shopId: targetShop.id, customer: 'Rathore Builders', phone: '9829044556', amount: 32400, paidAmount: 12400, estimatedProfit: 5180, paymentMode: 'Credit', status: 'Delivered', date: new Date(Date.now() - 38 * 86400000).toISOString() },
+        { id: 'KQ-2627-103', shopId: targetShop.id, customer: 'Agrawal Brothers', phone: '9829077889', amount: 19800, paidAmount: 19800, estimatedProfit: 3168, paymentMode: 'UPI', status: 'Delivered', date: new Date().toISOString() }
+      ]);
+  const myOrders = rawOrders.filter(o => !targetShop.id || !o.shopId || o.shopId === targetShop.id);
   const activeOrders = myOrders.filter(o => o.status !== 'Rejected' && o.status !== 'Cancelled' && o.docType !== 'Quotation' && o.status !== 'Quotation');
-  const myProducts = state.data.products.filter(p => p.shopId === shop.id);
-  const myUdhaar = state.data.myCustomerUdhaar || [];
-  const myExpenses = state.data.myExpenses || [];
+  const myProducts = (state.data.products || []).filter(p => !targetShop.id || !p.shopId || p.shopId === targetShop.id);
+  const myExpenses = (state.data.myExpenses && state.data.myExpenses.length > 0)
+    ? state.data.myExpenses
+    : [{ id: 'EXP-1', category: 'Transport / Freight', amount: 1850 }, { id: 'EXP-2', category: 'Shop Electricity & Tea', amount: 950 }];
   const myLeads = state.data.myCrmLeads || [];
 
-  const grossRev = activeOrders.reduce((s, o) => s + Number(o.amount || 0), 0);
-  const totalProfitBeforeExp = activeOrders.reduce((s, o) => s + Number(o.estimatedProfit || Math.round((o.amount || 0) * 0.16)), 0);
+  // Calculate real customer Udhaar & Aging buckets from orders
+  const nowMs = Date.now();
+  const buckets = { b30: 0, b60: 0, b90: 0, b90plus: 0 };
+  const partyUdhaarMap = new Map();
+  activeOrders.forEach(o => {
+    const gross = Number(o.customAmount || o.amount || 0);
+    const paid = Number(o.paidAmount || (o.paymentMode !== 'Credit' ? gross : 0));
+    const due = o.udhaarSettled ? 0 : Math.max(0, gross - paid);
+    if (due <= 0) return;
+    const orderTs = new Date(o.date || o.createdAt || nowMs).getTime();
+    const d = Math.max(0, Math.floor((nowMs - (isNaN(orderTs) ? nowMs : orderTs)) / 86400000));
+    if (d <= 30) buckets.b30 += due;
+    else if (d <= 60) buckets.b60 += due;
+    else if (d <= 90) buckets.b90 += due;
+    else buckets.b90plus += due;
+    const key = `${o.customer || 'Party'}__${o.phone || ''}`;
+    partyUdhaarMap.set(key, (partyUdhaarMap.get(key) || 0) + due);
+  });
+
+  const totalUdhaar = buckets.b30 + buckets.b60 + buckets.b90 + buckets.b90plus;
+  const udhaarPartyCount = partyUdhaarMap.size;
+  const grossRev = activeOrders.reduce((s, o) => s + Number(o.customAmount || o.amount || 0), 0);
+  const totalProfitBeforeExp = activeOrders.reduce((s, o) => s + Number(o.estimatedProfit || Math.round((o.customAmount || o.amount || 0) * 0.16)), 0);
   const totalExpenses = myExpenses.reduce((s, x) => s + Number(x.amount || 0), 0);
   const netOperatingProfit = totalProfitBeforeExp - totalExpenses;
-  const totalUdhaar = myUdhaar.reduce((s, c) => s + Number(c.balance || 0), 0);
 
   if (queryType === 'PROPOSAL_CARD' && customPayload) {
     const pId = customPayload.proposalId || ('prop_' + Date.now());
     const encoded = encodeURIComponent(JSON.stringify(customPayload));
+    const statusBadge = customPayload.executedStatus === 'APPROVED'
+      ? `<span class="badge badge-green">✔ ${tr('Approved & Executed by Owner', 'स्वामी द्वारा स्वीकृत एवं निष्पादित')}</span>`
+      : customPayload.executedStatus === 'DISCARDED'
+      ? `<span class="badge badge-red">✕ ${tr('Proposal Discarded (Zero DB Changes)', 'प्रस्ताव निरस्त (डेटाबेस में कोई बदलाव नहीं)')}</span>`
+      : `
+          <button type="button" class="btn btn-gold btn-sm" style="background:#16A34A;border-color:#16A34A;color:#FFFFFF" onclick="approveAiProposal('${pId}', '${customPayload.actionType}', '${encoded}')">
+            ✔ ${tr('Approve & Execute in Database', 'स्वीकृत करें और डेटाबेस में दर्ज करें')}
+          </button>
+          <button type="button" class="btn btn-outline btn-sm" style="color:#DC2626;border-color:#FECACA" onclick="discardAiProposal('${pId}')">
+            ✕ ${tr('Discard Proposal', 'प्रस्ताव निरस्त करें')}
+          </button>
+        `;
     return `
       <div id="${pId}" style="border:2px solid #2563EB;background:#EFF6FF;border-radius:12px;padding:16px">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
@@ -6449,29 +6497,13 @@ function renderAiManagerInsightCard(queryType, shop, customPayload = null) {
           `).join('')}
         </div>
         <div class="proposal-actions" style="display:flex;gap:10px;flex-wrap:wrap">
-          <button type="button" class="btn btn-gold btn-sm" style="background:#16A34A;border-color:#16A34A;color:#FFFFFF" onclick="approveAiProposal('${pId}', '${customPayload.actionType}', '${encoded}')">
-            ✔ ${tr('Approve & Execute in Database', 'स्वीकृत करें और डेटाबेस में दर्ज करें')}
-          </button>
-          <button type="button" class="btn btn-outline btn-sm" style="color:#DC2626;border-color:#FECACA" onclick="discardAiProposal('${pId}')">
-            ✕ ${tr('Discard Proposal', 'प्रस्ताव निरस्त करें')}
-          </button>
+          ${statusBadge}
         </div>
       </div>
     `;
   }
 
   if (queryType === 'UDHAAR_AGING' || queryType === 'pending_udhaar') {
-    const nowMs = Date.now();
-    const buckets = { b30: 0, b60: 0, b90: 0, b90plus: 0 };
-    myUdhaar.forEach(c => {
-      const bal = Number(c.balance || 0);
-      if (bal <= 0) return;
-      const d = c.lastDate ? Math.max(0, Math.floor((nowMs - new Date(c.lastDate).getTime()) / 86400000)) : 12;
-      if (d <= 30) buckets.b30 += bal;
-      else if (d <= 60) buckets.b60 += bal;
-      else if (d <= 90) buckets.b90 += bal;
-      else buckets.b90plus += bal;
-    });
     return `
       <div>
         <div style="font-weight:700;font-size:0.96rem;color:#0F172A;margin-bottom:8px">
@@ -6479,8 +6511,8 @@ function renderAiManagerInsightCard(queryType, shop, customPayload = null) {
         </div>
         <p style="font-size:0.84rem;color:#334155;margin:0 0 12px">
           ${tr(
-            `Total market credit pending is ₹${fmt(totalUdhaar)} across ${myUdhaar.filter(x => x.balance > 0).length} parties. Critical 60+ days overdue is ₹${fmt(buckets.b90 + buckets.b90plus)}.`,
-            `बाजार में कुल बकाया उधार ₹${fmt(totalUdhaar)} है (${myUdhaar.filter(x => x.balance > 0).length} पार्टियां)। 60+ दिन से अधिक का गंभीर बकाया ₹${fmt(buckets.b90 + buckets.b90plus)} है।`
+            `Total market credit pending is ₹${fmt(totalUdhaar)} across ${udhaarPartyCount} parties. Critical 60+ days overdue is ₹${fmt(buckets.b90 + buckets.b90plus)}.`,
+            `बाजार में कुल बकाया उधार ₹${fmt(totalUdhaar)} है (${udhaarPartyCount} पार्टियां)। 60+ दिन से अधिक का गंभीर बकाया ₹${fmt(buckets.b90 + buckets.b90plus)} है।`
           )}
         </p>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px">
@@ -6501,7 +6533,7 @@ function renderAiManagerInsightCard(queryType, shop, customPayload = null) {
             <div style="font-size:1.05rem;font-weight:800;color:#DC2626">₹${fmt(buckets.b90plus)}</div>
           </div>
         </div>
-        <button class="btn btn-outline btn-xs" onclick="state.merchantTab='CustomerUdhaar';render()">
+        <button type="button" class="btn btn-outline btn-xs" onclick="state.aiChatModalOpen=false;state.merchantTab='Udhaar';if(state.route!=='/merchant')navigate('/merchant');else render()">
           📲 ${tr('Open Aging Radar & Send WhatsApp Reminders', 'एजिंग रडार खोलें और WhatsApp रिमाइंडर भेजें')} →
         </button>
       </div>
@@ -6558,7 +6590,7 @@ function renderAiManagerInsightCard(queryType, shop, customPayload = null) {
   return `
     <div>
       <div style="font-weight:700;font-size:0.96rem;color:#0F172A;margin-bottom:6px">
-        📊 ${tr('Executive Financial Summary & Net Operating Profit', 'कार्यकारी वित्तीय सारांश और शुद्ध परिचालन लाभ')} — ${esc(shop.shop || shop.name)}
+        📊 ${tr('Executive Financial Summary & Net Operating Profit', 'कार्यकारी वित्तीय सारांश और शुद्ध परिचालन लाभ')} — ${esc(targetShop.shop || targetShop.name || 'KuberQ Store')}
       </div>
       <p style="font-size:0.84rem;color:#334155;margin:0 0 12px">
         ${tr(
@@ -6592,12 +6624,21 @@ function renderAiManagerInsightCard(queryType, shop, customPayload = null) {
   `;
 }
 
+function scrollAiChatBoxesToBottom() {
+  setTimeout(() => {
+    ['ai-mgr-chat-box', 'ai-global-chat-box'].forEach(id => {
+      const box = document.getElementById(id);
+      if (box) box.scrollTop = box.scrollHeight;
+    });
+  }, 40);
+}
+
 window.askAiBusinessManager = function(chipKey) {
-  const shop = state.data.myShop;
-  if (!shop) return;
+  const shop = getActiveAiShop();
   const nowStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
   let userText = '';
   let html = '';
+  let proposalPayload = null;
 
   if (chipKey === 'DAILY_SUMMARY' || chipKey === 'sales_summary' || chipKey === 'profit_expenses') {
     userText = tr('Show me today’s total sales, expenses & Net Operating Profit summary.', 'आज की कुल बिक्री, खर्च और शुद्ध मुनाफे (Net Profit) का विवरण दिखाएं।');
@@ -6610,7 +6651,7 @@ window.askAiBusinessManager = function(chipKey) {
     html = renderAiManagerInsightCard('TOP_ITEMS', shop);
   } else if (chipKey === 'PROPOSE_INVOICE' || chipKey === 'draft_bill_sharma') {
     userText = tr('Prepare a GST Bill / Quotation of ₹2,500 for Sharma Traders.', 'शर्मा ट्रेडर्स के लिए ₹2,500 का बिल / कोटेशन तैयार करें।');
-    html = renderAiManagerInsightCard('PROPOSAL_CARD', shop, {
+    proposalPayload = {
       proposalId: 'prop_' + Date.now(),
       actionType: 'CREATE_QUOTATION',
       title: tr('Create Formal Quotation (QT-2627) for Sharma Traders (₹2,500)', 'शर्मा ट्रेडर्स के लिए औपचारिक कोटेशन (QT-2627) बनाएं (₹2,500)'),
@@ -6629,10 +6670,11 @@ window.askAiBusinessManager = function(chipKey) {
         paymentMode: 'Quotation',
         items: [{ name: 'B2B Assorted Wholesale Lot', hsn: '8471', qty: 1, price: 2500, gstRate: 18, taxMode: 'inclusive' }]
       }
-    });
+    };
+    html = renderAiManagerInsightCard('PROPOSAL_CARD', shop, proposalPayload);
   } else if (chipKey === 'PROPOSE_EXPENSE' || chipKey === 'draft_expense_elec') {
     userText = tr('Log ₹1,200 Electricity Bill Expense for today.', 'आज का ₹1,200 बिजली बिल खर्च दर्ज करें।');
-    html = renderAiManagerInsightCard('PROPOSAL_CARD', shop, {
+    proposalPayload = {
       proposalId: 'prop_' + Date.now(),
       actionType: 'ADD_EXPENSE',
       title: tr('Log Operating Expense Voucher (₹1,200)', 'परिचालन खर्च वाउचर दर्ज करें (₹1,200)'),
@@ -6651,21 +6693,22 @@ window.askAiBusinessManager = function(chipKey) {
         date: new Date().toISOString().slice(0, 10),
         note: 'Monthly Shop Electricity Bill (AI Assisted)'
       }
-    });
+    };
+    html = renderAiManagerInsightCard('PROPOSAL_CARD', shop, proposalPayload);
   }
 
   state.aiManagerMessages.push({ role: 'user', time: nowStr, html: esc(userText) });
-  state.aiManagerMessages.push({ role: 'assistant', time: nowStr, html });
+  state.aiManagerMessages.push({ role: 'assistant', time: nowStr, proposalId: proposalPayload?.proposalId, proposalPayload, html });
   render();
+  scrollAiChatBoxesToBottom();
 };
 
-window.submitAiBusinessManagerPrompt = function(e) {
+window.submitAiBusinessManagerPrompt = function(e, inputId = 'ai-mgr-input') {
   e.preventDefault();
-  const input = document.getElementById('ai-mgr-input');
+  const input = document.getElementById(inputId) || document.getElementById('ai-mgr-input') || document.getElementById('ai-global-input');
   const text = (input?.value || '').trim();
   if (!text) return;
-  const shop = state.data.myShop;
-  if (!shop) return;
+  const shop = getActiveAiShop();
 
   const fmt = (n) => Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 });
   const nowStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
@@ -6675,6 +6718,7 @@ window.submitAiBusinessManagerPrompt = function(e) {
   const amountVal = numMatch ? Number(numMatch[1].replace(/,/g, '')) : 1500;
 
   let responseHtml = '';
+  let proposalPayload = null;
   // Check if user is asking for a mutation / action (bill, quote, expense, lead)
   if (lower.includes('बिल') || lower.includes('bill') || lower.includes('invoice') || lower.includes('quote') || lower.includes('quotation') || lower.includes('कोटेशन') || lower.includes('बनाओ') || lower.includes('create')) {
     const isQuote = lower.includes('quote') || lower.includes('quotation') || lower.includes('कोटेशन');
@@ -6687,7 +6731,7 @@ window.submitAiBusinessManagerPrompt = function(e) {
     } else if (lower.includes('अग्रवाल') || lower.includes('agrawal') || lower.includes('agarwal')) {
       partyName = 'Agrawal Brothers';
     }
-    responseHtml = renderAiManagerInsightCard('PROPOSAL_CARD', shop, {
+    proposalPayload = {
       proposalId: 'prop_' + Date.now(),
       actionType: isQuote ? 'CREATE_QUOTATION' : 'CREATE_INVOICE',
       title: isQuote
@@ -6709,9 +6753,10 @@ window.submitAiBusinessManagerPrompt = function(e) {
         paidAmount: isQuote ? 0 : amountVal,
         items: [{ name: 'As per Order / B2B Supply', hsn: '8471', qty: 1, price: amountVal, gstRate: 18, taxMode: 'inclusive' }]
       }
-    });
+    };
+    responseHtml = renderAiManagerInsightCard('PROPOSAL_CARD', shop, proposalPayload);
   } else if (lower.includes('खर्च') || lower.includes('खर्चा') || lower.includes('expense') || lower.includes('भाड़ा') || lower.includes('freight') || lower.includes('rent')) {
-    responseHtml = renderAiManagerInsightCard('PROPOSAL_CARD', shop, {
+    proposalPayload = {
       proposalId: 'prop_' + Date.now(),
       actionType: 'ADD_EXPENSE',
       title: tr(`Record Shop Expense Voucher (₹${fmt(amountVal)})`, `दुकान खर्च वाउचर दर्ज करें (₹${fmt(amountVal)})`),
@@ -6729,7 +6774,8 @@ window.submitAiBusinessManagerPrompt = function(e) {
         date: new Date().toISOString().slice(0, 10),
         note: text
       }
-    });
+    };
+    responseHtml = renderAiManagerInsightCard('PROPOSAL_CARD', shop, proposalPayload);
   } else if (lower.includes('उधार') || lower.includes('udhaar') || lower.includes('बकाया') || lower.includes('due') || lower.includes('aging') || lower.includes('overdue')) {
     responseHtml = renderAiManagerInsightCard('UDHAAR_AGING', shop);
   } else if (lower.includes('स्टॉक') || lower.includes('stock') || lower.includes('सामान') || lower.includes('item') || lower.includes('product') || lower.includes('margin')) {
@@ -6738,13 +6784,16 @@ window.submitAiBusinessManagerPrompt = function(e) {
     responseHtml = renderAiManagerInsightCard('DAILY_SUMMARY', shop);
   }
 
-  state.aiManagerMessages.push({ role: 'assistant', time: nowStr, html: responseHtml });
+  state.aiManagerMessages.push({ role: 'assistant', time: nowStr, proposalId: proposalPayload?.proposalId, proposalPayload, html: responseHtml });
   render();
+  scrollAiChatBoxesToBottom();
 };
 
 window.approveAiProposal = async function(proposalId, actionType, encodedData) {
   try {
-    if (state.activeStaffRole !== 'Owner') {
+    const u = state.data.user || {};
+    const isStaffRestricted = u.role === 'staff' && u.staffRole && u.staffRole !== 'Owner';
+    if (isStaffRestricted) {
       return showToast(tr('Only Store Owner can approve & execute AI Action Proposals!', 'केवल दुकान के स्वामी (Owner) ही AI कार्य प्रस्ताव को स्वीकृत कर सकते हैं!'), 'error');
     }
     const parsed = JSON.parse(decodeURIComponent(encodedData));
@@ -6753,22 +6802,32 @@ window.approveAiProposal = async function(proposalId, actionType, encodedData) {
         method: 'POST',
         body: JSON.stringify(parsed.payload)
       });
+      // Mark message as approved before re-render
+      const msg = state.aiManagerMessages.find(m => m.proposalId === proposalId);
+      if (msg && msg.proposalPayload) {
+        msg.proposalPayload.executedStatus = 'APPROVED';
+        msg.html = renderAiManagerInsightCard('PROPOSAL_CARD', getActiveAiShop(), msg.proposalPayload);
+      }
       await bootstrap();
       showToast(tr(`✅ Executed! Created ${res.order.invoiceNo} for ${res.order.customer}.`, `✅ निष्पादित! ${res.order.customer} के लिए ${res.order.invoiceNo} बना दिया गया।`));
     } else if (actionType === 'ADD_EXPENSE') {
-      await apiFetch('/api/merchant/ledger', {
-        method: 'POST',
-        body: JSON.stringify(parsed.payload)
-      });
-      await bootstrap();
-      showToast(tr('✅ Executed! Expense voucher saved & Net Profit updated.', '✅ निष्पादित! खर्च वाउचर सुरक्षित हो गया और शुद्ध मुनाफा अपडेट हो गया।'));
-    }
-    const cardEl = document.getElementById(proposalId);
-    if (cardEl) {
-      const actionsEl = cardEl.querySelector('.proposal-actions');
-      if (actionsEl) {
-        actionsEl.innerHTML = `<span class="badge badge-green">✔ ${tr('Approved & Executed by Owner', 'स्वामी द्वारा स्वीकृत एवं निष्पादित')}</span>`;
+      if (state.token) {
+        await apiFetch('/api/merchant/ledger', {
+          method: 'POST',
+          body: JSON.stringify(parsed.payload)
+        });
+      } else {
+        state.data.myExpenses = state.data.myExpenses || [];
+        state.data.myExpenses.unshift({ id: 'EXP-' + Date.now(), ...parsed.payload });
       }
+      const msg = state.aiManagerMessages.find(m => m.proposalId === proposalId);
+      if (msg && msg.proposalPayload) {
+        msg.proposalPayload.executedStatus = 'APPROVED';
+        msg.html = renderAiManagerInsightCard('PROPOSAL_CARD', getActiveAiShop(), msg.proposalPayload);
+      }
+      if (state.token) await bootstrap();
+      else render();
+      showToast(tr('✅ Executed! Expense voucher saved & Net Profit updated.', '✅ निष्पादित! खर्च वाउचर सुरक्षित हो गया और शुद्ध मुनाफा अपडेट हो गया।'));
     }
   } catch (err) {
     showToast(err.message, 'error');
@@ -6776,14 +6835,34 @@ window.approveAiProposal = async function(proposalId, actionType, encodedData) {
 };
 
 window.discardAiProposal = function(proposalId) {
-  const cardEl = document.getElementById(proposalId);
-  if (cardEl) {
-    const actionsEl = cardEl.querySelector('.proposal-actions');
-    if (actionsEl) {
-      actionsEl.innerHTML = `<span class="badge badge-red">✕ ${tr('Proposal Discarded (Zero DB Changes)', 'प्रस्ताव निरस्त (डेटाबेस में कोई बदलाव नहीं)')}</span>`;
-    }
+  const msg = state.aiManagerMessages.find(m => m.proposalId === proposalId);
+  if (msg && msg.proposalPayload) {
+    msg.proposalPayload.executedStatus = 'DISCARDED';
+    msg.html = renderAiManagerInsightCard('PROPOSAL_CARD', getActiveAiShop(), msg.proposalPayload);
   }
+  render();
   showToast(tr('Action proposal discarded safely.', 'कार्य प्रस्ताव सुरक्षित रूप से निरस्त कर दिया गया।'));
+};
+
+window.openAiScannerModal = function() {
+  state.aiModalOpen = true;
+  render();
+};
+
+window.pickRegisteredBuyerForInvoice = function(merchantId) {
+  if (!merchantId) return;
+  const m = (state.data.merchants || []).find(x => x.id === merchantId);
+  if (!m) return;
+  state.invoiceBuyer = {
+    ...state.invoiceBuyer,
+    buyerShopId: m.id,
+    name: m.shop || m.name || '',
+    phone: m.phone || '',
+    gstin: m.gstin || '',
+    address: m.city ? `${m.city}, ${m.state || 'Rajasthan'}` : ''
+  };
+  render();
+  showToast(tr(`🔄 Linked ${m.shop} for Dual-Ledger Auto-Sync!`, `🔄 दोहरे बही-खाते हेतु ${m.shop} को चुन लिया गया!`));
 };
 
 window.updateOrderField = async function(orderId, fields) {
@@ -8359,6 +8438,9 @@ function renderFloatingActionHub() {
     <div class="floating-action-hub">
       ${isOpen ? `
         <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;margin-bottom:4px">
+          <button type="button" class="floating-sub-btn" style="background:linear-gradient(135deg,#1E3A8A,#2563EB);color:#ffffff;border-color:#1D4ED8;font-weight:700" onclick="openGlobalAiChatModal()">
+            🤖 <span>${tr('AI Business Chat ("Ask Your Data")', 'AI बिज़नेस चैट (डेटा से पूछें)')}</span>
+          </button>
           <button type="button" class="floating-sub-btn" onclick="openVoucherScanModal()">
             📸 <span>${tr('AI Voucher & Bill Scanner', 'AI वाउचर व बिल स्कैनर')}</span>
           </button>
@@ -8372,12 +8454,115 @@ function renderFloatingActionHub() {
         </div>
       ` : ''}
 
-      <button type="button" class="floating-hub-pill" onclick="state.floatingHubOpen=!state.floatingHubOpen;render()">
-        <span>${isOpen ? tr('✕ Close Tools', '✕ टूल्स बंद करें') : tr('✨ AI Tools & Excel Sheet', '✨ AI टूल्स व एक्सेल शीट')}</span>
-      </button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button type="button" class="floating-hub-pill" style="background:linear-gradient(135deg,#0F172A,#1E3A8A);border:1.5px solid #3B82F6" onclick="openGlobalAiChatModal()">
+          <span>🤖 ${tr('AI Chat', 'AI चैट')}</span>
+        </button>
+        <button type="button" class="floating-hub-pill" onclick="state.floatingHubOpen=!state.floatingHubOpen;render()">
+          <span>${isOpen ? tr('✕ Close', '✕ बंद करें') : tr('✨ AI Tools & Excel', '✨ AI टूल्स व एक्सेल')}</span>
+        </button>
+      </div>
     </div>
   `;
 }
+
+function renderGlobalAiChatModal() {
+  const shop = getActiveAiShop();
+  const u = state.data.user || {};
+  const messages = state.aiManagerMessages && state.aiManagerMessages.length > 0
+    ? state.aiManagerMessages
+    : [
+        {
+          id: 'welcome-ai',
+          role: 'assistant',
+          time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+          html: renderAiManagerInsightCard('welcome', shop)
+        }
+      ];
+
+  return `
+    <div class="modal-overlay" style="display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(15,23,42,0.72);z-index:99999;backdrop-filter:blur(4px);padding:12px">
+      <div class="card" style="max-width:860px;width:100%;max-height:92vh;display:flex;flex-direction:column;border-radius:18px;padding:0;overflow:hidden;border:2px solid #2563EB;box-shadow:0 24px 48px rgba(15,23,42,0.35)">
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg,#0F172A 0%,#1E3A8A 100%);color:#ffffff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+          <div>
+            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(250,204,21,0.2);border:1px solid rgba(250,204,21,0.5);color:#fde047;padding:2px 8px;border-radius:999px;font-size:0.7rem;font-weight:800;margin-bottom:4px">
+              🛡️ ZERO DIRECT MUTATION · 883s AI BUSINESS MANAGER
+            </div>
+            <h3 style="color:#ffffff;margin:0;font-size:1.1rem">🤖 ${tr('KuberQ AI Business Chat — "Ask Your Data Anything"', 'KuberQ AI बिज़नेस चैट — अपने व्यापार के डेटा से कुछ भी पूछें')}</h3>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" style="color:#ffffff;border-color:rgba(255,255,255,0.3)" onclick="state.aiChatModalOpen=false;render()">✕ ${tr('Close', 'बंद करें')}</button>
+        </div>
+
+        <!-- Quick Chips -->
+        <div style="background:#EFF6FF;padding:10px 16px;border-bottom:1px solid #BFDBFE;display:flex;gap:6px;flex-wrap:wrap">
+          <button type="button" class="btn btn-xs btn-primary" onclick="askAiBusinessManager('sales_summary')">📊 ${tr('Sales & Net Profit', 'बिक्री व शुद्ध मुनाफ़ा')}</button>
+          <button type="button" class="btn btn-xs btn-outline" style="background:#fff" onclick="askAiBusinessManager('pending_udhaar')">📒 ${tr('Udhaar & 60+ Days Aging', 'बकाया उधार व एजिंग')}</button>
+          <button type="button" class="btn btn-xs btn-outline" style="background:#fff" onclick="askAiBusinessManager('top_stock')">📦 ${tr('Stock & Margins', 'स्टॉक व मार्जिन')}</button>
+          <button type="button" class="btn btn-xs btn-outline" style="background:#FEFCE8;border-color:#FDE047;color:#854D0E" onclick="askAiBusinessManager('draft_bill_sharma')">⚡ ${tr('Proposal: ₹2,500 Quote for Sharma Ji', 'प्रस्ताव: शर्मा जी ₹2,500 कोटेशन')}</button>
+          <button type="button" class="btn btn-xs btn-outline" style="background:#F0FDF4;border-color:#86EFAC;color:#166534" onclick="askAiBusinessManager('draft_expense_elec')">⚡ ${tr('Proposal: ₹1,200 Electricity Expense', 'प्रस्ताव: ₹1,200 बिजली खर्च')}</button>
+        </div>
+
+        <!-- Chat Stream -->
+        <div id="ai-global-chat-box" style="flex:1;overflow-y:auto;padding:16px;background:#F8FAFC;display:flex;flex-direction:column;gap:12px;min-height:280px;max-height:54vh">
+          ${messages.map(m => `
+            <div style="display:flex;flex-direction:column;align-items:${m.role === 'user' ? 'flex-end' : 'flex-start'}">
+              <div style="max-width:${m.role === 'user' ? '80%' : '98%'};width:${m.role === 'user' ? 'auto' : '100%'};background:${m.role === 'user' ? '#2563EB' : '#ffffff'};color:${m.role === 'user' ? '#ffffff' : '#0f172a'};padding:12px 14px;border-radius:14px;border:${m.role === 'user' ? 'none' : '1.5px solid #cbd5e1'};box-shadow:0 2px 6px rgba(15,23,42,0.05)">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:4px;font-size:0.7rem;opacity:0.8">
+                  <b>${m.role === 'user' ? `👤 ${esc(u.name || tr('Merchant / Visitor', 'व्यापारी / उपयोगकर्ता'))}` : '🤖 KuberQ AI Business Manager'}</b>
+                  <span>${esc(m.time || '')}</span>
+                </div>
+                <div>${m.html}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <!-- Input Bar -->
+        <form onsubmit="submitAiBusinessManagerPrompt(event, 'ai-global-input')" style="padding:12px 16px;background:#ffffff;border-top:1px solid #E2E8F0;display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center">
+          <input class="input" id="ai-global-input" placeholder="${tr('Ask in Hindi or English: "आज की कुल बिक्री?", "किसका उधार बाकी है?", "Create bill for Sharma Traders Rs 2500"...', 'हिंदी या अंग्रेज़ी में पूछें: "आज की कुल बिक्री?", "किसका उधार बाकी है?", "शर्मा जी का 2500 का बिल बनाओ"...')}" style="font-size:0.92rem;padding:10px 14px" />
+          <button type="button" class="btn btn-outline" style="padding:10px 12px" title="${tr('Speak in Hindi or English', 'बोलकर पूछें (Voice)')}" onclick="startAiVoiceInput('ai-global-input')">
+            🎤 ${tr('Voice', 'बोलें')}
+          </button>
+          <button type="submit" class="btn btn-primary" style="padding:10px 18px;font-weight:700">
+            🚀 ${tr('Ask AI', 'पूछें')}
+          </button>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+window.openGlobalAiChatModal = function() {
+  state.aiChatModalOpen = true;
+  state.floatingHubOpen = false;
+  render();
+  scrollAiChatBoxesToBottom();
+};
+
+window.startAiVoiceInput = function(inputId = 'ai-mgr-input') {
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRec) {
+    return showToast(tr('Voice input is supported in Chrome / Edge browsers.', 'वॉइस इनपुट Chrome / Edge ब्राउज़र में समर्थित है।'), 'error');
+  }
+  const rec = new SpeechRec();
+  rec.lang = state.lang === 'hi' ? 'hi-IN' : 'en-IN';
+  rec.interimResults = false;
+  rec.maxAlternatives = 1;
+  showToast(tr('🎤 Listening... Speak your query or billing instruction now!', '🎤 सुन रहा हूँ... अपना सवाल या बिल निर्देश बोलें!'));
+  rec.onresult = function(event) {
+    const transcript = event.results?.[0]?.[0]?.transcript || '';
+    const el = document.getElementById(inputId) || document.getElementById('ai-mgr-input') || document.getElementById('ai-global-input');
+    if (el && transcript) {
+      el.value = transcript;
+      window.submitAiBusinessManagerPrompt({ preventDefault: () => {} }, inputId);
+    }
+  };
+  rec.onerror = function() {
+    showToast(tr('Could not capture voice. Please try again or type below.', 'आवाज़ स्पष्ट नहीं आई, कृपया पुनः प्रयास करें या टाइप करें।'), 'error');
+  };
+  rec.start();
+};
 
 function downloadCatalogExcelTemplate() {
   const csvContent = "data:text/csv;charset=utf-8," + encodeURIComponent(
@@ -8754,6 +8939,20 @@ function render() {
   const root = document.getElementById('app');
   if (!root) return;
 
+  // Preserve active input focus and cursor position across full DOM re-renders
+  const activeEl = document.activeElement;
+  let focusInfo = null;
+  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') && activeEl.type !== 'file' && activeEl.type !== 'checkbox' && activeEl.type !== 'radio') {
+    const allInputs = Array.from(root.querySelectorAll('input, textarea'));
+    focusInfo = {
+      id: activeEl.id || '',
+      placeholder: activeEl.getAttribute('placeholder') || '',
+      index: allInputs.indexOf(activeEl),
+      start: activeEl.selectionStart,
+      end: activeEl.selectionEnd
+    };
+  }
+
   let pageHtml = '';
   const r = state.route;
   if (r === '/' || r === '/merchants') pageHtml = renderHome();
@@ -8779,12 +8978,32 @@ function render() {
     (r === '/customer' && state.data.user)
   );
 
-  const extraModals = `${renderFloatingActionHub()}${state.bulkReviewModal ? renderBulkReviewModal() : ''}${state.voucherModalOpen ? renderVoucherScanModal() : ''}`;
+  const extraModals = `${renderFloatingActionHub()}${state.aiChatModalOpen ? renderGlobalAiChatModal() : ''}${state.bulkReviewModal ? renderBulkReviewModal() : ''}${state.voucherModalOpen ? renderVoucherScanModal() : ''}`;
 
   if (isEnterpriseView) {
     root.innerHTML = `${pageHtml}${state.demoModalOpen ? renderDemoModal() : ''}${state.reportModal ? renderReportModal() : ''}${state.orderReviewModal ? renderOrderReviewModal() : ''}${state.customerBillModal ? renderCustomerBillModal() : ''}${state.partyLedgerModalKey ? renderPartyLedgerModal() : ''}${state.aiModalOpen ? (state.data.myShop ? renderAiScannerModal(state.data.myShop) : '') : ''}${extraModals}`;
   } else {
     root.innerHTML = `${renderHeader()}<main>${pageHtml}</main>${renderFooter()}${renderMobileBottomNav()}${state.demoModalOpen ? renderDemoModal() : ''}${state.reportModal ? renderReportModal() : ''}${state.orderReviewModal ? renderOrderReviewModal() : ''}${state.customerBillModal ? renderCustomerBillModal() : ''}${state.partyLedgerModalKey ? renderPartyLedgerModal() : ''}${extraModals}`;
+  }
+
+  // Restore focus & cursor position if an input was being typed into
+  if (focusInfo) {
+    let target = focusInfo.id ? document.getElementById(focusInfo.id) : null;
+    if (!target && focusInfo.placeholder) {
+      target = Array.from(root.querySelectorAll('input, textarea')).find(el => el.getAttribute('placeholder') === focusInfo.placeholder);
+    }
+    if (!target && focusInfo.index >= 0) {
+      const allNow = Array.from(root.querySelectorAll('input, textarea'));
+      target = allNow[focusInfo.index] || null;
+    }
+    if (target) {
+      target.focus();
+      try {
+        if (typeof focusInfo.start === 'number' && target.setSelectionRange) {
+          target.setSelectionRange(focusInfo.start, focusInfo.end);
+        }
+      } catch (_) {}
+    }
   }
 }
 
