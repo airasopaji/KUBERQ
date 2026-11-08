@@ -5,13 +5,15 @@
  * and Super-Admin + Employee Command Center.
  */
 
+const CENTRAL_SUPPORT_PHONE = '7240692736';
+
 const state = {
   lang: localStorage.getItem('kuberq_lang') || 'en',
   token: localStorage.getItem('kuberq_token') || '',
   route: window.location.pathname || '/',
   query: Object.fromEntries(new URLSearchParams(window.location.search)),
   data: {
-    settings: { enableTransportLive: true, enableServicesLive: true, adminWhatsApp: '' },
+    settings: { enableTransportLive: true, enableServicesLive: true, adminWhatsApp: '7240692736' },
     user: null,
     merchants: [
       {
@@ -20,7 +22,7 @@ const state = {
         city: 'Jodhpur',
         state: 'Rajasthan',
         category: 'Hardware & Sanitary',
-        phone: '9414123456',
+        phone: CENTRAL_SUPPORT_PHONE,
         refCode: 'KQM-31CD16',
         communityVerifications: 14
       }
@@ -204,7 +206,14 @@ const DYN_HI_MAP = {
   'UPI': 'UPI भुगतान',
   'Card': 'कार्ड',
   'Credit': 'उधार (Credit)',
-  'Unmarked': 'अचिह्नित'
+  'Unmarked': 'अचिह्नित',
+  'Hardware & Sanitary': 'हार्डवेयर और सेनेटरी',
+  'Pipes & Fittings': 'पाइप और फिटिंग्स',
+  'Building Materials': 'निर्माण सामग्री',
+  'Can we generate Inter-State IGST bills for Gujarat dealers?': 'Buyer और supplier की state अलग होने पर बिल कैसे बनेगा? (इंटर-स्टेट IGST बिलिंग)',
+  'Yes! Enter the buyer GSTIN starting with 24 (Gujarat) and KuberQ automatically switches CGST+SGST to 100% IGST.': 'Buyer और supplier की state अलग होने पर invoice में CGST+SGST की जगह लागू rate पर IGST लगाया जाएगा।',
+  'Buyer और supplier की state अलग होने पर बिल कैसे बनेगा? (Can we generate Inter-State IGST bills?)': 'Buyer और supplier की state अलग होने पर बिल कैसे बनेगा? (इंटर-स्टेट IGST बिलिंग)',
+  'Buyer और supplier की state अलग होने पर invoice में CGST+SGST की जगह लागू rate पर IGST लगाया जाएगा। (When buyer and supplier are located in different states, KuberQ automatically calculates and applies IGST at the applicable tax rate instead of CGST+SGST.)': 'Buyer और supplier की state अलग होने पर invoice में CGST+SGST की जगह लागू rate पर IGST लगाया जाएगा।'
 };
 
 function trDyn(str) {
@@ -816,20 +825,26 @@ function renderHeader() {
 
         <!-- Right: Theme Toggle + Language Toggle + Auth (Aligned Flush Right on Same Row) -->
         <div class="nav-actions">
-          <button type="button" class="btn btn-ghost btn-sm" style="padding:6px 10px;font-size:0.95rem" title="${tr('Toggle Dark / Light Mode', 'डार्क / लाइट मोड बदलें')}" onclick="toggleTheme()">
+          <button type="button" class="btn btn-ghost btn-sm" style="padding:6px 8px;font-size:0.95rem" title="${tr('Toggle Dark / Light Mode', 'डार्क / लाइट मोड बदलें')}" onclick="toggleTheme()">
             ${state.theme === 'dark' ? '☀️' : '🌙'}
           </button>
 
-          <div class="lang-toggle-box" title="${tr('Switch Entire Website Language', 'पूरी वेबसाइट की भाषा बदलें')}">
+          <!-- Desktop Dual Box -->
+          <div class="desktop-only lang-toggle-box" title="${tr('Switch Entire Website Language', 'पूरी वेबसाइट की भाषा बदलें')}">
             <button type="button" class="lang-btn ${state.lang === 'hi' ? 'active' : ''}" onclick="setLang('hi')">हिन्दी</button>
             <span style="color:#94a3b8;font-weight:700;font-size:0.8rem">/</span>
             <button type="button" class="lang-btn ${state.lang === 'en' ? 'active' : ''}" onclick="setLang('en')">ENG</button>
           </div>
 
+          <!-- Mobile 1-Tap Toggle Pill (Saves 60px so Free Trial Never Clips) -->
+          <button type="button" class="mobile-only btn btn-ghost btn-sm" style="padding:4px 6px;font-size:0.75rem;font-weight:700;border:1px solid #cbd5e1" title="${tr('Switch Language', 'भाषा बदलें')}" onclick="setLang(state.lang === 'hi' ? 'en' : 'hi')">
+            ${state.lang === 'hi' ? 'ENG' : 'हिन्दी'}
+          </button>
+
           ${u ? `
             <button class="btn btn-ghost btn-sm" onclick="logout()">${tr('Log Out', 'लॉग आउट')}</button>
           ` : `
-            <button class="btn btn-ghost btn-sm" onclick="navigate('/auth')">${tr('Log In', 'लॉगिन')}</button>
+            <button class="btn btn-ghost btn-sm desktop-only" onclick="navigate('/auth')">${tr('Log In', 'लॉगिन')}</button>
             <button class="btn btn-coral btn-sm" onclick="navigate('/signup')">${tr('Free Trial', 'निःशुल्क ट्रायल')}</button>
           `}
         </div>
@@ -882,7 +897,7 @@ function renderFooter() {
 function renderMobileBottomNav() {
   const u = state.data.user;
   const merchantTarget = !u ? '/auth' : (u.role === 'admin' || u.role === 'employee' ? '/admin' : '/merchant');
-  const supportPhone = state.data.settings?.adminWhatsApp || '9414123456';
+  const supportPhone = state.data.settings?.adminWhatsApp || CENTRAL_SUPPORT_PHONE;
   const isHome = state.route === '/';
   const isOrder = state.route === '/order';
   const isMerchant = state.route === '/merchant' || state.route === '/admin' || state.route === '/auth';
@@ -1326,30 +1341,39 @@ function renderHome() {
 
       <div class="community-stats-grid">
         <div class="community-stat-item">
-          <div class="community-stat-val">10,000+</div>
-          <div class="community-stat-label">${tr('Parchis & Invoices Made', 'पर्ची व GST बिल प्रोसेस')}</div>
-          <div class="community-stat-sub">100% ${tr('Tax Compliant', 'GST अनुपालन')}</div>
+          <div class="community-stat-val">1,500+</div>
+          <div class="community-stat-label">${tr('Invoices & Parchis Tested', 'परीक्षित पर्चियां व बिल')}</div>
+          <div class="community-stat-sub">${tr('Across Pilot Traders', 'पायलट व्यापारियों में')}</div>
         </div>
         <div class="community-stat-item">
-          <div class="community-stat-val">10 Sec</div>
-          <div class="community-stat-label">${tr('Average Billing Speed', 'औसत बिल बनाने का समय')}</div>
-          <div class="community-stat-sub">5x ${tr('Faster Than Tally', 'पारंपरिक सॉफ़्टवेयर से तेज़')}</div>
+          <div class="community-stat-val">~10 Sec</div>
+          <div class="community-stat-label">${tr('Rapid Counter Billing', 'त्वरित काउंटर बिलिंग')}</div>
+          <div class="community-stat-sub">${tr('Zero-lag 1-click generation', '1-क्लिक फास्ट जेनरेशन')}</div>
         </div>
         <div class="community-stat-item">
           <div class="community-stat-val">0%</div>
-          <div class="community-stat-label">${tr('Commission on Payments', 'भुगतान पर कमीशन')}</div>
-          <div class="community-stat-sub">${tr('Direct UPI to Bank', 'सीधा बैंक खाते में UPI')}</div>
+          <div class="community-stat-label">${tr('Platform Commission Fee', 'प्लेटफ़ॉर्म कमीशन शुल्क')}</div>
+          <div class="community-stat-sub">${tr('Direct Peer UPI / Bank', 'सीधा बैंक खाते में UPI')}</div>
         </div>
         <div class="community-stat-item">
-          <div class="community-stat-val">100%</div>
-          <div class="community-stat-label">${tr('Private & Encrypted', 'डेटा सुरक्षा एवं गोपनीयता')}</div>
-          <div class="community-stat-sub">AES-256 ${tr('Server Vault', 'सर्वर एन्क्रिप्शन')}</div>
+          <div class="community-stat-val">AES-256</div>
+          <div class="community-stat-label">${tr('Server Vault Encryption', 'सर्वर एन्क्रिप्शन सुरक्षा')}</div>
+          <div class="community-stat-sub">${tr('AES-256-GCM at rest', 'हार्डवेयर व डेटा स्तर पर')}</div>
         </div>
         <div class="community-stat-item">
           <div class="community-stat-val">₹0</div>
-          <div class="community-stat-label">${tr('Setup or Hidden Cost', 'हिडन चार्ज या सेटअप शुल्क')}</div>
-          <div class="community-stat-sub">${tr('Free Instant Trial', 'निःशुल्क ट्रायल शुरू करें')}</div>
+          <div class="community-stat-label">${tr('Starter Plan Fee', 'स्टार्टर निःशुल्क योजना')}</div>
+          <div class="community-stat-sub">${tr('Free 14-day full access', '14 दिन का पूर्ण ट्रायल')}</div>
         </div>
+      </div>
+
+      <!-- Transparent Grounded Methodology Note (Item #9) -->
+      <div style="margin-top:20px;padding:12px 16px;background:rgba(255,255,255,0.06);border-radius:10px;border:1px solid rgba(255,255,255,0.14);text-align:left;font-size:0.82rem;color:#cbd5e1;line-height:1.5">
+        <strong style="color:#fde047">ℹ️ ${tr('Methodology & Transparency Notes:', 'पारदर्शिता एवं कार्यपद्धति विवरण:')}</strong>
+        ${tr(
+          '1. Billing speed measured on internal tests for 3-item walk-in GST invoices compared to legacy multi-step ERP software. 2. 0% Commission applies to peer-to-peer UPI QR payments deposited directly to merchant bank accounts without platform escrow. 3. AES-256-GCM encryption is actively enforced on server-side stored API credentials and session records. 4. Free starter tier includes core billing with 3 complimentary AI scans for test evaluation.',
+          '1. बिलिंग समय का बेंचमार्क 3-आइटम काउंटर GST बिल को सामान्य बहु-चरणीय ERP की तुलना में 1-क्लिक जनरेशन पर आधारित है। 2. 0% कमीशन का तात्पर्य सीधे व्यापारी के बैंक UPI खाते में बिना बिचौलिए के भुगतान प्राप्त होना है। 3. AES-256-GCM एन्क्रिप्शन सर्वर तिजोरी (API व क्रेडेंशियल डेटा) पर सक्रिय है। 4. स्टार्टर प्लान में 3 निःशुल्क AI स्कैन एवं बेसिक बिलिंग सुविधाएं शामिल हैं।'
+        )}
       </div>
 
       <div class="community-quote-banner">
@@ -1427,7 +1451,7 @@ function renderHome() {
           const cityDisp = trDyn(m.city);
           const stateDisp = trDyn(m.state);
           const catDisp = trDyn(m.category);
-          const vouchCount = Number(m.communityVerifications ?? 14);
+          const isDemoStore = Boolean(m.isDemo || m.id === 'shop-marwar-hw-01' || m.id === 'MQM-31CD16');
           return `
             <div class="store-card" style="display:flex;flex-direction:column;justify-content:space-between;gap:18px">
               <div>
@@ -1436,15 +1460,28 @@ function renderHome() {
                     ${esc(shopNameDisp)}, ${esc(cityDisp)}
                   </h3>
                   <div style="display:flex;gap:6px;flex-wrap:wrap">
-                    <span class="badge badge-primary" style="font-size:0.86rem;padding:4px 12px">
-                      ✔ ${tr('Verified', 'सत्यापित')}
-                    </span>
-                    <span class="badge badge-gold" style="font-size:0.84rem;padding:4px 10px" title="${tr('Verified by fellow merchants & buyers', 'ग्राहकों व साथी व्यापारियों द्वारा सत्यापित')}">
-                      🛡️ ${vouchCount} ${tr('Trusted', 'द्वारा सत्यापित')}
-                    </span>
+                    ${isDemoStore ? `
+                      <span class="badge badge-gold" style="font-size:0.84rem;padding:4px 10px;background:#fef3c7;color:#92400e;border:1.5px solid #f59e0b">
+                        🏷️ ${tr('Sample / Demo Store', 'सैंपल डेमो स्टोर')}
+                      </span>
+                      <span class="badge badge-primary" style="font-size:0.82rem;padding:4px 8px" title="${tr('Sample catalog for trying order and invoice flow', 'ऑर्डर और बिलिंग टेस्ट करने हेतु डेमो कैटलॉग')}">
+                        ✔ ${tr('Demo KYC Oct 2026', 'KYC डेमो सत्यापन Oct 2026')}
+                      </span>
+                    ` : `
+                      <span class="badge badge-primary" style="font-size:0.86rem;padding:4px 12px">
+                        🏢 ${tr('Verified Business', 'सत्यापित बिज़नेस')}
+                      </span>
+                      <span class="badge badge-gold" style="font-size:0.84rem;padding:4px 10px">
+                        ✔ ${tr('KYC Approved', 'KYC स्वीकृत')} (${esc(m.verifiedDate || 'Active')})
+                      </span>
+                    `}
                   </div>
                 </div>
                 <p style="font-size:1.02rem;color:#334155;margin-top:6px;font-weight:500">
+                  ${esc(catDisp)} · ${esc(cityDisp)}, ${esc(stateDisp)} · 📞 ${esc(m.phone || CENTRAL_SUPPORT_PHONE)}
+                  ${isDemoStore ? `<span class="text-muted" style="font-size:0.82rem;display:block;margin-top:3px">💡 ${tr('Sample Demo Storefront with preloaded test catalog & fictional GSTIN.', 'सैंपल डेमो स्टोर: परीक्षण हेतु डेमो कैटलॉग व टेस्ट GSTIN।')}</span>` : ''}
+                </p>
+              </div>
                   ${esc(catDisp)} · ${esc(cityDisp)}, ${esc(stateDisp)} · 📞 ${esc(m.phone)}
                 </p>
               </div>
@@ -1495,7 +1532,7 @@ function renderHome() {
     </section>
 
     <!-- FAQ & ASK A QUESTION SECTION (Wired to /api/public/submit kind='faq' & /admin) -->
-    <section class="container" style="padding:12px 24px 56px">
+    <section class="container" style="padding:16px 0 56px">
       <div class="grid grid-2">
         <div class="card">
           <span class="badge badge-gold">❓ ${tr('FREQUENTLY ASKED QUESTIONS', 'अक्सर पूछे जाने वाले प्रश्न')}</span>
@@ -1503,8 +1540,8 @@ function renderHome() {
           <div style="display:grid;gap:12px">
             ${(state.data.faqs || []).slice(0, 4).map(f => `
               <div class="card-subtle">
-                <p style="font-weight:800;color:#0f172a">${esc(f.question)}</p>
-                <p class="text-muted" style="font-size:0.92rem;margin-top:4px">${esc(f.answer || tr('Our team will answer this shortly.', 'हमारी टीम शीघ्र ही इसका उत्तर देगी।'))}</p>
+                <p style="font-weight:800;color:#0f172a">${esc(trDyn(f.question))}</p>
+                <p class="text-muted" style="font-size:0.92rem;margin-top:4px">${esc(trDyn(f.answer || tr('Our team will answer this shortly.', 'हमारी टीम शीघ्र ही इसका उत्तर देगी।')))}</p>
               </div>
             `).join('')}
           </div>
@@ -1517,18 +1554,21 @@ function renderHome() {
             <div class="grid grid-2">
               <div class="form-group">
                 <label class="form-label">${tr('Your Name / Shop Name', 'आपका नाम / दुकान का नाम')} *</label>
-                <input class="input" id="faq-name" required placeholder="${tr('e.g. Mahesh Traders', 'जैसे: महेश ट्रेडर्स')}" />
+                <input class="input" id="faq-name" name="name" autocomplete="name" required placeholder="${tr('e.g. Mahesh Traders', 'जैसे: महेश ट्रेडर्स')}" />
               </div>
               <div class="form-group">
                 <label class="form-label">${tr('10-Digit Mobile Number', '10 अंकों का मोबाइल नंबर')} *</label>
-                <input class="input" id="faq-phone" required maxlength="10" placeholder="98XXXXXXXX" />
+                <input class="input" id="faq-phone" name="tel" autocomplete="tel" pattern="^[6-9][0-9]{9}$" required maxlength="10" placeholder="98XXXXXXXX" />
               </div>
             </div>
             <div class="form-group">
               <label class="form-label">${tr('Your Question', 'आपका प्रश्न')} *</label>
-              <textarea class="textarea" rows="2" id="faq-question" required placeholder="${tr('e.g. How can I import my existing item list?', 'जैसे: मैं अपनी दुकान की रेट लिस्ट कैसे अपलोड कर सकता हूँ?')}"></textarea>
+              <textarea class="textarea" rows="2" id="faq-question" name="question" required placeholder="${tr('e.g. How can I import my existing item list?', 'जैसे: मैं अपनी दुकान की रेट लिस्ट कैसे अपलोड कर सकता हूँ?')}"></textarea>
             </div>
             <button type="submit" class="btn btn-gold" style="width:100%">📨 ${tr('Submit Question to KuberQ Team', 'अपना प्रश्न भेजें')}</button>
+            <p class="text-muted" style="font-size:0.78rem;margin-top:8px;text-align:center">
+              ⏱️ ${tr('Expected response time: Within 2–4 business hours via WhatsApp/Call.', 'अपेक्षित उत्तर समय: 2 से 4 कार्य घंटों के भीतर WhatsApp या कॉल द्वारा।')}
+            </p>
           </form>
         </div>
       </div>
@@ -2225,6 +2265,12 @@ function renderOrderPage() {
             ${o.note ? `<p style="margin-top:6px"><b>📝 ${tr('Parchi List:', 'पर्ची विवरण:')}</b><br/>${esc(o.note)}</p>` : ''}
           </div>
 
+          <!-- Expected Dispatch & Response Time (Item #8) -->
+          <div style="margin:16px 0;padding:12px 14px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;font-size:0.88rem;color:#166534;text-align:left">
+            ⏱️ <b>${tr('Expected Response Time:', 'अपेक्षित प्रतिक्रिया समय:')}</b>
+            ${tr('Merchant usually verifies stock and confirms dispatch within 15–30 minutes during business hours (9 AM – 8 PM).', 'दुकानदार आमतौर पर व्यापारिक समय (सुबह 9 से रात 8 बजे) में 15 से 30 मिनट के भीतर स्टॉक जांचकर बिल/डिलीवरी की पुष्टि करता है।')}
+          </div>
+
           <div style="display:grid;gap:12px">
             <a class="btn btn-gold" style="width:100%;font-size:1.05rem" target="_blank" rel="noreferrer" href="https://wa.me/91${shopPhone}?text=${encodeURIComponent(waText)}">
               📲 ${tr('Send Order Alert to Shop on WhatsApp (Instant)', 'दुकानदार को WhatsApp पर तुरंत ऑर्डर अलर्ट भेजें')}
@@ -2261,16 +2307,16 @@ function renderOrderPage() {
             </p>
           </div>
 
-          <div style="background:rgba(255,255,255,0.1);padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,0.2)">
+          <div style="background:rgba(255,255,255,0.1);padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);max-width:100%;box-sizing:border-box">
             <label style="font-size:0.75rem;color:#93c5fd;display:block;margin-bottom:4px;font-weight:700">${tr('Switch Store / Trader:', 'अन्य दुकान चुनें:')}</label>
-            <select class="select" style="background:#0f172a;color:#ffffff;border-color:#475569;font-size:0.85rem;padding:6px 10px" onchange="state.selectedShopId=this.value;state.cart={};navigate('/order?shop='+this.value)">
+            <select class="select" style="background:#0f172a;color:#ffffff;border-color:#475569;font-size:0.85rem;padding:6px 10px;max-width:100%;box-sizing:border-box" onchange="state.selectedShopId=this.value;state.cart={};navigate('/order?shop='+this.value)">
               ${shops.map(s => `<option value="${s.id}" ${s.id === shop?.id ? 'selected' : ''}>[${s.refCode || s.id}] ${esc(s.shop)} (${esc(s.city)})</option>`).join('')}
             </select>
           </div>
         </div>
 
         <!-- Mode Toggle Pill -->
-        <div style="display:flex;gap:10px;margin-top:18px;border-top:1px solid rgba(255,255,255,0.15);padding-top:14px">
+        <div style="display:flex;gap:10px;margin-top:18px;border-top:1px solid rgba(255,255,255,0.15);padding-top:14px;flex-wrap:wrap">
           <button type="button" class="btn btn-sm ${orderMode === 'catalog' ? 'btn-gold' : 'btn-ghost'}" style="${orderMode === 'catalog' ? '' : 'color:#ffffff;border-color:rgba(255,255,255,0.3)'}" onclick="state.orderPageTab='catalog';render()">
             📦 ${tr('1. Select from Catalog', '1. कैटलॉग से सामान चुनें')} (${allProducts.length})
           </button>
@@ -2464,23 +2510,34 @@ function renderOrderPage() {
           <div class="grid grid-2" style="gap:14px">
             <div class="form-group" style="margin-bottom:10px">
               <label class="form-label">${tr('Your Name / Firm Name', 'आपका नाम / फर्म का नाम')} *</label>
-              <input class="input" id="ord-name" required value="${esc(state.data.user?.name || state.checkoutCustomer.name)}" placeholder="${tr('e.g. Vikram Rathore (Contractor)', 'जैसे: विक्रम राठौड़ (ठेकेदार)')}" />
+              <input class="input" id="ord-name" name="name" autocomplete="name" required value="${esc(state.data.user?.name || state.checkoutCustomer.name)}" placeholder="${tr('e.g. Vikram Rathore (Contractor)', 'जैसे: विक्रम राठौड़ (ठेकेदार)')}" />
             </div>
 
             <div class="form-group" style="margin-bottom:10px">
               <label class="form-label">${tr('10-Digit Mobile (WhatsApp Alert)', '10 अंकों का WhatsApp मोबाइल नंबर')} *</label>
-              <input class="input" id="ord-phone" required maxlength="10" value="${esc(state.data.user?.phone || state.checkoutCustomer.phone)}" placeholder="9828XXXXXX" />
+              <input class="input" id="ord-phone" name="tel" autocomplete="tel" pattern="^[6-9][0-9]{9}$" required maxlength="10" value="${esc(state.data.user?.phone || state.checkoutCustomer.phone)}" placeholder="9828XXXXXX" oninput="const e=document.getElementById('ord-phone-err');if(e)e.style.display='none'" />
+              <div id="ord-phone-err" style="display:none;color:#dc2626;font-size:0.78rem;font-weight:600;margin-top:4px"></div>
             </div>
           </div>
 
           <div class="form-group" style="margin-bottom:10px">
             <label class="form-label">${tr('Delivery Address / Site Location', 'डिलीवरी का पता / साइट लोकेशन')} *</label>
-            <input class="input" id="ord-addr" required value="${esc(state.checkoutCustomer.address)}" placeholder="${tr('Plot / Shop No, Market, Landmark, City', 'प्लॉट / दुकान नंबर, मुख्य बाजार या साइट, शहर')}" />
+            <input class="input" id="ord-addr" name="address" autocomplete="street-address" required value="${esc(state.checkoutCustomer.address)}" placeholder="${tr('Plot / Shop No, Market, Landmark, City', 'प्लॉट / दुकान नंबर, मुख्य बाजार या साइट, शहर')}" />
           </div>
 
           <div class="form-group" style="margin-bottom:6px">
             <label class="form-label">${tr('Buyer GSTIN (Optional — For B2B Input Tax Credit)', 'खरीदार GSTIN (वैकल्पिक — पक्का B2B ITC बिल प्राप्त करने हेतु)')}</label>
-            <input class="input" id="ord-gstin" maxlength="15" style="text-transform:uppercase;font-family:monospace" value="${esc(state.checkoutCustomer.buyerGstin)}" placeholder="08AAACR5055K1Z2" />
+            <input class="input" id="ord-gstin" name="organization" autocomplete="organization" maxlength="15" style="text-transform:uppercase;font-family:monospace" value="${esc(state.checkoutCustomer.buyerGstin)}" placeholder="08AAACR5055K1Z2" />
+          </div>
+
+          <!-- DPDP Act 2025 Explicit Order Update Consent Checkbox -->
+          <div style="margin:12px 0 6px;display:flex;align-items:flex-start;gap:10px;text-align:left;background:#f8fafc;padding:10px 12px;border-radius:8px;border:1px solid #e2e8f0">
+            <input type="checkbox" id="ord-consent" checked required style="margin-top:3px;accent-color:var(--primary);width:16px;height:16px;flex-shrink:0;cursor:pointer" />
+            <label for="ord-consent" style="font-size:0.8rem;color:#475569;line-height:1.45;cursor:pointer">
+              ${tr('I consent to receiving order confirmations, digital GST invoices & dispatch updates via WhatsApp / SMS under KuberQ DPDP-compliant', 'मैं KuberQ की DPDP-अनुपालन')}
+              <a href="javascript:void(0)" onclick="navigate('/privacy')" style="color:#2563EB;text-decoration:underline;font-weight:600">${tr('Privacy Policy', 'गोपनीयता नीति')}</a>
+              ${tr('terms.', 'के अंतर्गत WhatsApp/SMS पर ऑर्डर पुष्टि, GST बिल व डिलीवरी अपडेट्स प्राप्त करने की सहमति देता हूँ।')}
+            </label>
           </div>
         </div>
 
@@ -7560,34 +7617,41 @@ function renderLegalPage(kind) {
       ]
     },
     privacy: {
-      title: tr('Privacy Policy (DPDP Act, 2023 Compliant)', 'गोपनीयता नीति (DPDP अधिनियम, 2023)'),
+      title: tr('Privacy Policy & DPDP Rules 2025 Compliance', 'गोपनीयता नीति एवं DPDP नियम 2025 अनुपालन'),
       items: [
         [
-          tr('1. Data Collected', '1. एकत्रित किया जाने वाला डेटा'),
+          tr('1. Purpose & Categories of Data Collected', '1. एकत्रित डेटा की श्रेणियां एवं उद्देश्य'),
           tr(
-            'We collect your Name, 10-digit Mobile Number, Business/Shop details, optional GSTIN, and order/ledger records required to operate your account.',
-            'हम आपका नाम, 10 अंकों का मोबाइल नंबर, दुकान/फ़र्म का विवरण, वैकल्पिक GSTIN और आपके खाते के संचालन हेतु आवश्यक बिल/ऑर्डर डेटा सुरक्षित रखते हैं।'
+            'We collect Primary Contact Name, 10-digit Indian Mobile Number, Business Name, Billing/Delivery Addresses, optional Buyer GSTIN, and accounting ledger records strictly for order processing, digital invoice generation, and tax compliance.',
+            'हम नाम, 10 अंकों का मोबाइल नंबर, व्यापारिक फ़र्म का नाम, डिलीवरी पता, वैकल्पिक GSTIN और बिल/बही-खाता डेटा केवल ऑर्डर निष्पादन, डिजिटल बिल निर्माण और वैधानिक टैक्स अनुपालन हेतु सुरक्षित रखते हैं।'
           )
         ],
         [
-          tr('2. Strict Isolation & Encryption', '2. उच्च स्तरीय एन्क्रिप्शन और सुरक्षा'),
+          tr('2. Statutory Data Retention Periods (GST Law vs CRM Drafts)', '2. वैधानिक डेटा संरक्षण समय-सीमा (GST कानून बनाम अस्थायी ड्राफ्ट)'),
           tr(
-            'Passwords are hashed using cryptographic Scrypt with random salts. Platform API keys are stored in an AES-256-GCM server-only vault and never exposed to browsers.',
-            'सभी पासवर्ड Scrypt तकनीक से एन्क्रिप्ट किए जाते हैं। प्लेटफ़ॉर्म की API Key सर्वर की AES-256-GCM तिजोरी में बंद रहती है और कभी भी किसी ब्राउज़र में नहीं दिखती।'
+            '• Tax Invoices, Credit Notes & Accounting Ledgers: Retained for a mandatory statutory period of 6 years (72 months) as mandated under Section 36 of the Central Goods and Services Tax (CGST) Act, 2017.\n• Parchi notes, abandoned cart drafts, and transient inquiries: Retained for up to 90 days or until user-requested deletion.',
+            '• पक्के GST इनवॉइस, क्रेडिट नोट एवं बही-खाता: CGST अधिनियम, 2017 की धारा 36 के अनुसार न्यूनतम 6 वर्ष (72 महीने) तक सुरक्षित रखना अनिवार्य है।\n• कच्ची पर्ची, अपूर्ण कार्ट एवं सामान्य पूछताछ: अधिकतम 90 दिन या उपयोगकर्ता द्वारा हटाने के अनुरोध तक ही रखी जाती हैं।'
           )
         ],
         [
-          tr('3. Public Directory Masking', '3. नंबर गोपनीयता'),
+          tr('3. Data Processors & Security Architecture', '3. डेटा प्रोसेसर्स एवं सुरक्षा संरचना'),
           tr(
-            'Contact numbers on public boards are masked for unauthenticated visitors to prevent scraping.',
-            'सार्वजनिक डायरेक्टरी में स्पैम रोकने के लिए बिना लॉगिन वाले यूज़र्स से मोबाइल नंबर सुरक्षित रखे जाते हैं।'
+            'Passwords are cryptographically salted and hashed via Scrypt. Platform API credentials are stored in an AES-256-GCM server-only encrypted vault. Transactional WhatsApp/SMS communications are dispatched solely via authorized enterprise gateway APIs for delivery notifications and invoice sharing. KuberQ never sells, rents, or monetizes personal data to third parties.',
+            'पासवर्ड Scrypt तकनीक द्वारा सुरक्षित हैं। संवेदनशील API चाबियां सर्वर की AES-256-GCM तिजोरी में बंद रहती हैं। WhatsApp/SMS अलर्ट केवल अधिकृत गेटवे API द्वारा बिल और डिलीवरी सूचना हेतु भेजे जाते हैं। KuberQ कभी भी किसी तीसरे पक्ष को डेटा बेचता या साझा नहीं करता।'
           )
         ],
         [
-          tr('4. Your DPDP Rights', '4. आपके डेटा अधिकार'),
+          tr('4. Consent Withdrawal & Right to Erasure (DPDP Rules 2025)', '4. सहमति वापस लेना एवं डेटा हटाने का अधिकार'),
           tr(
-            'You may request data correction or account deletion by contacting our Grievance Officer.',
-            'आप अपने डेटा में सुधार या खाता हटाने के लिए हमारे शिकायत अधिकारी से संपर्क कर सकते हैं।'
+            'Under Digital Personal Data Protection (DPDP) Rules 2025, users may withdraw communication consent or request complete erasure of non-statutory records at any time by emailing grievance@kuberq.in. Deletion requests are processed and confirmed within 7 business days.',
+            'DPDP नियम 2025 के तहत, कोई भी उपयोगकर्ता grievance@kuberq.in पर ईमेल करके अपनी सहमति वापस ले सकता है या गैर-वैधानिक डेटा को हटाने का अनुरोध कर सकता है। डेटा निष्कासन अनुरोधों का निस्तारण 7 कार्य दिवसों में किया जाता है।'
+          )
+        ],
+        [
+          tr('5. Grievance Officer & Resolution SLA', '5. शिकायत निवारण अधिकारी व समय-सीमा'),
+          tr(
+            'Designated Grievance Officer: Legal & Compliance Officer, KuberQ\nEmail: grievance@kuberq.in | WhatsApp: +91-7240692736\nAcknowledgement SLA: Within 48 hours | Resolution SLA: Within 15 calendar days under IT Rules 2021 & DPDP framework.',
+            'शिकायत अधिकारी: विधिक एवं अनुपालन अधिकारी, KuberQ\nईमेल: grievance@kuberq.in | WhatsApp: 7240692736\nपावती समय: 48 घंटे के भीतर | पूर्ण समाधान: 15 दिनों के भीतर (IT नियम 2021 व DPDP के अनुरूप)।'
           )
         ]
       ]
@@ -7741,13 +7805,34 @@ window.updateCart = function(productId, delta) {
 window.submitCustomerOrder = async function(e, shopId) {
   e.preventDefault();
   try {
+    const phoneInput = document.getElementById('ord-phone');
+    const phoneVal = phoneInput ? phoneInput.value.trim() : '';
+    const errEl = document.getElementById('ord-phone-err');
+
+    if (!/^[6-9]\d{9}$/.test(phoneVal)) {
+      if (errEl) {
+        errEl.textContent = tr('Please enter a valid 10-digit Indian mobile number (e.g. 9828XXXXXX)', 'कृपया 10 अंकों का वैध भारतीय मोबाइल नंबर दर्ज करें (शुरुआत 6, 7, 8 या 9 से हो)');
+        errEl.style.display = 'block';
+      }
+      showToast(tr('Invalid mobile number: Please enter 10 digits starting with 6, 7, 8 or 9.', 'अमान्य मोबाइल नंबर: कृपया 6, 7, 8 या 9 से शुरू होने वाले 10 अंक दर्ज करें।'), 'error');
+      if (phoneInput) phoneInput.focus();
+      return;
+    }
+    if (errEl) errEl.style.display = 'none';
+
+    const consentBox = document.getElementById('ord-consent');
+    if (consentBox && !consentBox.checked) {
+      showToast(tr('Please agree to receive order notifications as per Privacy Policy.', 'कृपया गोपनीयता नीति के तहत ऑर्डर नोटिफिकेशन पाने की अनुमति दें।'), 'error');
+      return;
+    }
+
     const items = Object.entries(state.cart)
       .filter(([, q]) => q > 0)
       .map(([productId, qty]) => ({ productId, qty }));
     const payload = {
       shopId,
       customer: document.getElementById('ord-name').value.trim(),
-      phone: document.getElementById('ord-phone').value.trim(),
+      phone: phoneVal,
       address: document.getElementById('ord-addr').value.trim(),
       buyerGstin: document.getElementById('ord-gstin').value.trim().toUpperCase(),
       note: document.getElementById('ord-note').value.trim(),
@@ -8771,7 +8856,7 @@ window.requestPlanUpgrade = async function(plan, amount) {
         phone: state.data.myShop?.phone || state.data.user?.phone || ''
       })
     });
-    const adminWa = state.data.settings.adminWhatsApp || '';
+    const adminWa = state.data.settings?.adminWhatsApp || CENTRAL_SUPPORT_PHONE;
     const msg = `⚡ *KuberQ Plan Upgrade Request*\nShop: ${state.data.myShop?.shop || 'New Trader'}\nPlan: *${plan} (${billingCycle} - ₹${amount})*\nPlease share UPI details to activate my plan & AI credits.`;
     window.open(`https://wa.me/91${adminWa}?text=${encodeURIComponent(msg)}`, '_blank');
     showToast('Upgrade request logged & opened in WhatsApp!');
@@ -8803,17 +8888,23 @@ window.submitDemoRequest = async function(e) {
 window.submitPublicFaq = async function(e) {
   e.preventDefault();
   try {
+    const phone = document.getElementById('faq-phone').value.trim();
+    if (!/^[6-9]\d{9}$/.test(phone)) {
+      showToast(tr('Please enter a valid 10-digit Indian mobile number (e.g. 98XXXXXXXX)', 'कृपया 10 अंकों का वैध भारतीय मोबाइल नंबर दर्ज करें (शुरुआत 6, 7, 8 या 9 से हो)'), 'error');
+      document.getElementById('faq-phone').focus();
+      return;
+    }
     await apiFetch('/api/public/submit', {
       method: 'POST',
       body: JSON.stringify({
         kind: 'faq',
         name: document.getElementById('faq-name').value.trim(),
-        phone: document.getElementById('faq-phone').value.trim(),
+        phone,
         question: document.getElementById('faq-question').value.trim()
       })
     });
     document.getElementById('faq-question').value = '';
-    showToast(tr('Question submitted! Our team will respond shortly.', 'आपका प्रश्न दर्ज हो गया है! हमारी टीम शीघ्र उत्तर देगी।'));
+    showToast(tr('Question submitted! Expected response within 2–4 business hours via WhatsApp/Call.', 'प्रश्न सफलतापूर्वक दर्ज हो गया! हमारी टीम 2 से 4 कार्य घंटों में WhatsApp या कॉल द्वारा संपर्क करेगी।'));
   } catch (err) {
     showToast(err.message, 'error');
   }
@@ -9988,11 +10079,11 @@ function renderFloatingActionHub() {
   return `
     <div class="floating-action-hub">
       ${isOpen ? `
-        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;margin-bottom:4px">
-          <button type="button" class="floating-sub-btn" style="background:linear-gradient(135deg,#1E3A8A,#2563EB);color:#ffffff;border-color:#1D4ED8;font-weight:700" onclick="openGlobalAiChatModal()">
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;margin-bottom:6px">
+          <button type="button" class="floating-sub-btn" style="background:linear-gradient(135deg,#1E3A8A,#2563EB);color:#ffffff;border-color:#1D4ED8;font-weight:700" onclick="state.floatingHubOpen=false;openGlobalAiChatModal()">
             🤖 <span>${tr('AI Business Chat ("Ask Your Data")', 'AI बिज़नेस चैट (डेटा से पूछें)')}</span>
           </button>
-          <button type="button" class="floating-sub-btn" onclick="openVoucherScanModal()">
+          <button type="button" class="floating-sub-btn" onclick="state.floatingHubOpen=false;openVoucherScanModal()">
             📸 <span>${tr('AI Voucher & Bill Scanner', 'AI वाउचर व बिल स्कैनर')}</span>
           </button>
           <button type="button" class="floating-sub-btn" onclick="downloadCatalogExcelTemplate()">
@@ -10005,12 +10096,20 @@ function renderFloatingActionHub() {
         </div>
       ` : ''}
 
-      <div style="display:flex;gap:8px;align-items:center">
+      <!-- Desktop View: Dual Pill Buttons -->
+      <div class="desktop-only" style="display:flex;gap:8px;align-items:center">
         <button type="button" class="floating-hub-pill" style="background:linear-gradient(135deg,#0F172A,#1E3A8A);border:1.5px solid #3B82F6" onclick="openGlobalAiChatModal()">
           <span>🤖 ${tr('AI Chat', 'AI चैट')}</span>
         </button>
         <button type="button" class="floating-hub-pill" onclick="state.floatingHubOpen=!state.floatingHubOpen;render()">
           <span>${isOpen ? tr('✕ Close', '✕ बंद करें') : tr('✨ AI Tools & Excel', '✨ AI टूल्स व एक्सेल')}</span>
+        </button>
+      </div>
+
+      <!-- Mobile View: Compact 48px Circular FAB (Does Not Obscure Cards) -->
+      <div class="mobile-only">
+        <button type="button" class="mobile-fab-circle" aria-label="AI Business Hub" title="${tr('AI Hub & Tools', 'AI टूल्स व असिस्टेंट')}" onclick="state.floatingHubOpen=!state.floatingHubOpen;render()">
+          <span>${isOpen ? '✕' : '✨'}</span>
         </button>
       </div>
     </div>
