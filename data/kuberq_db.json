@@ -25,10 +25,11 @@
       "email": "9829011223@phone.kuberq.in",
       "role": "merchant",
       "shopId": "shop-marwar-hw-01",
-      "passwordHash": "7219cdee6191b2b428efa4a244eefc9e:6467c3bca457d62e27e0cb16f3a90054eba26873eb607f829face691636d7fd80f4c179333df1bb7e0967e9f6c66e51582975ebf7ab94a74931596462c2d934e",
+      "passwordHash": "0a12ecf7ed0f9da3480de5b76a1caf33:69236e737c35f7ef9d478da0f1edffd805893d40bc965de5c8539acf545300357aac9c1dd1096abdc1b453420a2b8a517d876968085ecb7c5a6c63d9db659e77",
       "active": true,
       "createdAt": "2026-10-27T18:19:12.960Z",
-      "uniqueId": "KQM-31CD16"
+      "uniqueId": "KQM-31CD16",
+      "updatedAt": "2026-11-08T07:20:29.975Z"
     },
     {
       "id": "usr-demo-merchant-2",
@@ -55,6 +56,40 @@
       "active": true,
       "createdAt": "2026-10-27T18:19:13.037Z",
       "uniqueId": "KQC-849201"
+    },
+    {
+      "id": "usr-b977572b",
+      "uniqueId": "KQM-E04761",
+      "name": "Vikram Malhotra",
+      "phone": "9882549277",
+      "email": "vikram@apexinfotech.com",
+      "role": "merchant",
+      "shopId": "shop-b242c4dc",
+      "passwordHash": "a8f77d29ba5f3c46eb504fab5656e187:6367b8601509a2341d56c8277641fa1cf4aedc9ffa3f5ef75b5b540acca313553aa247da37c3f059ba52a6224ead74a88ed0b8ddf0f3ec088d967d1ae08ff36f",
+      "authProvider": "google",
+      "active": true,
+      "createdAt": "2026-11-08T04:59:04.342Z"
+    },
+    {
+      "id": "usr-feb36358",
+      "uniqueId": "KQS-18C165",
+      "name": "Suresh Manager",
+      "phone": "9829099887",
+      "email": "suresh@shop.com",
+      "role": "staff",
+      "shopId": "shop-marwar-hw-01",
+      "permissions": [
+        "Dashboard View",
+        "Customers",
+        "Invoices",
+        "Product",
+        "Tasks"
+      ],
+      "designation": "Store Manager",
+      "passwordHash": "7ee139ff912690136354ab7f55352e17:f5d00af4ae59a8f9e666b18b654dfc757fe067c4de27c66fcb9b8fc7ae4365e82017968e906447c78086f52cb8adfd3ce45cfd8b5a773d3b307f9c7c13f0cbe5",
+      "active": true,
+      "createdBy": "usr-demo-merchant-1",
+      "createdAt": "2026-11-08T04:59:04.395Z"
     }
   ],
   "employees": [
@@ -90,6 +125,9 @@
       "role": "merchant",
       "active": true,
       "verified": true,
+      "isDemo": true,
+      "kycStatus": "Sample / Demo Store (Verified Demo KYC Oct 2026)",
+      "verifiedDate": "2026-10-27",
       "open": true,
       "plan": "Vyapar Pro",
       "aiUsed": 3,
@@ -123,6 +161,34 @@
       "refCode": "KQM-A949A5",
       "renewsOn": "2026-11-26T18:19:13.075Z",
       "createdAt": "2026-10-27T18:19:13.075Z",
+      "communityVerifications": 18
+    },
+    {
+      "id": "shop-b242c4dc",
+      "shop": "Vikram Malhotra Enterprises",
+      "owner": "Vikram Malhotra",
+      "phone": "9882549277",
+      "officialEmail": "vikram@apexinfotech.com",
+      "city": "Jodhpur",
+      "state": "Rajasthan",
+      "stateCode": "08",
+      "category": "Hardware, Pipes & Sanitary",
+      "gstin": "",
+      "upiId": "",
+      "address": "Jodhpur, Rajasthan",
+      "role": "merchant",
+      "active": true,
+      "verified": true,
+      "isDemo": true,
+      "kycStatus": "Sample / Demo Store (Verified Demo KYC Oct 2026)",
+      "verifiedDate": "2026-10-27",
+      "open": true,
+      "plan": "Starter (Free)",
+      "aiUsed": 0,
+      "aiLimit": 5,
+      "invoiceCounter": 0,
+      "refCode": "KQM-E04761",
+      "createdAt": "2026-11-08T04:59:04.283Z",
       "communityVerifications": 18
     }
   ],
@@ -502,8 +568,8 @@
       "id": "faq-01",
       "name": "Suresh Jangid (Timber Trader)",
       "phone": "9414077889",
-      "question": "Can we generate Inter-State IGST bills for Gujarat dealers?",
-      "answer": "Yes! Enter the buyer GSTIN starting with 24 (Gujarat) and KuberQ automatically switches CGST+SGST to 100% IGST.",
+      "question": "Buyer और supplier की state अलग होने पर बिल कैसे बनेगा? (Can we generate Inter-State IGST bills?)",
+      "answer": "Buyer और supplier की state अलग होने पर invoice में CGST+SGST की जगह लागू rate पर IGST लगाया जाएगा। (When buyer and supplier are located in different states, KuberQ automatically calculates and applies IGST at the applicable tax rate instead of CGST+SGST.)",
       "answered": true,
       "date": "2026-10-27T18:19:13.075Z"
     }
@@ -524,6 +590,34 @@
     }
   ],
   "activity": [
+    {
+      "id": "act-a9a27900",
+      "shopId": "shop-marwar-hw-01",
+      "actorName": "Rajesh Mohta",
+      "action": "Created Manager ID for Suresh Manager (5 permissions)",
+      "at": "2026-11-08T04:59:04.395Z"
+    },
+    {
+      "id": "act-db39ddc9",
+      "shopId": "shop-marwar-hw-01",
+      "actorName": "Rajesh Mohta",
+      "action": "Added task \"Follow up with Apex Infotech on GST Invoice\" (Urgent)",
+      "at": "2026-11-08T04:59:04.352Z"
+    },
+    {
+      "id": "act-1503c446",
+      "shopId": "shop-marwar-hw-01",
+      "actorName": "Rajesh Mohta",
+      "action": "Added customer Vikram Malhotra",
+      "at": "2026-11-08T04:59:04.348Z"
+    },
+    {
+      "id": "act-cd875b71",
+      "shopId": "shop-marwar-hw-01",
+      "actorName": "Rajesh Mohta",
+      "action": "Added task \"Follow up with Apex Infotech on GST Invoice\" (Urgent)",
+      "at": "2026-11-08T04:22:43.590Z"
+    },
     {
       "id": "act-6ec3ad74",
       "shopId": "shop-marwar-hw-01",
@@ -843,6 +937,215 @@
       "totalBatchCost": 102720,
       "unitProductionCost": 2568,
       "createdAt": "2026-10-30T16:45:02.535Z"
+    }
+  ],
+  "crmLeads": [
+    {
+      "id": "lead-101",
+      "shopId": "shop-marwar-hw-01",
+      "buyerName": "Rathore Infrastructure & Builders",
+      "phone": "9829011223",
+      "source": "WhatsApp Inquiry",
+      "expectedValue": 85000,
+      "itemsInterest": "Supreme PVC Pipes 1 inch (150 pcs) & Sintex Tank 1000L (5 pcs)",
+      "stage": "Proposal Sent",
+      "followUpDate": "2026-11-08",
+      "notes": "Sent wholesale rate quotation. Follow up tomorrow morning.",
+      "createdAt": "2026-11-05T15:56:00.873Z"
+    },
+    {
+      "id": "lead-102",
+      "shopId": "shop-marwar-hw-01",
+      "buyerName": "Shree Balaji Sanitary Traders (Pali)",
+      "phone": "9414188990",
+      "source": "Store QR Catalog",
+      "expectedValue": 42000,
+      "itemsInterest": "CPVC Fitting Lot & Brass Bib Cocks (Sub-dealer bulk order)",
+      "stage": "New Inquiry",
+      "followUpDate": "2026-11-07",
+      "notes": "Asked for MOQ sub-dealer discount on Astral CPVC.",
+      "createdAt": "2026-11-06T15:56:00.873Z"
+    },
+    {
+      "id": "lead-103",
+      "shopId": "shop-marwar-hw-01",
+      "buyerName": "Apex Civil Contractors",
+      "phone": "9928055667",
+      "source": "Direct Counter Walk-in",
+      "expectedValue": 120000,
+      "itemsInterest": "Complete Plumbing & Sanitary Material for 12 Flats Site",
+      "stage": "Contacted",
+      "followUpDate": "2026-11-09",
+      "notes": "Site engineer visited shop, sample approved.",
+      "createdAt": "2026-11-03T15:56:00.873Z"
+    },
+    {
+      "id": "lead-104",
+      "shopId": "shop-surya-elec-02",
+      "buyerName": "Desert Solar & Power Projects",
+      "phone": "9829044556",
+      "source": "B2B Directory",
+      "expectedValue": 165000,
+      "itemsInterest": "Polycab FR Wire 2.5 sq mm (60 Coils) & MCB Distribution Boxes",
+      "stage": "Proposal Sent",
+      "followUpDate": "2026-11-08",
+      "notes": "Quotation shared on WhatsApp.",
+      "createdAt": "2026-11-05T15:56:00.873Z"
+    }
+  ],
+  "proCustomers": [
+    {
+      "id": "cus-6295115c",
+      "shopId": "shop-marwar-hw-01",
+      "name": "Vikram Malhotra",
+      "contactName": "Vikram Malhotra",
+      "company": "Apex Infotech Solutions",
+      "companyName": "Apex Infotech Solutions",
+      "email": "contact@apexinfotech.example.com",
+      "phone": "9820112345",
+      "gstin": "27AAACA1234A1Z5",
+      "pan": "AAACA1234A",
+      "address": "",
+      "street": "",
+      "city": "Mumbai",
+      "state": "Maharashtra",
+      "pincode": "400093",
+      "creditLimit": 0,
+      "notes": "",
+      "updatedAt": "2026-11-08T04:59:04.348Z",
+      "createdAt": "2026-11-08T04:59:04.348Z"
+    },
+    {
+      "id": "cust-101",
+      "shopId": "shop-marwar-hw-01",
+      "name": "Vikram Singh Rathore",
+      "companyName": "Rathore Infrastructure & Builders",
+      "email": "vikram@rathoreinfra.in",
+      "phone": "9928055667",
+      "gstin": "08AABCR1234F1Z5",
+      "pan": "AABCR1234F",
+      "address": "Plot 14, Heavy Industrial Area",
+      "city": "Jodhpur",
+      "state": "Rajasthan",
+      "pincode": "342003",
+      "creditLimit": 250000,
+      "notes": "Regular B2B builder account. Prefers 15-day credit cycle.",
+      "createdAt": "2026-10-24T04:19:02.281Z",
+      "updatedAt": "2026-11-08T04:19:02.281Z",
+      "contactName": "Vikram Singh Rathore",
+      "company": "Rathore Infrastructure & Builders",
+      "street": "Plot 14, Heavy Industrial Area"
+    },
+    {
+      "id": "cust-102",
+      "shopId": "shop-marwar-hw-01",
+      "name": "Mahendra Gehlot",
+      "companyName": "Shree Balaji Sanitary Traders",
+      "email": "balajisanitary.pali@gmail.com",
+      "phone": "9414188990",
+      "gstin": "08AAFCB8899K1Z2",
+      "pan": "AAFCB8899K",
+      "address": "Station Road, Near Bus Stand",
+      "city": "Pali",
+      "state": "Rajasthan",
+      "pincode": "306401",
+      "creditLimit": 150000,
+      "notes": "Sub-dealer wholesale rate tier applicable.",
+      "createdAt": "2026-10-29T04:19:02.281Z",
+      "updatedAt": "2026-11-08T04:19:02.281Z",
+      "contactName": "Mahendra Gehlot",
+      "company": "Shree Balaji Sanitary Traders",
+      "street": "Station Road, Near Bus Stand"
+    },
+    {
+      "id": "cust-103",
+      "shopId": "shop-marwar-hw-01",
+      "name": "Deepak Chopra",
+      "companyName": "Apex Civil Contractors Pvt Ltd",
+      "email": "purchase@apexcivil.com",
+      "phone": "9829077665",
+      "gstin": "08AAACA9988L1Z1",
+      "pan": "AAACA9988L",
+      "address": "Chopasni Housing Board Sector 11",
+      "city": "Jodhpur",
+      "state": "Rajasthan",
+      "pincode": "342008",
+      "creditLimit": 300000,
+      "notes": "Requires e-Way bill on every dispatch above ₹50,000.",
+      "createdAt": "2026-11-03T04:19:02.281Z",
+      "updatedAt": "2026-11-08T04:19:02.281Z",
+      "contactName": "Deepak Chopra",
+      "company": "Apex Civil Contractors Pvt Ltd",
+      "street": "Chopasni Housing Board Sector 11"
+    }
+  ],
+  "proTasks": [
+    {
+      "id": "tsk-93639435",
+      "shopId": "shop-marwar-hw-01",
+      "createdBy": "Rajesh Mohta",
+      "title": "Follow up with Apex Infotech on GST Invoice",
+      "details": "",
+      "priority": "Urgent",
+      "dueDate": "2026-11-10",
+      "assignedTo": "Owner",
+      "status": "Pending",
+      "relatedTo": "",
+      "updatedAt": "2026-11-08T04:59:04.352Z",
+      "createdAt": "2026-11-08T04:59:04.352Z"
+    },
+    {
+      "id": "tsk-91a924ac",
+      "shopId": "shop-marwar-hw-01",
+      "createdBy": "Rajesh Mohta",
+      "title": "Follow up with Apex Infotech on GST Invoice",
+      "details": "",
+      "priority": "Urgent",
+      "dueDate": "2026-11-10",
+      "assignedTo": "Owner",
+      "status": "Pending",
+      "relatedTo": "",
+      "updatedAt": "2026-11-08T04:22:43.590Z",
+      "createdAt": "2026-11-08T04:22:43.590Z"
+    },
+    {
+      "id": "tsk-101",
+      "shopId": "shop-marwar-hw-01",
+      "title": "Follow up with Rathore Builders for ₹85,000 PVC Pipe Quotation",
+      "details": "Confirm delivery schedule for 150 pcs Supreme PVC 1 inch pipes & 5 Sintex tanks.",
+      "priority": "Urgent",
+      "dueDate": "2026-11-09",
+      "assignedTo": "Rajesh Mohta (Owner)",
+      "status": "Pending",
+      "relatedParty": "Rathore Infrastructure & Builders",
+      "createdAt": "2026-11-07T04:19:02.281Z",
+      "updatedAt": "2026-11-08T04:19:02.281Z"
+    },
+    {
+      "id": "tsk-102",
+      "shopId": "shop-marwar-hw-01",
+      "title": "Collect pending Udhaar clearance from Pali Sub-Dealer",
+      "details": "Send WhatsApp payment link with UPI QR for last week invoice.",
+      "priority": "High",
+      "dueDate": "2026-11-08",
+      "assignedTo": "Accounts Desk",
+      "status": "In Progress",
+      "relatedParty": "Shree Balaji Sanitary Traders",
+      "createdAt": "2026-11-06T04:19:02.281Z",
+      "updatedAt": "2026-11-08T04:19:02.281Z"
+    },
+    {
+      "id": "tsk-103",
+      "shopId": "shop-marwar-hw-01",
+      "title": "Reconcile GSTR-3B Input Tax Credit with Supreme Depot Bill",
+      "details": "Verify supplier GSTIN 08AAACS1234F1Z2 in purchase register before 20th.",
+      "priority": "Medium",
+      "dueDate": "2026-11-12",
+      "assignedTo": "CA Desk",
+      "status": "Pending",
+      "relatedParty": "Supreme Industries Ltd",
+      "createdAt": "2026-11-05T04:19:02.281Z",
+      "updatedAt": "2026-11-08T04:19:02.281Z"
     }
   ]
 }
