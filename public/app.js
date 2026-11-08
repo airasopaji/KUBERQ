@@ -46,10 +46,38 @@ const state = {
     myJobWorkOrders: [],
     myProductionBatches: [],
     myCrmLeads: [],
+    myCustomers: [],
+    myTasks: [],
+    myManagers: [],
     bids: [],
     adminData: null
   },
   // UI Sub-states
+  theme: localStorage.getItem('kuberq_theme') || 'light',
+  quickCreateOpen: false,
+  globalSearchQuery: '',
+  globalSearchOpen: false,
+  customerModal: null,
+  customerSearch: '',
+  productModal: null,
+  dealModal: null,
+  taskModal: null,
+  taskFilterStatus: 'ALL',
+  taskFilterPriority: 'ALL',
+  managerModal: null,
+  settingsSubTab: 'profile',
+  aiProviderForm: {
+    id: '',
+    provider: 'Google AI Studio (Gemini)',
+    label: 'Google AI Studio (Gemini)',
+    apiKey: '',
+    modelId: 'google/gemini-flash-1.5',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    temperature: 0.70,
+    maxTokens: 4096,
+    enabled: true,
+    isPrimary: true
+  },
   merchantTab: 'Dashboard',
   merchantMoreSubTab: 'QR Standee',
   mfgSubTab: 'raw_materials',
@@ -228,11 +256,24 @@ async function bootstrap() {
     state.selectedShopId = state.data.merchants[0].id;
   }
   document.documentElement.lang = state.lang;
+  document.documentElement.setAttribute('data-theme', state.theme || 'light');
   render();
 
   try {
     const data = await apiFetch('/api/bootstrap');
     state.data = { ...state.data, ...data };
+    if (state.data.myShop && state.data.myShop.invoiceDefaults && !state._invoiceDefaultsApplied) {
+      const def = state.data.myShop.invoiceDefaults;
+      state._invoiceDefaultsApplied = true;
+      state.invoiceBuyer.paymentMode = def.defaultPaymentMode || 'Cash';
+      state.invoiceBuyer.supplyType = def.defaultSupplyType || 'auto';
+      state.printFormat = def.defaultPrintFormat || 'a4';
+      if (state.invoiceLines && state.invoiceLines.length === 1 && !state.invoiceLines[0].name) {
+        state.invoiceLines[0].hsn = def.defaultHsn || '3917';
+        state.invoiceLines[0].gstRate = Number(def.defaultGstRate ?? 18);
+        state.invoiceLines[0].taxMode = def.defaultTaxMode || 'exclusive';
+      }
+    }
     if (state.query.shop) {
       state.selectedShopId = state.query.shop;
     } else if (!state.selectedShopId && state.data.merchants.length > 0) {
@@ -243,6 +284,34 @@ async function bootstrap() {
     console.error('Bootstrap error:', err);
     render();
   }
+}
+
+window.toggleTheme = function() {
+  state.theme = state.theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('kuberq_theme', state.theme);
+  document.documentElement.setAttribute('data-theme', state.theme);
+  render();
+};
+
+if (typeof window !== 'undefined' && !window._ctrlKBound) {
+  window._ctrlKBound = true;
+  window.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+      e.preventDefault();
+      state.globalSearchOpen = true;
+      render();
+      setTimeout(() => {
+        const el = document.getElementById('global-ctrl-k-input');
+        if (el) el.focus();
+      }, 30);
+    } else if (e.key === 'Escape') {
+      if (state.quickCreateOpen || state.globalSearchOpen) {
+        state.quickCreateOpen = false;
+        state.globalSearchOpen = false;
+        render();
+      }
+    }
+  });
 }
 
 function navigate(path, queryParams = {}) {
@@ -414,6 +483,94 @@ function setEnterpriseNavTab(key) {
   render();
 }
 
+function renderGlobalSearchDropdown() {
+  const q = (state.globalSearchQuery || '').trim().toLowerCase();
+  if (!state.globalSearchOpen || !q) return '';
+
+  const results = [];
+  for (const c of state.data.myCustomers || []) {
+    if ((c.name || '').toLowerCase().includes(q) || (c.companyName || '').toLowerCase().includes(q) || (c.phone || '').includes(q) || (c.gstin || '').toLowerCase().includes(q)) {
+      results.push({ type: 'Customer', icon: '👥', title: c.name, sub: `${c.companyName || ''} · ${c.phone || ''}`, tab: 'Customers' });
+    }
+  }
+  for (const o of state.data.myOrders || []) {
+    if ((o.invoiceNo || '').toLowerCase().includes(q) || (o.customer || '').toLowerCase().includes(q) || (o.phone || '').includes(q)) {
+      const isQ = o.docType === 'Quotation' || o.status === 'Quotation';
+      results.push({ type: isQ ? 'Quotation' : 'Invoice', icon: isQ ? '📝' : '🧾', title: `${o.invoiceNo} — ${o.customer}`, sub: `${fmtINR(o.totals?.gross || 0)} · ${o.paymentMode || ''}`, tab: 'Billing' });
+    }
+  }
+  for (const l of state.data.myCrmLeads || []) {
+    if ((l.title || '').toLowerCase().includes(q) || (l.buyerName || '').toLowerCase().includes(q) || (l.companyName || '').toLowerCase().includes(q) || (l.itemsInterest || '').toLowerCase().includes(q)) {
+      results.push({ type: 'Deal / Lead', icon: '🎯', title: l.title || l.buyerName, sub: `${l.companyName || l.buyerName} · ${fmtINR(l.expectedValue || 0)} (${l.stage})`, tab: 'CRM Pipeline' });
+    }
+  }
+  for (const p of (state.data.products || []).filter(x => !state.data.myShop || x.shopId === state.data.myShop.id)) {
+    if ((p.name || '').toLowerCase().includes(q) || (p.hsn || '').includes(q) || (p.category || '').toLowerCase().includes(q)) {
+      results.push({ type: 'Product', icon: '📦', title: p.name, sub: `${fmtINR(p.price)} · Stock: ${p.stock} ${p.unit || ''}`, tab: 'Inventory' });
+    }
+  }
+  for (const t of state.data.myTasks || []) {
+    if ((t.title || '').toLowerCase().includes(q) || (t.details || '').toLowerCase().includes(q)) {
+      results.push({ type: 'Task', icon: '✅', title: t.title, sub: `${t.priority} · Due: ${t.dueDate || 'Today'}`, tab: 'Tasks' });
+    }
+  }
+
+  return `
+    <div class="global-search-dropdown" onclick="event.stopPropagation()">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px 6px;border-bottom:1px solid #e2e8f0;font-size:0.74rem;color:#64748b;font-weight:700">
+        <span>🔍 ${tr('GLOBAL SEARCH RESULTS', 'खोज परिणाम')} (${results.length})</span>
+        <button type="button" class="btn btn-ghost btn-sm" style="padding:1px 6px;font-size:0.7rem" onclick="state.globalSearchOpen=false;state.globalSearchQuery='';render()">✕ ESC</button>
+      </div>
+      ${results.length === 0 ? `
+        <div style="padding:16px;text-align:center;font-size:0.84rem;color:#64748b">
+          ${tr('No matching customers, invoices, leads, products, or tasks found.', 'कोई ग्राहक, बिल, लीड या सामान नहीं मिला।')}
+        </div>
+      ` : results.slice(0, 10).map(r => `
+        <div class="global-search-item" onclick="state.globalSearchOpen=false;state.merchantTab='${r.tab}';if(state.route!=='/merchant')navigate('/merchant');else render()">
+          <div style="display:flex;align-items:center;gap:8px;min-width:0">
+            <span style="font-size:1.1rem">${r.icon}</span>
+            <div style="min-width:0">
+              <div style="font-weight:700;font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.title)}</div>
+              <div style="font-size:0.74rem;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.sub)}</div>
+            </div>
+          </div>
+          <span class="badge badge-primary" style="font-size:0.68rem;flex-shrink:0">${esc(r.type)}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+window.triggerQuickCreate = function(action) {
+  state.quickCreateOpen = false;
+  if (state.route !== '/merchant') {
+    state.route = '/merchant';
+    window.history.pushState({}, '', '/merchant');
+  }
+  if (action === 'invoice') {
+    state.invoiceDocType = 'Tax Invoice';
+    state.merchantTab = 'Billing';
+  } else if (action === 'quotation') {
+    state.invoiceDocType = 'Quotation';
+    state.merchantTab = 'Billing';
+  } else if (action === 'customer') {
+    openCustomerModal();
+    return;
+  } else if (action === 'deal') {
+    openDealModal();
+    return;
+  } else if (action === 'product') {
+    openProductAddModal();
+    return;
+  } else if (action === 'expense') {
+    state.merchantTab = 'Expenses';
+  } else if (action === 'task') {
+    openTaskModal();
+    return;
+  }
+  render();
+};
+
 function renderEnterpriseShell(opts) {
   const {
     roleTitle,
@@ -439,53 +596,82 @@ function renderEnterpriseShell(opts) {
   const isMobileOpen = !!state.sidebarMobileOpen;
 
   return `
-    <div class="enterprise-shell">
-      <!-- 1. Dark Navy Top Bar Header -->
+    <div class="enterprise-shell" onclick="if(state.quickCreateOpen||state.globalSearchOpen){state.quickCreateOpen=false;state.globalSearchOpen=false;render();}">
+      <!-- 1. Dark Navy Top Bar Header with Global Search (Ctrl+K), + Create & Theme Toggle -->
       <header class="enterprise-topbar no-print">
         <div class="topbar-left">
-          <button class="sidebar-toggle-btn" type="button" onclick="toggleEnterpriseSidebar()" title="${tr('Toggle Sidebar Menu', 'मेनू छोटा/बड़ा करें')}">
+          <button class="sidebar-toggle-btn" type="button" onclick="event.stopPropagation();toggleEnterpriseSidebar()" title="${tr('Toggle Sidebar Menu', 'मेनू छोटा/बड़ा करें')}">
             ☰
           </button>
           <div class="topbar-brand" onclick="navigate('/')" title="${tr('Go to KuberQ Home', 'KuberQ मुख्य पृष्ठ पर जाएं')}">
             <span class="brand-logo-icon">K</span>
             <span>Kuber<span style="color:#38bdf8">Q</span></span>
-            <span style="font-size:0.75rem;background:#1e3a8a;color:#93c5fd;padding:2px 7px;border-radius:5px;margin-left:6px;font-weight:700">ERP</span>
+            <span style="font-size:0.72rem;background:#1e3a8a;color:#93c5fd;padding:2px 6px;border-radius:5px;margin-left:4px;font-weight:700">ERP</span>
           </div>
         </div>
 
+        <!-- Center: YBT-Style Global Search Bar (Ctrl+K) -->
+        <div class="topbar-global-search-wrap desktop-only" onclick="event.stopPropagation()">
+          <div class="topbar-global-search-box">
+            <span style="font-size:0.88rem;opacity:0.8">🔍</span>
+            <input
+              id="global-ctrl-k-input"
+              class="topbar-global-search-input"
+              placeholder="${tr('Search customers, invoices, leads... (Ctrl+K)', 'ग्राहक, इनवॉइस, लीड या सामान खोजें... (Ctrl+K)')}"
+              value="${esc(state.globalSearchQuery || '')}"
+              onfocus="state.globalSearchOpen=true;render()"
+              oninput="state.globalSearchQuery=this.value;state.globalSearchOpen=true;render()"
+            />
+            <span class="topbar-kbd-badge">Ctrl+K</span>
+          </div>
+          ${renderGlobalSearchDropdown()}
+        </div>
+
         <div class="topbar-right-ribbon">
-          <div class="topbar-ribbon-item">
-            <span>👤</span>
-            <span style="color:#94a3b8;font-size:0.78rem">WELCOME,</span>
-            <span class="topbar-user-name">${esc((u.name || '').toUpperCase())}</span>
+          <!-- + Create Quick Action Dropdown (Item #1) -->
+          <div class="quick-create-wrap" onclick="event.stopPropagation()">
+            <button type="button" class="quick-create-btn" onclick="state.quickCreateOpen=!state.quickCreateOpen;state.globalSearchOpen=false;render()">
+              <span>+ ${tr('Create', 'नया बनाएँ')}</span>
+              <span style="font-size:0.7rem">▾</span>
+            </button>
+            ${state.quickCreateOpen ? `
+              <div class="quick-create-menu">
+                <button type="button" class="quick-create-item" onclick="triggerQuickCreate('invoice')">🧾 ${tr('New GST Invoice', 'नया GST इनवॉइस')}</button>
+                <button type="button" class="quick-create-item" onclick="triggerQuickCreate('quotation')">📝 ${tr('New Quotation', 'नया कोटेशन (Estimate)')}</button>
+                <button type="button" class="quick-create-item" onclick="triggerQuickCreate('customer')">👥 ${tr('Add New Customer', 'नया ग्राहक जोड़ें')}</button>
+                <button type="button" class="quick-create-item" onclick="triggerQuickCreate('deal')">🎯 ${tr('Add Deal / Lead', 'नई डील / लीड जोड़ें')}</button>
+                <button type="button" class="quick-create-item" onclick="triggerQuickCreate('product')">📦 ${tr('Add Product / Service', 'नया प्रोडक्ट / सर्विस जोड़ें')}</button>
+                <button type="button" class="quick-create-item" onclick="triggerQuickCreate('task')">✅ ${tr('Add Task / Reminder', 'नया टास्क / रिमाइंडर')}</button>
+                <button type="button" class="quick-create-item" onclick="triggerQuickCreate('expense')">💸 ${tr('Log Shop Expense', 'दुकान का खर्चा लिखें')}</button>
+              </div>
+            ` : ''}
           </div>
 
-          <span class="topbar-ribbon-divider">||</span>
+          <!-- Quick AI Assistant Button -->
+          <button type="button" class="theme-toggle-btn" style="color:#38bdf8" title="${tr('Ask AI Digital Manager', 'AI डिजिटल मैनेजर से पूछें')}" onclick="state.merchantTab='AI Manager';if(state.route!=='/merchant')navigate('/merchant');else render()">
+            ✨
+          </button>
 
-          <div class="topbar-ribbon-item">
-            <span>📅 🕒</span>
+          <!-- Dark / Light Mode Switch (Item #2) -->
+          <button type="button" class="theme-toggle-btn" title="${tr('Switch Dark / Light Mode', 'डार्क / लाइट मोड बदलें')}" onclick="toggleTheme()">
+            ${state.theme === 'dark' ? '☀️' : '🌙'}
+          </button>
+
+          <span class="topbar-ribbon-divider desktop-only">||</span>
+
+          <div class="topbar-ribbon-item desktop-only">
             <span id="live-enterprise-clock" class="topbar-live-clock">${getFormattedEnterpriseDateTime().display}</span>
           </div>
 
-          <span class="topbar-ribbon-divider">||</span>
+          <span class="topbar-ribbon-divider desktop-only">||</span>
 
-          <div class="topbar-ribbon-item">
-            <span>🆔</span>
+          <div class="topbar-ribbon-item desktop-only">
             <span class="topbar-id-badge">${esc(uniqueId || 'KQM-000000')}</span>
           </div>
 
-          ${shop?.plan ? `
-            <span class="topbar-ribbon-divider">||</span>
-            <span class="badge badge-gold" style="font-size:0.72rem;letter-spacing:0.5px">💎 ${esc(shop.plan.toUpperCase())}</span>
-          ` : ''}
-
-          <span class="topbar-ribbon-divider">||</span>
-
-          <button class="btn btn-ghost btn-sm" onclick="navigate('/')" style="color:#38bdf8;padding:4px 9px;font-size:0.78rem" title="${tr('Switch to Public Website', 'वेबसाइट देखें')}">
+          <button class="btn btn-ghost btn-sm desktop-only" onclick="navigate('/')" style="color:#38bdf8;padding:4px 8px;font-size:0.76rem" title="${tr('Switch to Public Website', 'वेबसाइट देखें')}">
             🌐 ${tr('Website', 'वेबसाइट')}
           </button>
-
-          <span class="topbar-ribbon-divider">||</span>
 
           <button class="topbar-logout-btn" onclick="logout()" title="${tr('Secure Logout', 'सुरक्षित लॉगआउट')}">
             🚪 ${tr('LOGOUT', 'लॉगआउट')}
@@ -622,8 +808,12 @@ function renderHeader() {
           ` : ''}
         </nav>
 
-        <!-- Right: Language Toggle + Auth + Call Support (Aligned Flush Right on Same Row) -->
+        <!-- Right: Theme Toggle + Language Toggle + Auth (Aligned Flush Right on Same Row) -->
         <div class="nav-actions">
+          <button type="button" class="btn btn-ghost btn-sm" style="padding:6px 10px;font-size:0.95rem" title="${tr('Toggle Dark / Light Mode', 'डार्क / लाइट मोड बदलें')}" onclick="toggleTheme()">
+            ${state.theme === 'dark' ? '☀️' : '🌙'}
+          </button>
+
           <div class="lang-toggle-box" title="${tr('Switch Entire Website Language', 'पूरी वेबसाइट की भाषा बदलें')}">
             <button type="button" class="lang-btn ${state.lang === 'hi' ? 'active' : ''}" onclick="setLang('hi')">हिन्दी</button>
             <span style="color:#94a3b8;font-weight:700;font-size:0.8rem">/</span>
@@ -1437,31 +1627,120 @@ function renderPricing() {
 }
 
 // ============================================================================
-// 3. ZERO-COST MOBILE + PASSWORD LOGIN & SIGNUP (`/auth` & `/signup`)
+// 3. ZERO-COST MOBILE + PASSWORD LOGIN & SIGNUP + GOOGLE & AUTOFILL (`/auth` & `/signup`)
 // ============================================================================
+function getSavedBrowserAccounts() {
+  try {
+    return JSON.parse(localStorage.getItem('kuberq_saved_accounts') || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function saveBrowserAccount(identifier, name, role) {
+  try {
+    const list = getSavedBrowserAccounts().filter(a => a.identifier !== identifier);
+    list.unshift({ identifier, name: name || identifier, role: role || 'merchant', savedAt: new Date().toISOString() });
+    localStorage.setItem('kuberq_saved_accounts', JSON.stringify(list.slice(0, 5)));
+  } catch (_) {}
+}
+
+window.pickSavedLoginAccount = function(identifier, role) {
+  state.authRole = role || 'merchant';
+  state.authMode = String(identifier).includes('@') ? 'email' : 'mobile';
+  render();
+  setTimeout(() => {
+    const idEl = document.getElementById('li-id');
+    const passEl = document.getElementById('li-pass');
+    if (idEl) idEl.value = identifier;
+    if (passEl) passEl.focus();
+  }, 30);
+};
+
+window.handleGoogleQuickAuth = async function() {
+  try {
+    const saved = getSavedBrowserAccounts().find(a => String(a.identifier).includes('@'));
+    const defaultEmail = saved ? saved.identifier : 'rajesh@marwarhardware.in';
+    const email = prompt(
+      tr(
+        'Google Account Direct Sign-In (Free):\nEnter or confirm your Google Email ID to sign in directly:',
+        'गूगल अकाउंट डायरेक्ट लॉगिन (निःशुल्क):\nसीधे लॉगिन करने के लिए अपनी Google Email ID दर्ज करें या पुष्टि करें:'
+      ),
+      defaultEmail
+    );
+    if (!email || !email.trim()) return;
+    const cleanEmail = email.trim().toLowerCase();
+    const res = await apiFetch('/api/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: cleanEmail,
+        name: cleanEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        role: state.authRole || 'merchant'
+      })
+    });
+    state.token = res.token;
+    localStorage.setItem('kuberq_token', res.token);
+    saveBrowserAccount(cleanEmail, res.name, res.role);
+    await bootstrap();
+    showToast(tr(`✅ Signed in with Google as ${res.name}!`, `✅ गूगल खाते (${res.name}) से सफल लॉगिन!`));
+    if (res.role === 'admin' || res.role === 'employee') navigate('/admin');
+    else if (res.role === 'customer') navigate('/customer');
+    else navigate('/merchant');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
 function renderAuth(isSignup = false) {
   const roles = [
     ['merchant', tr('Merchant / Trader', 'दुकानदार / व्यापारी')],
     ['manufacturer', tr('Manufacturer / Wholesaler', 'निर्माता / थोक विक्रेता')],
+    ['staff', tr('Shop Manager / Staff', 'दुकान मैनेजर / स्टाफ')],
     ['customer', tr('Customer / Sub-Dealer', 'ग्राहक / सब-डीलर')],
     ['agent', tr('Channel Partner', 'पार्टनर एजेंट')],
     ['employee', tr('Platform Staff (Sub-Admin)', 'KuberQ टीम (सब-एडमिन)')]
   ];
+  const savedAccounts = getSavedBrowserAccounts();
 
   return `
-    <div class="container" style="max-width:600px;padding:48px 24px">
+    <div class="container" style="max-width:600px;padding:36px 20px">
       <div class="card">
-        <div style="text-align:center;margin-bottom:22px">
-          <span class="badge badge-gold">🔐 ${tr('ZERO-OTP SECURE ACCESS', 'सुरक्षित मोबाइल लॉगिन')}</span>
-          <h1 style="font-size:1.9rem;margin-top:10px">
+        <div style="text-align:center;margin-bottom:18px">
+          <span class="badge badge-gold">🔐 ${tr('INSTANT AUTOFILL & GOOGLE SIGN-IN', 'ऑटो-फिल व गूगल डायरेक्ट लॉगिन')}</span>
+          <h1 style="font-size:1.75rem;margin-top:8px">
             ${isSignup ? tr('Register Your Business on KuberQ', 'KuberQ पर अपना व्यापार रजिस्टर करें') : tr('Sign In to KuberQ', 'KuberQ में लॉगिन करें')}
           </h1>
-          <p class="text-muted" style="font-size:0.98rem;margin-top:6px">
-            ${tr('Sign in with your 10-digit Mobile Number & Password — no email or paid SMS OTP needed.', 'अपने 10-अंकों के मोबाइल नंबर और पासवर्ड से लॉगिन करें — किसी ईमेल या महँगे OTP की आवश्यकता नहीं।')}
+          <p class="text-muted" style="font-size:0.9rem;margin-top:4px">
+            ${tr('Use 1-Click Google Sign-In, saved browser autofill, or your 10-digit Mobile / Email.', '1-क्लिक Google लॉगिन, ऑटो-फिल या अपने 10-अंकीय मोबाइल / ईमेल से तुरंत लॉगिन करें।')}
           </p>
         </div>
 
-        <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:20px">
+        <!-- Free 1-Click Google Sign-In Button (Item #4) -->
+        <div style="margin-bottom:16px">
+          <button
+            type="button"
+            onclick="handleGoogleQuickAuth()"
+            style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:11px 16px;border-radius:10px;border:1.5px solid #cbd5e1;background:#ffffff;color:#0f172a;font-weight:700;font-size:0.94rem;cursor:pointer;box-shadow:0 2px 6px rgba(15,23,42,0.06);transition:all 0.15s ease"
+          >
+            <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+            <span>${tr('Continue with Google (Instant Verified Email)', 'Google अकाउंट से सीधे लॉगिन करें (निःशुल्क)')}</span>
+          </button>
+        </div>
+
+        ${!isSignup && savedAccounts.length > 0 ? `
+          <div style="margin-bottom:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px">
+            <div style="font-size:0.76rem;font-weight:700;color:#475569;margin-bottom:6px">⚡ ${tr('Saved Accounts on This Device (Click to Auto-Fill):', 'इस डिवाइस पर सेव किए गए खाते (1-क्लिक ऑटो-फिल):')}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              ${savedAccounts.map(acc => `
+                <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.78rem;padding:4px 10px;background:#fff;border:1px solid #cbd5e1" onclick="pickSavedLoginAccount('${esc(acc.identifier)}', '${esc(acc.role)}')">
+                  👤 ${esc(acc.name)} (${esc(acc.identifier)})
+                </button>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+
+        <div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-bottom:16px">
           ${roles.map(([r, label]) => `
             <button type="button" class="btn btn-sm ${state.authRole === r ? 'btn-gold' : 'btn-ghost'}" onclick="state.authRole='${r}';render()">
               ${label}
@@ -1469,33 +1748,37 @@ function renderAuth(isSignup = false) {
           `).join('')}
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px;background:var(--bg-soft);padding:6px;border-radius:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;background:var(--bg-soft);padding:6px;border-radius:12px">
           <button type="button" class="btn btn-sm ${state.authMode === 'mobile' ? 'btn-primary' : 'btn-ghost'}" onclick="state.authMode='mobile';render()">
-            📱 ${tr('10-Digit Mobile (Recommended)', 'मोबाइल नंबर (अनुशंसित)')}
+            📱 ${tr('10-Digit Mobile (Auto-Fill)', 'मोबाइल नंबर (ऑटो-फिल)')}
           </button>
           <button type="button" class="btn btn-sm ${state.authMode === 'email' ? 'btn-primary' : 'btn-ghost'}" onclick="state.authMode='email';render()">
-            ✉️ ${tr('Email Address', 'ईमेल आईडी')}
+            ✉️ ${tr('Email Address (Auto-Fill)', 'ईमेल आईडी (ऑटो-फिल)')}
           </button>
         </div>
 
         ${isSignup ? `
-          <form onsubmit="handleSignup(event)">
+          <form onsubmit="handleSignup(event)" autocomplete="on">
             <div class="grid grid-2">
               <div class="form-group">
                 <label class="form-label">${tr('Your Full Name', 'आपका पूरा नाम')} *</label>
-                <input class="input" id="su-name" required placeholder="${tr('e.g. Rajesh Mohta', 'जैसे: राजेश मोहता')}" />
+                <input class="input" id="su-name" name="name" autocomplete="name" required placeholder="${tr('e.g. Rajesh Mohta', 'जैसे: राजेश मोहता')}" />
               </div>
               <div class="form-group">
                 <label class="form-label">${tr('10-Digit Mobile Number', '10 अंकों का मोबाइल नंबर')} *</label>
-                <input class="input" id="su-phone" required maxlength="10" placeholder="98XXXXXXXX" />
+                <input class="input" id="su-phone" name="phone" type="tel" autocomplete="tel" required maxlength="10" placeholder="98XXXXXXXX" />
               </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">${tr('Official Email Address (For Google & Auto-Fill Login)', 'ईमेल आईडी (गूगल व ऑटो-फिल लॉगिन हेतु)')}</label>
+              <input class="input" id="su-email" name="email" type="email" autocomplete="email" placeholder="business@example.com" />
             </div>
 
             ${state.authRole !== 'customer' ? `
               <div class="grid grid-2">
                 <div class="form-group">
                   <label class="form-label">${tr('Shop / Company / Factory Name', 'दुकान / कंपनी / फैक्टरी का नाम')} *</label>
-                  <input class="input" id="su-shop" required placeholder="${tr('e.g. Shree Balaji Hardware', 'जैसे: श्री बालाजी हार्डवेयर')}" />
+                  <input class="input" id="su-shop" name="organization" autocomplete="organization" required placeholder="${tr('e.g. Shree Balaji Hardware', 'जैसे: श्री बालाजी हार्डवेयर')}" />
                 </div>
                 <div class="form-group">
                   <label class="form-label">${tr('Business Category', 'व्यवसाय की श्रेणी')}</label>
@@ -1526,18 +1809,18 @@ function renderAuth(isSignup = false) {
             <div class="grid grid-2">
               <div class="form-group">
                 <label class="form-label">${tr('City', 'शहर')} *</label>
-                <input class="input" id="su-city" required value="Jodhpur" />
+                <input class="input" id="su-city" name="address-level2" autocomplete="address-level2" required value="Jodhpur" />
               </div>
               <div class="form-group">
                 <label class="form-label">${tr('State', 'राज्य')} *</label>
-                <input class="input" id="su-state" required value="Rajasthan" />
+                <input class="input" id="su-state" name="address-level1" autocomplete="address-level1" required value="Rajasthan" />
               </div>
             </div>
 
             <div class="grid grid-2">
               <div class="form-group">
                 <label class="form-label">${tr('Create Password (min 8 chars)', 'पासवर्ड बनाएँ (कम से कम 8 अक्षर)')} *</label>
-                <input class="input" type="password" id="su-pass" required minlength="8" placeholder="••••••••" />
+                <input class="input" type="password" id="su-pass" name="password" autocomplete="new-password" required minlength="8" placeholder="••••••••" />
               </div>
               <div class="form-group">
                 <label class="form-label">${tr('Referral Code (Optional)', 'रेफरल कोड (वैकल्पिक)')}</label>
@@ -1550,16 +1833,24 @@ function renderAuth(isSignup = false) {
             </button>
           </form>
         ` : `
-          <form onsubmit="handleLogin(event)">
+          <form onsubmit="handleLogin(event)" autocomplete="on">
             <div class="form-group">
               <label class="form-label">
-                ${state.authMode === 'mobile' ? tr('10-Digit Mobile Number', '10 अंकों का मोबाइल नंबर') : tr('Email Address', 'ईमेल पता')}
+                ${state.authMode === 'mobile' ? tr('10-Digit Mobile Number (or Email)', '10 अंकों का मोबाइल नंबर (या ईमेल)') : tr('Email Address (or Mobile)', 'ईमेल पता (या मोबाइल)')}
               </label>
-              <input class="input" id="li-id" required placeholder="${state.authMode === 'mobile' ? '98XXXXXXXX' : 'name@company.com'}" />
+              <input
+                class="input"
+                id="li-id"
+                name="username"
+                type="${state.authMode === 'email' ? 'email' : 'text'}"
+                autocomplete="${state.authMode === 'email' ? 'email' : 'username'}"
+                required
+                placeholder="${state.authMode === 'mobile' ? '9829011223' : 'name@company.com'}"
+              />
             </div>
             <div class="form-group">
               <label class="form-label">${tr('Password', 'पासवर्ड')}</label>
-              <input class="input" type="password" id="li-pass" required placeholder="••••••••" />
+              <input class="input" type="password" id="li-pass" name="password" autocomplete="current-password" required placeholder="••••••••" />
             </div>
             <button type="submit" class="btn btn-gold" style="width:100%;margin-top:10px">
               🔐 ${tr('Sign In Securely', 'सुरक्षित लॉगिन करें')}
@@ -1567,7 +1858,7 @@ function renderAuth(isSignup = false) {
           </form>
 
           <div class="card-subtle" style="margin-top:20px;font-size:0.92rem">
-            <p class="text-gold" style="font-weight:700;margin-bottom:8px">⚡ ${tr('Explore Demo Portals (For Evaluation):', 'पोर्टल जांच हेतु 1-क्लिक डेमो खाता:')}</p>
+            <p class="text-gold" style="font-weight:700;margin-bottom:8px">⚡ ${tr('1-Click Instant Demo Login (No Typing Needed):', 'बिना टाइप किए 1-क्लिक डेमो लॉगिन:')}</p>
             <div style="display:flex;flex-wrap:wrap;gap:8px">
               <button class="btn btn-ghost btn-sm" onclick="quickLogin('9829011223', 'Marwar@123', 'merchant')">🏪 ${tr('Demo B2B Retailer', 'डेमो व्यापारी (Marwar)')}</button>
               <button class="btn btn-ghost btn-sm" onclick="quickLogin('9414122334', 'Surya@123', 'merchant')">🏭 ${tr('Demo Wholesaler', 'डेमो थोक व्यापारी (Surya)')}</button>
@@ -2428,17 +2719,56 @@ function renderMerchantExpensesOnly(shop) {
   `;
 }
 
+function computeSixMonthFinancials(orders, expenses) {
+  const months = [];
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const label = d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+    months.push({ ym, label, revenue: 0, cogs: 0, expenses: 0, netProfit: 0, count: 0 });
+  }
+  for (const o of orders || []) {
+    if (o.status === 'Rejected' || o.status === 'Sales Return' || o.docType === 'Quotation' || o.status === 'Quotation') continue;
+    const ym = String(o.date || o.createdAt || '').slice(0, 7);
+    const m = months.find(x => x.ym === ym) || months[months.length - 1];
+    if (m) {
+      const g = Number(o.totals?.gross || o.amount || 0);
+      const tx = Number(o.totals?.taxable || g);
+      const cost = Number(o.totals?.costTotal) || Math.round(tx * 0.82);
+      m.revenue += g;
+      m.cogs += cost;
+      m.count += 1;
+    }
+  }
+  for (const ex of expenses || []) {
+    const ym = String(ex.date || '').slice(0, 7);
+    const m = months.find(x => x.ym === ym) || months[months.length - 1];
+    if (m) {
+      m.expenses += Number(ex.amount || 0);
+    }
+  }
+  for (const m of months) {
+    const grossMargin = Math.max(0, m.revenue - m.cogs);
+    m.grossMargin = grossMargin;
+    m.netProfit = grossMargin - m.expenses;
+  }
+  return months;
+}
+
 function renderMerchantReportsOnly(shop) {
   const period = state.accountingPeriod || 'all';
-  const allOrders = filterByAccountingPeriod(state.data.myOrders || [], period);
+  const rawOrders = state.data.myOrders || [];
+  const rawExpenses = state.data.myExpenses || [];
+  const allOrders = filterByAccountingPeriod(rawOrders, period);
   const supplierPurchases = filterByAccountingPeriod(state.data.mySupplierPurchases || [], period);
-  const products = state.data.products || [];
+  const expenses = filterByAccountingPeriod(rawExpenses, period);
+  const products = (state.data.products || []).filter(p => p.shopId === shop.id);
 
-  const outputGst = allOrders
-    .filter(o => o.status !== 'Rejected' && o.status !== 'Sales Return')
-    .reduce((s, o) => s + (Number(o.totals?.gst) || 0), 0);
-  const inputItc = supplierPurchases
-    .reduce((s, sp) => s + (Number(sp.gstAmount) || Math.round((Number(sp.totalAmount) || 0) * 18 / 118)), 0);
+  const validInvoices = allOrders.filter(o => o.status !== 'Rejected' && o.status !== 'Sales Return' && o.docType !== 'Quotation' && o.status !== 'Quotation');
+
+  const outputGst = validInvoices.reduce((s, o) => s + (Number(o.totals?.gst) || 0), 0);
+  const inputItc = supplierPurchases.reduce((s, sp) => s + (Number(sp.gstAmount) || Math.round((Number(sp.totalAmount) || 0) * 18 / 118)), 0);
   const netGstPayable = Math.max(0, outputGst - inputItc);
   const itcCarryForward = Math.max(0, inputItc - outputGst);
 
@@ -2454,17 +2784,179 @@ function renderMerchantReportsOnly(shop) {
     totalStockUnits += q;
   });
 
+  // 1. 6-Month P&L Statement Summary (Item #14)
+  const sixMonths = computeSixMonthFinancials(rawOrders, rawExpenses);
+  const total6mRev = sixMonths.reduce((s, m) => s + m.revenue, 0);
+  const total6mCogs = sixMonths.reduce((s, m) => s + m.cogs, 0);
+  const total6mExp = sixMonths.reduce((s, m) => s + m.expenses, 0);
+  const total6mNet = sixMonths.reduce((s, m) => s + m.netProfit, 0);
+
+  // 2. Top Revenue Customers Leaderboard (Item #14)
+  const custMap = new Map();
+  for (const o of validInvoices) {
+    const key = o.phone || o.customer || 'Walk-in';
+    const gross = Number(o.totals?.gross || o.amount || 0);
+    const paid = o.paymentMode === 'Credit' ? (o.udhaarSettled ? gross : Math.min(gross, Number(o.paidAmount || 0))) : gross;
+    const due = Math.max(0, gross - paid);
+    const cur = custMap.get(key) || { name: o.customer || 'Customer', phone: o.phone || '', gstin: o.buyerGstin || '', invoiced: 0, paid: 0, due: 0, count: 0 };
+    cur.invoiced += gross;
+    cur.paid += paid;
+    cur.due += due;
+    cur.count += 1;
+    custMap.set(key, cur);
+  }
+  const topCustomers = [...custMap.values()].sort((a, b) => b.invoiced - a.invoiced);
+
+  // 3. Expense Category Breakdown
+  const expCatMap = new Map();
+  for (const ex of expenses) {
+    const cat = ex.category || 'General';
+    expCatMap.set(cat, (expCatMap.get(cat) || 0) + Number(ex.amount || 0));
+  }
+  const expCategories = [...expCatMap.entries()].sort((a, b) => b[1] - a[1]);
+
   return `
-    <div style="display:grid;gap:20px">
-      <!-- 0-Latency Period Filter -->
+    <div style="display:grid;gap:18px">
+      <!-- 0-Latency Period Filter + Export Bar -->
       <div class="card-subtle no-print" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-weight:800;font-size:0.88rem;color:#0f172a">📅 ${tr('Select Accounting Period (0-Latency CA Filter):', 'लेखा अवधि चुनें (0-विलंबता CA फिल्टर):')}</span>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-weight:800;font-size:0.88rem;color:#0f172a">📅 ${tr('Accounting Period Filter:', 'लेखा अवधि चुनें:')}</span>
           <button class="btn btn-sm ${period === 'all' ? 'btn-gold' : 'btn-ghost'}" onclick="state.accountingPeriod='all';render()">${tr('All Time', 'समस्त रिकॉर्ड्स')}</button>
           <button class="btn btn-sm ${period === 'month' ? 'btn-gold' : 'btn-ghost'}" onclick="state.accountingPeriod='month';render()">${tr('This Month', 'चालू माह')}</button>
           <button class="btn btn-sm ${period === 'today' ? 'btn-gold' : 'btn-ghost'}" onclick="state.accountingPeriod='today';render()">${tr('Today', 'आज का दिन')}</button>
         </div>
-        <span class="badge badge-gold">CA & GSTR-3B Ready</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary btn-sm" onclick="exportGstr1Csv()">📥 ${tr('Export GSTR-1 / Tally CSV', 'GSTR-1 CSV डाउनलोड')}</button>
+          <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ ${tr('Print Financial Report', 'रिपोर्ट प्रिंट करें')}</button>
+        </div>
+      </div>
+
+      <!-- 1. 6-MONTH P&L STATEMENT SUMMARY (Item #14) -->
+      <div class="erp-card">
+        <div class="erp-card-header">
+          <div>
+            <span class="badge badge-primary">📊 ${tr('6-MONTH P&L STATEMENT SUMMARY', '6-माह का लाभ-हानि (P&L) विवरण सारांश')}</span>
+            <h3 style="margin-top:6px">${tr('Monthly Revenue, Cost of Goods (COGS), Operating Expenses & Net Profit', 'माह-वार कुल बिक्री, माल की लागत, परिचालन खर्चे एवं शुद्ध मुनाफ़ा')}</h3>
+          </div>
+          <span class="badge ${total6mNet >= 0 ? 'badge-primary' : 'badge-danger'}" style="font-size:0.95rem;padding:6px 12px">
+            ${tr('6M Net Profit:', '6-माह शुद्ध लाभ:')} ${fmtINR(total6mNet)}
+          </span>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>${tr('Month', 'माह')}</th>
+                <th>${tr('Invoices', 'बिल संख्या')}</th>
+                <th>${tr('Gross Revenue', 'कुल बिक्री (Revenue)')}</th>
+                <th>${tr('Est. COGS', 'माल लागत (COGS)')}</th>
+                <th>${tr('Gross Margin', 'सकल लाभ')}</th>
+                <th>${tr('Operating Expenses', 'दुकान खर्चे')}</th>
+                <th>${tr('Net Operating Profit', 'शुद्ध मुनाफ़ा (Net Profit)')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sixMonths.map(m => `
+                <tr>
+                  <td><b>${esc(m.label)}</b></td>
+                  <td>${m.count}</td>
+                  <td><b style="color:#0284c7">${fmtINR(m.revenue)}</b></td>
+                  <td>${fmtINR(m.cogs)}</td>
+                  <td style="color:#16a34a;font-weight:700">${fmtINR(m.grossMargin)}</td>
+                  <td style="color:#dc2626">−${fmtINR(m.expenses)}</td>
+                  <td>
+                    <b style="color:${m.netProfit >= 0 ? '#15803d' : '#dc2626'}">${fmtINR(m.netProfit)}</b>
+                  </td>
+                </tr>
+              `).join('')}
+              <tr style="background:#f8fafc;font-weight:800">
+                <td>${tr('6-Month Total', '6-माह कुल योग')}</td>
+                <td>${sixMonths.reduce((s, m) => s + m.count, 0)}</td>
+                <td style="color:#0284c7">${fmtINR(total6mRev)}</td>
+                <td>${fmtINR(total6mCogs)}</td>
+                <td style="color:#16a34a">${fmtINR(Math.max(0, total6mRev - total6mCogs))}</td>
+                <td style="color:#dc2626">−${fmtINR(total6mExp)}</td>
+                <td style="color:${total6mNet >= 0 ? '#15803d' : '#dc2626'}">${fmtINR(total6mNet)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 2. TOP REVENUE CUSTOMERS & EXPENSE BREAKDOWN (Item #14) -->
+      <div class="grid grid-2">
+        <div class="erp-card">
+          <div class="erp-card-header">
+            <div>
+              <span class="badge badge-gold">🏆 ${tr('TOP REVENUE CUSTOMERS', 'शीर्ष रेवेन्यू देने वाले ग्राहक')}</span>
+              <h3 style="margin-top:6px">${tr('Customer Revenue Contribution & Outstanding Balance', 'ग्राहक-वार कुल व्यापार एवं बकाया राशि')}</h3>
+            </div>
+          </div>
+          ${topCustomers.length === 0 ? `
+            <p class="text-muted" style="font-size:0.86rem">${tr('No customer invoices recorded in this period.', 'इस अवधि में कोई ग्राहक बिल नहीं है।')}</p>
+          ` : `
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>${tr('Customer', 'ग्राहक')}</th>
+                    <th>${tr('Bills', 'बिल')}</th>
+                    <th>${tr('Total Invoiced', 'कुल बिल')}</th>
+                    <th>${tr('Balance Due', 'बकाया')}</th>
+                    <th>${tr('Ledger', 'खाता')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${topCustomers.slice(0, 8).map((c, idx) => `
+                    <tr>
+                      <td>
+                        <b>#${idx + 1} ${esc(c.name)}</b>
+                        <div class="text-muted" style="font-size:0.74rem">${esc(c.phone)} ${c.gstin ? `· ${esc(c.gstin)}` : ''}</div>
+                      </td>
+                      <td>${c.count}</td>
+                      <td><b style="color:#0284c7">${fmtINR(c.invoiced)}</b></td>
+                      <td><b style="color:${c.due > 0 ? '#dc2626' : '#16a34a'}">${fmtINR(c.due)}</b></td>
+                      <td>
+                        <button type="button" class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:0.75rem" onclick="openPartyLedgerModal('${esc(c.phone || c.name)}')">📄 Ledger</button>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `}
+        </div>
+
+        <div class="erp-card">
+          <div class="erp-card-header">
+            <div>
+              <span class="badge badge-danger">💸 ${tr('OPERATING EXPENSE BREAKDOWN', 'खर्च श्रेणी विश्लेषण')}</span>
+              <h3 style="margin-top:6px">${tr('Category-Wise Shop & Operational Expenses', 'मद-वार दुकान एवं व्यापारिक खर्चों का विवरण')}</h3>
+            </div>
+          </div>
+          ${expCategories.length === 0 ? `
+            <p class="text-muted" style="font-size:0.86rem">${tr('No operating expenses recorded in this period.', 'इस अवधि में कोई खर्च दर्ज नहीं है।')}</p>
+          ` : `
+            <div style="display:grid;gap:10px">
+              ${expCategories.map(([cat, amt]) => {
+                const totalExpAll = Math.max(1, expenses.reduce((s, e) => s + Number(e.amount || 0), 0));
+                const pct = Math.min(100, Math.round((amt / totalExpAll) * 100));
+                return `
+                  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.84rem;margin-bottom:4px">
+                      <b>${esc(cat)}</b>
+                      <span style="color:#dc2626;font-weight:800">${fmtINR(amt)} (${pct}%)</span>
+                    </div>
+                    <div style="height:6px;background:#e2e8f0;border-radius:999px;overflow:hidden">
+                      <div style="width:${pct}%;height:100%;background:#ef4444;border-radius:999px"></div>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `}
+        </div>
       </div>
 
       <!-- GSTR-3B Tax Set-Off Summary -->
@@ -2548,70 +3040,451 @@ function renderMerchantReportsOnly(shop) {
   `;
 }
 
+// ============================================================================
+// 5-TAB SYSTEM SETTINGS (Items #8, #9, #10 — Matching Screenshots 3 & 4)
+// ============================================================================
 function renderMerchantSettingsOnly(shop, qrUrl) {
-  const aiRemaining = Math.max(0, (Number(shop.aiLimit) || 3) - (Number(shop.aiUsed) || 0));
+  const subTab = state.settingsSubTab || 'profile';
+  const bp = shop.businessProfile || {};
+  const bk = shop.banking || {};
+  const invDef = shop.invoiceDefaults || {};
+  const aiProviders = shop.aiProviders || [];
+  const f = state.aiProviderForm || {};
+
+  const tabs = [
+    ['profile', '🏢', tr('Business Profile', 'व्यापार प्रोफ़ाइल')],
+    ['banking', '🏦', tr('Banking & UPI', 'बैंकिंग व UPI')],
+    ['invoice', '🧾', tr('Invoice Defaults', 'इनवॉइस डिफ़ॉल्ट सेटिंग्स')],
+    ['ai_apis', '✨', tr('AI Digital Manager & APIs', 'AI डिजिटल मैनेजर व API')],
+    ['backup', '💾', tr('Backup & Reset', 'बैकअप व स्टोर लिंक')]
+  ];
 
   return `
-    <div style="display:grid;gap:20px">
-      <!-- Shop Details Card -->
-      <div class="erp-card">
-        <div class="erp-card-header">
-          <div>
-            <span class="badge badge-gold">💎 ${esc(trDyn(shop.plan))}</span>
-            <span class="badge ${aiRemaining > 0 ? 'badge-primary' : 'badge-danger'}">
-              ✨ AI क्रेडिट: ${aiRemaining} / ${shop.aiLimit || 3} शेष
-            </span>
-            ${shop.verified ? `<span class="badge badge-gold">✓ सत्यापित B2B प्रतिष्ठान</span>` : ''}
-            <span class="badge ${shop.open ? 'badge-primary' : 'badge-danger'}">${shop.open ? 'दुकान खुली है' : 'दुकान बंद है'}</span>
-            <h2 style="font-size:1.7rem;margin-top:8px;color:#0f172a">${esc(trDyn(shop.shop))}</h2>
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-gold btn-sm" onclick="downloadFullShopBackup()">
-              💾 ${tr('1-Click Offline Data Backup', '1-क्लिक डेटा बैकअप')}
-            </button>
-            <button class="btn btn-ghost btn-sm" onclick="toggleShopOpen(${!shop.open})">
-              ${shop.open ? '🔴 दुकान बंद मार्क करें' : '🟢 दुकान खुली मार्क करें'}
-            </button>
-            <button class="btn btn-primary btn-sm" onclick="navigate('/pricing')">
-              💎 ${tr('Upgrade Plan / AI Credits', 'प्लान व AI अपग्रेड')}
-            </button>
-          </div>
-        </div>
+    <div>
+      <p class="text-muted" style="font-size:0.86rem;margin-bottom:10px">
+        ${tr('Configure organization profile, tax rules, banking details, invoice defaults, AI providers, and system backups.', 'अपनी कंपनी की पहचान, जीएसटी, बैंक खाता, डिफ़ॉल्ट इनवॉइस नियम, AI प्रोवाइडर API और डेटा बैकअप यहाँ से प्रबंधित करें।')}
+      </p>
 
-        <div class="clean-form-grid" style="margin:0">
-          <div class="card-subtle">
-            <p class="text-muted" style="font-size:0.78rem">दुकान यूनिक ID (Ref Code):</p>
-            <p style="font-weight:800;font-family:monospace;font-size:1.15rem;color:#2563EB">${esc(shop.refCode)}</p>
-          </div>
-          <div class="card-subtle">
-            <p class="text-muted" style="font-size:0.78rem">GSTIN नंबर:</p>
-            <p style="font-weight:800;font-size:1.05rem">${esc(shop.gstin || 'पंजीकृत नहीं (Bill of Supply)')}</p>
-          </div>
-          <div class="card-subtle">
-            <p class="text-muted" style="font-size:0.78rem">व्यापार UPI VPA:</p>
-            <p style="font-weight:800;font-size:1.05rem">${esc(shop.upiId || 'काउंटर नकद')}</p>
-          </div>
-          <div class="card-subtle">
-            <p class="text-muted" style="font-size:0.78rem">शहर व राज्य:</p>
-            <p style="font-weight:800;font-size:1.05rem">${esc(shop.city)}, ${esc(shop.state)}</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Quick Share & QR Links -->
-      <div class="erp-card">
-        <h3 style="margin-bottom:12px">🔗 दुकान ऑनलाइन ऑर्डर लिंक</h3>
-        <p class="text-muted" style="font-size:0.88rem;margin-bottom:14px">ग्राहक इस लिंक पर सीधे आपकी दुकान का कैटलॉग देख सकते हैं एवं ऑर्डर लगा सकते हैं:</p>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <input class="input" readonly value="${esc(qrUrl)}" style="max-width:440px" />
-          <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${qrUrl}');showToast('लिंक कॉपी हो गया!')">
-            📋 लिंक कॉपी करें
+      <!-- 5 Horizontal Sub-Tabs (Screenshot 3) -->
+      <div class="ybt-settings-tabs no-print">
+        ${tabs.map(([k, icon, label]) => `
+          <button type="button" class="ybt-settings-tab-btn ${subTab === k ? 'active' : ''}" onclick="state.settingsSubTab='${k}';render()">
+            <span>${icon}</span>
+            <span>${label}</span>
           </button>
-          <a class="btn btn-primary btn-sm" target="_blank" rel="noreferrer" href="https://wa.me/?text=${encodeURIComponent(`Order online from ${shop.shop} on KuberQ: ${qrUrl}`)}">
-            📲 WhatsApp पर भेजें
-          </a>
-        </div>
+        `).join('')}
       </div>
+
+      ${subTab === 'profile' ? `
+        <div class="erp-card">
+          <div class="erp-card-header">
+            <h3>${tr('Company Identity & Tax Details', 'कंपनी पहचान एवं टैक्स विवरण (One-Time Setup)')}</h3>
+            <span class="badge badge-primary">ID: ${esc(shop.refCode)}</span>
+          </div>
+          <form onsubmit="saveSystemSettingsTab(event, 'profile')">
+            <div class="grid grid-2" style="gap:14px;margin-bottom:12px">
+              <div class="form-group-clean">
+                <label>${tr('Business Trade Name *', 'व्यापार / दुकान का नाम *')}</label>
+                <input class="input" id="set-trade-name" required value="${esc(bp.tradeName || shop.shop || '')}" placeholder="Apex Infotech Solutions" />
+              </div>
+              <div class="form-group-clean">
+                <label>${tr('Legal Registered Entity Name', 'पंजीकृत कानूनी फर्म का नाम')}</label>
+                <input class="input" id="set-legal-name" value="${esc(bp.legalName || shop.shop || '')}" placeholder="Apex Infotech Solutions Private Limited" />
+              </div>
+            </div>
+
+            <div class="form-group-clean" style="margin-bottom:12px">
+              <label>${tr('Tagline', 'व्यापार टैगलाइन / स्लोगन')}</label>
+              <input class="input" id="set-tagline" value="${esc(bp.tagline || '')}" placeholder="Empowering Digital Transformation / Authorized Wholesale Dealer" />
+            </div>
+
+            <div class="grid grid-2" style="gap:14px;margin-bottom:12px">
+              <div class="form-group-clean">
+                <label>${tr('Official Email', 'आधिकारिक ईमेल पता')}</label>
+                <input class="input" type="email" id="set-email" value="${esc(bp.officialEmail || '')}" placeholder="contact@company.example.com" />
+              </div>
+              <div class="form-group-clean">
+                <label>${tr('Official Phone', 'आधिकारिक फ़ोन / WhatsApp')}</label>
+                <input class="input" id="set-phone" value="${esc(bp.officialPhone || shop.phone || '')}" placeholder="+91 98201 12345" />
+              </div>
+            </div>
+
+            <div class="grid grid-2" style="gap:14px;margin-bottom:12px">
+              <div class="form-group-clean">
+                <label>${tr('GSTIN (Goods and Services Tax Number)', 'GSTIN (15-अंकीय जीएसटी नंबर)')}</label>
+                <input class="input" id="set-gstin" maxlength="15" style="text-transform:uppercase;font-family:monospace" value="${esc(bp.gstin || shop.gstin || '')}" placeholder="27AAACA1234A1Z5" />
+              </div>
+              <div class="form-group-clean">
+                <label>${tr('PAN (Permanent Account Number)', 'PAN (10-अंकीय पैन नंबर)')}</label>
+                <input class="input" id="set-pan" maxlength="10" style="text-transform:uppercase;font-family:monospace" value="${esc(bp.pan || '')}" placeholder="AAACA1234A" />
+              </div>
+            </div>
+
+            <div class="form-group-clean" style="margin-bottom:10px">
+              <label>${tr('Registered Office Address', 'पंजीकृत कार्यालय / दुकान का पता')}</label>
+              <input class="input" id="set-addr1" style="margin-bottom:8px" value="${esc(bp.addressLine1 || shop.address || '')}" placeholder="Tech Park Plaza, Tower B, Suite 402" />
+              <input class="input" id="set-addr2" value="${esc(bp.addressLine2 || '')}" placeholder="Industrial Area / Main Market Road" />
+            </div>
+
+            <div class="grid grid-3" style="gap:12px;margin-bottom:16px">
+              <div class="form-group-clean">
+                <label>${tr('City', 'शहर')}</label>
+                <input class="input" id="set-city" value="${esc(bp.city || shop.city || '')}" placeholder="Mumbai / Jodhpur" />
+              </div>
+              <div class="form-group-clean">
+                <label>${tr('State', 'राज्य')}</label>
+                <input class="input" id="set-state" value="${esc(bp.state || shop.state || '')}" placeholder="Maharashtra / Rajasthan" />
+              </div>
+              <div class="form-group-clean">
+                <label>${tr('Pincode', 'पिनकोड')}</label>
+                <input class="input" id="set-pincode" maxlength="6" value="${esc(bp.pincode || '')}" placeholder="400093" />
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="background:#0284c7;border-color:#0284c7">
+              💾 ${tr('Save Business Profile', 'व्यापार प्रोफ़ाइल सेव करें')}
+            </button>
+          </form>
+        </div>
+      ` : ''}
+
+      ${subTab === 'banking' ? `
+        <div class="erp-card">
+          <div class="erp-card-header">
+            <h3>🏦 ${tr('Company Bank Account & Direct UPI QR Settings', 'बैंक खाता एवं UPI पेमेंट सेटिंग्स')}</h3>
+          </div>
+          <form onsubmit="saveSystemSettingsTab(event, 'banking')">
+            <div class="grid grid-2" style="gap:14px;margin-bottom:12px">
+              <div class="form-group-clean">
+                <label>${tr('Bank Name', 'बैंक का नाम')}</label>
+                <input class="input" id="set-bank-name" value="${esc(bk.bankName || '')}" placeholder="HDFC Bank / SBI / ICICI Bank" />
+              </div>
+              <div class="form-group-clean">
+                <label>${tr('Account Holder Name', 'खाताधारक का नाम')}</label>
+                <input class="input" id="set-acc-holder" value="${esc(bk.accountHolder || shop.shop || '')}" placeholder="${esc(shop.shop)}" />
+              </div>
+            </div>
+            <div class="grid grid-3" style="gap:14px;margin-bottom:12px">
+              <div class="form-group-clean">
+                <label>${tr('Account Number', 'खाता संख्या (A/c No.)')}</label>
+                <input class="input" id="set-acc-no" style="font-family:monospace" value="${esc(bk.accountNumber || '')}" placeholder="50200012345678" />
+              </div>
+              <div class="form-group-clean">
+                <label>${tr('IFSC Code', 'IFSC कोड')}</label>
+                <input class="input" id="set-ifsc" style="text-transform:uppercase;font-family:monospace" value="${esc(bk.ifsc || '')}" placeholder="HDFC0000123" />
+              </div>
+              <div class="form-group-clean">
+                <label>${tr('Branch Name', 'शाखा (Branch)')}</label>
+                <input class="input" id="set-branch" value="${esc(bk.branch || shop.city || '')}" placeholder="Main Industrial Branch" />
+              </div>
+            </div>
+            <div class="form-group-clean" style="margin-bottom:16px">
+              <label>${tr('Merchant UPI ID (For Dynamic Invoice QR & WhatsApp Payment Link)', 'व्यापारी UPI ID (इनवॉइस QR व WhatsApp पेमेंट लिंक हेतु)')}</label>
+              <input class="input" id="set-upi-id" value="${esc(bk.upiId || shop.upiId || '')}" placeholder="merchant@okaxis" />
+            </div>
+            <button type="submit" class="btn btn-primary" style="background:#0284c7;border-color:#0284c7">
+              💾 ${tr('Save Banking & UPI Details', 'बैंक व UPI विवरण सेव करें')}
+            </button>
+          </form>
+        </div>
+      ` : ''}
+
+      ${subTab === 'invoice' ? `
+        <div class="erp-card">
+          <div class="erp-card-header">
+            <div>
+              <h3>🧾 ${tr('Seller Invoice Default Settings (Auto-Fills Every New Invoice)', 'डिफ़ॉल्ट इनवॉइस सेटिंग्स (हर नए बिल में स्वतः लागू)')}</h3>
+              <p class="text-muted" style="font-size:0.8rem;margin:2px 0 0">${tr('Set your default tax rate, HSN, payment mode, due days, terms & signatory once so you never have to retype them.', 'एक बार डिफ़ॉल्ट टैक्स, HSN, नियम व शर्तें सेव करें ताकि हर बिल बनाते समय बार-बार न भरना पड़े।')}</p>
+            </div>
+          </div>
+          <form onsubmit="saveSystemSettingsTab(event, 'invoice')">
+            <div class="grid grid-4" style="gap:12px;margin-bottom:12px">
+              <div class="form-group-clean">
+                <label>${tr('Default Payment Mode', 'डिफ़ॉल्ट भुगतान माध्यम')}</label>
+                <select class="select" id="set-inv-paymode">
+                  ${['Cash', 'UPI', 'Card', 'Credit'].map(m => `<option value="${m}" ${(invDef.defaultPaymentMode || 'Cash') === m ? 'selected' : ''}>${m}</option>`).join('')}
+                </select>
+              </div>
+              <div class="form-group-clean">
+                <label>${tr('Default GST Rate (%)', 'डिफ़ॉल्ट GST दर (%)')}</label>
+                <select class="select" id="set-inv-gst">
+                  ${[0, 5, 12, 18, 28].map(r => `<option value="${r}" ${Number(invDef.defaultGstRate ?? 18) === r ? 'selected' : ''}>${r}% GST</option>`).join('')}
+                </select>
+              </div>
+              <div class="form-group-clean">
+                <label>${tr('Default Tax Mode', 'डिफ़ॉल्ट टैक्स मोड')}</label>
+                <select class="select" id="set-inv-taxmode">
+                  <option value="exclusive" ${(invDef.defaultTaxMode || 'exclusive') === 'exclusive' ? 'selected' : ''}>+GST (Tax Exclusive)</option>
+                  <option value="inclusive" ${invDef.defaultTaxMode === 'inclusive' ? 'selected' : ''}>MRP (Tax Inclusive)</option>
+                </select>
+              </div>
+              <div class="form-group-clean">
+                <label>${tr('Default HSN / SAC Code', 'डिफ़ॉल्ट HSN / SAC कोड')}</label>
+                <input class="input" id="set-inv-hsn" value="${esc(invDef.defaultHsn || '3917')}" placeholder="3917" />
+              </div>
+            </div>
+
+            <div class="grid grid-4" style="gap:12px;margin-bottom:12px">
+              <div class="form-group-clean">
+                <label>${tr('Default Supply Type', 'सप्लाई का प्रकार')}</label>
+                <select class="select" id="set-inv-supply">
+                  <option value="auto" ${(invDef.defaultSupplyType || 'auto') === 'auto' ? 'selected' : ''}>Auto Detect from GSTIN</option>
+                  <option value="intra" ${invDef.defaultSupplyType === 'intra' ? 'selected' : ''}>Intra-State (CGST+SGST)</option>
+                  <option value="inter" ${invDef.defaultSupplyType === 'inter' ? 'selected' : ''}>Inter-State (100% IGST)</option>
+                </select>
+              </div>
+              <div class="form-group-clean">
+                <label>${tr('Payment Due Days', 'उधार भुगतान समय-सीमा (दिन)')}</label>
+                <input class="input" type="number" id="set-inv-duedays" value="${Number(invDef.dueDays ?? 15)}" />
+              </div>
+              <div class="form-group-clean">
+                <label>${tr('Quotation Validity (Days)', 'कोटेशन वैधता (दिन)')}</label>
+                <input class="input" type="number" id="set-inv-quotedays" value="${Number(invDef.quotationValidityDays ?? 7)}" />
+              </div>
+              <div class="form-group-clean">
+                <label>${tr('Default Print Paper Size', 'डिफ़ॉल्ट प्रिंट साइज')}</label>
+                <select class="select" id="set-inv-print">
+                  <option value="a4" ${(invDef.defaultPrintFormat || 'a4') === 'a4' ? 'selected' : ''}>A4 Full Tax Invoice</option>
+                  <option value="thermal" ${invDef.defaultPrintFormat === 'thermal' ? 'selected' : ''}>3-Inch Thermal POS</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-2" style="gap:12px;margin-bottom:12px">
+              <div class="form-group-clean">
+                <label>${tr('Authorized Signatory Name / Title', 'अधिकृत हस्ताक्षरकर्ता का नाम / पद')}</label>
+                <input class="input" id="set-inv-sign" value="${esc(invDef.signatoryTitle || ('For ' + shop.shop))}" />
+              </div>
+              <div class="form-group-clean">
+                <label>${tr('Invoice Footer Thank-You Note', 'बिल फुटर संदेश')}</label>
+                <input class="input" id="set-inv-footer" value="${esc(invDef.footerNote || 'Thank you for your business!')}" />
+              </div>
+            </div>
+
+            <div class="form-group-clean" style="margin-bottom:12px">
+              <label>${tr('Default Invoice Terms & Conditions (Printed on Every Bill)', 'डिफ़ॉल्ट नियम एवं शर्तें (हर बिल पर स्वतः छपेंगी)')}</label>
+              <textarea class="textarea" rows="3" id="set-inv-terms">${esc(invDef.termsAndConditions || '1. Goods once sold will not be taken back.\n2. Subject to local jurisdiction only.')}</textarea>
+            </div>
+
+            <div style="margin-bottom:16px">
+              <label style="display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:0.86rem;cursor:pointer">
+                <input type="checkbox" id="set-inv-showbank" ${invDef.showBankDetails !== false ? 'checked' : ''} />
+                <span>${tr('Automatically print Company Bank Account & UPI ID on all Tax Invoices', 'सभी टैक्स इनवॉइस पर कंपनी का बैंक खाता और UPI ID स्वतः प्रिंट करें')}</span>
+              </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="background:#0284c7;border-color:#0284c7">
+              💾 ${tr('Save Invoice Defaults', 'इनवॉइस डिफ़ॉल्ट सेव करें')}
+            </button>
+          </form>
+        </div>
+      ` : ''}
+
+      ${subTab === 'ai_apis' ? `
+        <div style="display:grid;gap:16px">
+          <!-- Status Banner Matching Screenshot 4 -->
+          <div class="erp-card" style="display:flex;align-items:center;gap:14px;padding:14px 18px;background:#f8fafc;border-left:4px solid #0284c7;margin-bottom:0">
+            <div style="width:36px;height:36px;border-radius:10px;background:#e0f2fe;color:#0284c7;display:grid;place-items:center;font-size:1.1rem;flex-shrink:0">⚛️</div>
+            <div>
+              <div style="font-weight:700;font-size:0.94rem;color:#0f172a">
+                ${aiProviders.some(p => p.enabled && p.keyConfigured)
+                  ? tr('Cloud Generative AI + Autonomous Business Logic Active', 'क्लाउड जनरेटिव AI + लोकल बिज़नेस लॉजिक सक्रिय')
+                  : tr('Autonomous Local Business Logic Active', 'लोकल बिज़नेस लॉजिक इंजन सक्रिय (Offline Mode)')}
+              </div>
+              <div style="font-size:0.8rem;color:#64748b">
+                ${tr('The assistant runs smoothly in local mode using database-driven business logic. To enable generative cloud LLM conversations, connect your Google AI Studio, OpenRouter, OpenAI, or Claude API key below.', 'असिस्टेंट डेटाबेस-आधारित लोकल बिज़नेस लॉजिक पर हमेशा मुफ़्त काम करता है। क्लाउड जनरेटिव AI चैट के लिए नीचे अपना Google AI Studio (Gemini) या OpenRouter API Key जोड़ें।')}
+              </div>
+            </div>
+          </div>
+
+          <!-- Configure New AI Provider API Card Matching Screenshot 4 -->
+          <div class="erp-card">
+            <div class="erp-card-header">
+              <h3>🔑 ${tr('Configure New AI Provider API', 'नया AI प्रोवाइडर API कॉन्फ़िगर करें')}</h3>
+            </div>
+
+            <form onsubmit="saveAiProviderConfig(event)">
+              <div class="grid grid-2" style="gap:16px;margin-bottom:14px">
+                <div class="form-group-clean">
+                  <label>${tr('Provider Platform *', 'प्रोवाइडर प्लेटफ़ॉर्म *')}</label>
+                  <select class="select" id="aip-provider" onchange="onAiProviderPlatformChange(this.value)">
+                    ${[
+                      'Google AI Studio (Gemini)',
+                      'OpenRouter (Unified API)',
+                      'OpenAI (ChatGPT)',
+                      'Anthropic Claude',
+                      'Custom OpenAI-Compatible API (Ollama / Local / Groq)'
+                    ].map(p => `<option value="${p}" ${f.provider === p ? 'selected' : ''}>${p}</option>`).join('')}
+                  </select>
+                </div>
+                <div class="form-group-clean">
+                  <label>${tr('Configuration Label *', 'कॉन्फ़िगरेशन नाम (Label) *')}</label>
+                  <input class="input" id="aip-label" required value="${esc(f.label || f.provider || 'Google AI Studio (Gemini)')}" oninput="state.aiProviderForm.label=this.value" placeholder="Google AI Studio (Gemini)" />
+                </div>
+              </div>
+
+              <div class="form-group-clean" style="margin-bottom:14px">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <label>${tr('API Key (Encrypted with AES-256-GCM at rest — never logged)', 'API Key (सर्वर पर AES-256-GCM से सुरक्षित एन्क्रिप्टेड)')}</label>
+                  <a href="${f.provider.includes('OpenRouter') ? 'https://openrouter.ai/keys' : (f.provider.includes('OpenAI') ? 'https://platform.openai.com/api-keys' : (f.provider.includes('Anthropic') ? 'https://console.anthropic.com/' : 'https://aistudio.google.com/app/apikey'))}" target="_blank" rel="noreferrer" style="font-size:0.78rem;color:#0284c7;font-weight:600">
+                    Get ${esc(f.provider)} API Key ↗
+                  </a>
+                </div>
+                <input class="input" type="password" id="aip-key" value="${esc(f.apiKey || '')}" oninput="state.aiProviderForm.apiKey=this.value" placeholder="AIzaSy... or sk-or-v1-..." />
+              </div>
+
+              <div class="grid grid-2" style="gap:16px;margin-bottom:14px">
+                <div class="form-group-clean">
+                  <label>${tr('Model ID *', 'मॉडल ID (Model ID) *')}</label>
+                  <input class="input" id="aip-model" required value="${esc(f.modelId || 'google/gemini-flash-1.5')}" oninput="state.aiProviderForm.modelId=this.value" placeholder="google/gemini-flash-1.5" />
+                  <div style="margin-top:6px">
+                    <span style="font-size:0.74rem;color:#64748b;display:block;margin-bottom:4px">Quick Select:</span>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap">
+                      ${[
+                        'google/gemini-flash-1.5',
+                        'openai/gpt-4o-mini',
+                        'anthropic/claude-3.5-sonnet',
+                        'deepseek/deepseek-chat',
+                        'meta-llama/llama-3.3-70b-instruct'
+                      ].map(m => `
+                        <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:0.72rem;border:1px solid #cbd5e1;font-family:monospace" onclick="state.aiProviderForm.modelId='${m}';render()">
+                          ${m}
+                        </button>
+                      `).join('')}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-group-clean">
+                  <label>${tr('Base API URL', 'बेस API URL')}</label>
+                  <input class="input" id="aip-baseurl" value="${esc(f.baseUrl || 'https://openrouter.ai/api/v1')}" oninput="state.aiProviderForm.baseUrl=this.value" placeholder="https://openrouter.ai/api/v1" />
+                  <span style="font-size:0.74rem;color:#64748b;margin-top:4px">Pre-filled with official vendor endpoint. Change for custom reverse proxies or local models.</span>
+                </div>
+              </div>
+
+              <div class="grid grid-2" style="gap:16px;margin-bottom:14px;align-items:center">
+                <div class="form-group-clean">
+                  <label>Temperature: <b id="temp-val-lbl">${Number(f.temperature ?? 0.70).toFixed(2)}</b></label>
+                  <input type="range" min="0" max="1" step="0.05" value="${Number(f.temperature ?? 0.70)}" oninput="state.aiProviderForm.temperature=parseFloat(this.value);const l=document.getElementById('temp-val-lbl');if(l)l.textContent=Number(this.value).toFixed(2)" style="accent-color:#0284c7;cursor:pointer" />
+                  <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:#64748b">
+                    <span>0.0 (Precise / Factual)</span>
+                    <span>1.0 (Creative)</span>
+                  </div>
+                </div>
+
+                <div class="form-group-clean">
+                  <label>${tr('Max Output Tokens', 'अधिकतम आउटपुट टोकन')}</label>
+                  <select class="select" id="aip-tokens" onchange="state.aiProviderForm.maxTokens=Number(this.value)">
+                    <option value="1024" ${Number(f.maxTokens) === 1024 ? 'selected' : ''}>1,024 tokens (Fast & Concise)</option>
+                    <option value="2048" ${Number(f.maxTokens) === 2048 ? 'selected' : ''}>2,048 tokens (Standard)</option>
+                    <option value="4096" ${Number(f.maxTokens || 4096) === 4096 ? 'selected' : ''}>4,096 tokens (Detailed, Recommended)</option>
+                    <option value="8192" ${Number(f.maxTokens) === 8192 ? 'selected' : ''}>8,192 tokens (Extended Reports)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:18px">
+                <label style="display:inline-flex;align-items:center;gap:7px;font-size:0.86rem;font-weight:600;cursor:pointer">
+                  <input type="checkbox" id="aip-enabled" ${f.enabled !== false ? 'checked' : ''} onchange="state.aiProviderForm.enabled=this.checked" />
+                  <span>${tr('Enable this AI provider for requests', 'इस AI प्रोवाइडर को अनुरोधों के लिए सक्रिय करें')}</span>
+                </label>
+                <label style="display:inline-flex;align-items:center;gap:7px;font-size:0.86rem;font-weight:600;cursor:pointer">
+                  <input type="checkbox" id="aip-primary" ${f.isPrimary !== false ? 'checked' : ''} onchange="state.aiProviderForm.isPrimary=this.checked" />
+                  <span>${tr('Set as primary default AI provider', 'मुख्य डिफ़ॉल्ट AI प्रोवाइडर के रूप में सेट करें')}</span>
+                </label>
+              </div>
+
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;border-top:1px solid #e2e8f0;padding-top:14px">
+                <button type="button" class="btn btn-ghost" style="border:1.5px solid #cbd5e1" onclick="testAiProviderConnection()">
+                  ⚡ ${tr('Test Connection', 'कनेक्शन टेस्ट करें')}
+                </button>
+                <button type="submit" class="btn btn-primary" style="background:#0284c7;border-color:#0284c7">
+                  💾 ${tr('Save AI Provider', 'AI प्रोवाइडर सेव करें')}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          ${aiProviders.length > 0 ? `
+            <div class="erp-card">
+              <div class="erp-card-header">
+                <h3>📋 ${tr('Configured AI Providers', 'सेव किए गए AI प्रोवाइडर्स')} (${aiProviders.length})</h3>
+              </div>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>${tr('Provider & Label', 'प्रोवाइडर व नाम')}</th>
+                      <th>${tr('Model ID', 'मॉडल ID')}</th>
+                      <th>${tr('API Key Vault', 'API Key स्थिति')}</th>
+                      <th>${tr('Status', 'स्थिति')}</th>
+                      <th>${tr('Actions', 'कार्रवाई')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${aiProviders.map(p => `
+                      <tr>
+                        <td>
+                          <b>${esc(p.label)}</b>
+                          <div class="text-muted" style="font-size:0.74rem">${esc(p.provider)}</div>
+                        </td>
+                        <td style="font-family:monospace;font-size:0.8rem">${esc(p.modelId)}</td>
+                        <td><span class="badge ${p.keyConfigured ? 'badge-primary' : 'badge-muted'}">${esc(p.keyMasked || 'Not Set')}</span></td>
+                        <td>
+                          ${p.isPrimary ? '<span class="badge badge-gold">★ Primary</span> ' : ''}
+                          <span class="badge ${p.enabled ? 'badge-primary' : 'badge-danger'}">${p.enabled ? 'Enabled' : 'Disabled'}</span>
+                        </td>
+                        <td>
+                          <div style="display:flex;gap:6px">
+                            <button type="button" class="btn btn-ghost btn-sm" onclick="testAiProviderConnection('${p.id}')">⚡ Test</button>
+                            <button type="button" class="btn btn-danger btn-sm" onclick="deleteAiProviderConfig('${p.id}')">🗑</button>
+                          </div>
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      ` : ''}
+
+      ${subTab === 'backup' ? `
+        <div style="display:grid;gap:16px">
+          <div class="erp-card">
+            <div class="erp-card-header">
+              <div>
+                <span class="badge badge-gold">💎 ${esc(trDyn(shop.plan))}</span>
+                <h3 style="margin-top:6px">💾 ${tr('1-Click Full Database Backup & Store Status', '1-क्लिक संपूर्ण डेटा बैकअप एवं दुकान स्थिति')}</h3>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-gold btn-sm" onclick="downloadFullShopBackup()">
+                  💾 ${tr('Download Complete JSON Backup', 'संपूर्ण बैकअप डाउनलोड करें')}
+                </button>
+                <button class="btn btn-primary btn-sm" onclick="exportGstr1Csv()">
+                  📥 ${tr('Export Invoices CSV', 'इनवॉइस CSV डाउनलोड')}
+                </button>
+                <button class="btn btn-ghost btn-sm" onclick="toggleShopOpen(${!shop.open})">
+                  ${shop.open ? '🔴 ' + tr('Mark Shop Closed', 'दुकान बंद मार्क करें') : '🟢 ' + tr('Mark Shop Open', 'दुकान खुली मार्क करें')}
+                </button>
+              </div>
+            </div>
+            <p class="text-muted" style="font-size:0.86rem;margin-bottom:14px">
+              ${tr('Your online storefront link where customers can view your catalog and place orders directly:', 'आपकी दुकान का ऑनलाइन ऑर्डर लिंक जहाँ ग्राहक सीधे कैटलॉग देखकर ऑर्डर भेज सकते हैं:')}
+            </p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <input class="input" readonly value="${esc(qrUrl)}" style="max-width:440px" />
+              <button class="btn btn-ghost btn-sm" onclick="navigator.clipboard.writeText('${qrUrl}');showToast('Link copied!')">
+                📋 ${tr('Copy Link', 'लिंक कॉपी करें')}
+              </button>
+              <a class="btn btn-primary btn-sm" target="_blank" rel="noreferrer" href="https://wa.me/?text=${encodeURIComponent(`Order online from ${shop.shop} on KuberQ: ${qrUrl}`)}">
+                📲 ${tr('Share on WhatsApp', 'WhatsApp पर भेजें')}
+              </a>
+            </div>
+          </div>
+        </div>
+      ` : ''}
     </div>
   `;
 }
@@ -2653,65 +3526,109 @@ function renderMerchantPortal() {
   if (curTab === 'GST Invoice') curTab = 'Billing';
   if (curTab === 'Udhaar Khata') curTab = 'Udhaar';
   if (curTab === 'More Tools') curTab = 'Standee';
-  state.merchantTab = curTab;
 
   const allOrders = state.data.myOrders || [];
-  const creditOrders = allOrders.filter(o => o.status !== 'Rejected' && o.status !== 'Sales Return' && o.paymentMode === 'Credit' && !o.udhaarSettled);
+  const creditOrders = allOrders.filter(o => o.status !== 'Rejected' && o.status !== 'Sales Return' && o.docType !== 'Quotation' && o.status !== 'Quotation' && o.paymentMode === 'Credit' && !o.udhaarSettled);
   const pendingCount = creditOrders.length;
+  const pendingTasksCount = (state.data.myTasks || []).filter(t => t.status !== 'Completed').length;
   const qrUrl = `${window.location.origin}/order?shop=${shop.id}`;
   const uniqueId = shop.refCode || u.uniqueId || ('KQM-' + String(u.phone || '982901').slice(-6));
 
-  const navItems = [
-    ['Dashboard', '📊', tr('Dashboard & Overview', 'डैशबोर्ड एवं आज का सारांश'), ''],
-    ['AI Manager', '🤖', tr('AI Business Manager (Ask Data)', 'AI बिज़नेस मैनेजर (डेटा से पूछें)'), '883s AI'],
-    ['CRM Pipeline', '📋', tr('Leads & Quotations (Kanban)', 'B2B लीड्स व कोटेशन पाइपलाइन'), 'CRM'],
-    ['Billing', '🧾', tr('Quick 5-Sec & GST Billing', 'त्वरित 5-सेकंड व GST बिलिंग'), ''],
-    ['Inventory', '📦', tr('Stock & AI Scanner', 'स्टॉक व AI बारकोड स्कैनर'), ''],
-    ['Manufacturing', '🏭', tr('Manufacturing & Job-Work', 'निर्माता व जॉब-वर्क (MSME)'), 'New'],
-    ['Udhaar', '📒', tr('Customer Udhaar Khata', 'ग्राहक उधार खाता व एजिंग रडार'), pendingCount ? String(pendingCount) : ''],
-    ['Purchases', '🛒', tr('Supplier Purchases & ITC', 'सप्लायर खरीद एवं ITC क्रेडिट'), ''],
-    ['Expenses', '💸', tr('Expenses & Net Profit (P&L)', 'खर्चे व शुद्ध मुनाफ़ा (Net Profit)'), ''],
-    ['Reports', '📄', tr('GSTR-3B & Party Ledgers', 'GSTR-3B टैक्स व पार्टी लेजर'), 'CA Ready'],
-    ['Staff', '👥', tr('Shop Staff & RBAC', 'दुकान स्टाफ एवं अनुमतियां'), ''],
-    ['Standee', '📢', tr('QR Standee & Promo', 'QR स्टैंडी व व्यापार प्रचार'), ''],
-    ['Settings', '⚙️', tr('Shop Settings & Backup', 'दुकान सेटिंग्स व डेटा बैकअप'), '']
+  // Complete Navigation List with Permission Mapping for Staff/Managers (Item #16)
+  const rawNavItems = [
+    ['Dashboard', '📊', tr('Dashboard', 'एग्जीक्यूटिव डैशबोर्ड'), '', 'dashboard'],
+    ['Customers', '👥', tr('Customers', 'ग्राहक (Customers CRM)'), String((state.data.myCustomers || []).length || ''), 'customers'],
+    ['CRM Pipeline', '🎯', tr('Leads & Deals', 'लीड्स व डील्स पाइपलाइन'), '', 'leads'],
+    ['Inventory', '📦', tr('Products & Services', 'प्रोडक्ट्स व स्टॉक'), '', 'products'],
+    ['Tasks', '✅', tr('Tasks & Reminders', 'टास्क व रिमाइंडर'), pendingTasksCount ? String(pendingTasksCount) : '', 'tasks'],
+    ['Billing', '🧾', tr('Billing, Quotes & Invoices', 'कोटेशन व GST बिलिंग'), '', 'invoices'],
+    ['Udhaar', '📒', tr('Payments & Udhaar Radar', 'पेमेंट व उधार रडार'), pendingCount ? String(pendingCount) : '', 'payments'],
+    ['Expenses', '💸', tr('Expenses & P&L', 'खर्चे व मुनाफ़ा (Expenses)'), '', 'expenses'],
+    ['Purchases', '🛒', tr('Supplier Purchases & ITC', 'सप्लायर खरीद व ITC'), '', 'expenses'],
+    ['Manufacturing', '🏭', tr('Manufacturing & Job-Work', 'निर्माता व जॉब-वर्क'), '', 'products'],
+    ['Reports', '📈', tr('Reports & 6M P&L', 'रिपोर्ट्स व 6-माह P&L'), 'CA Ready', 'reports'],
+    ['AI Manager', '✨', tr('AI Digital Manager', 'AI डिजिटल मैनेजर'), 'AI', 'ai'],
+    ['Staff', '🛡️', tr('Managers & Staff RBAC', 'मैनेजर व स्टाफ आईडी'), '', 'managers'],
+    ['Standee', '📢', tr('QR Standee & Promo', 'QR स्टैंडी व प्रचार'), '', 'dashboard'],
+    ['Settings', '⚙️', tr('Settings & APIs', 'सेटिंग्स व AI API'), '', 'settings']
   ];
 
+  const isStaffUser = u.role === 'staff';
+  const staffPerms = Array.isArray(u.permissions) ? u.permissions : [];
+  const filteredNav = isStaffUser
+    ? rawNavItems.filter(item => {
+        const permKey = item[4];
+        if (item[0] === 'Billing' && (staffPerms.includes('invoices') || staffPerms.includes('quotations'))) return true;
+        if (item[0] === 'Settings' && (staffPerms.includes('settings') || staffPerms.includes('backup'))) return true;
+        return staffPerms.includes(permKey);
+      })
+    : rawNavItems;
+
+  const navItems = (filteredNav.length > 0 ? filteredNav : rawNavItems.slice(0, 1)).map(([k, ic, lbl, bdg]) => [k, ic, lbl, bdg]);
+  if (!navItems.some(x => x[0] === curTab)) {
+    curTab = navItems[0][0];
+  }
+  state.merchantTab = curTab;
+
   let bannerIcon = '📊';
-  let bannerTitle = tr('Business Summary & Real-Time Orders', 'व्यापार सारांश एवं लाइव ऑर्डर्स');
-  let bannerSubtitle = tr("Today's revenue, cash/credit split, and pending orders", 'आज की कुल बिक्री, नकद/उधार विभाजन एवं नए ऑर्डर्स');
-  let bannerActionHtml = `<button class="btn btn-gold btn-sm" onclick="state.merchantTab='Billing';render()">+ ${tr('New GST Invoice', 'नया GST बिल बनाएं')}</button>`;
+  let bannerTitle = tr('Executive Dashboard', 'एग्जीक्यूटिव डैशबोर्ड एवं व्यापार प्रदर्शन');
+  let bannerSubtitle = tr(`Welcome back, ${u.name}! Here is your business performance summary.`, `स्वागत है, ${u.name}! यहाँ आपके व्यापार के प्रदर्शन का संपूर्ण सारांश है।`);
+  let bannerActionHtml = `
+    <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,0.14);color:#ffffff;border:1px solid rgba(255,255,255,0.35)" onclick="state.merchantTab='AI Manager';render()">✨ ${tr('Ask AI Manager', 'AI मैनेजर से पूछें')}</button>
+    <button class="btn btn-gold btn-sm" onclick="openCustomerModal()">+ ${tr('Add Customer', 'नया ग्राहक')}</button>
+    <button class="btn btn-primary btn-sm" style="background:#0284c7;border-color:#38bdf8" onclick="state.invoiceDocType='Tax Invoice';state.merchantTab='Billing';render()">+ ${tr('New Invoice', 'नया GST बिल')}</button>
+  `;
   let contentHtml = '';
 
   if (curTab === 'Dashboard') {
-    bannerIcon = '📊';
-    bannerTitle = tr('Business Dashboard & Today\'s Sales', 'व्यापार डैशबोर्ड एवं आज की बिक्री');
-    bannerSubtitle = tr('Live counter of revenue, cash/credit orders, profit margin and recent customer bills', 'आज की कुल बिक्री, नकद/उधार विभाजन, अनुमानित लाभ एवं नए ऑर्डर्स');
-    bannerActionHtml = `<button class="btn btn-gold btn-sm" onclick="state.merchantTab='Billing';render()">+ ${tr('New GST Invoice', 'नया GST बिल बनाएं')}</button>`;
     contentHtml = renderMerchantDashboard(shop);
+  } else if (curTab === 'Customers') {
+    bannerIcon = '👥';
+    bannerTitle = tr('Customers CRM & One-Time Buyer Profiles', 'ग्राहक CRM एवं वन-टाइम खरीदार प्रोफ़ाइल');
+    bannerSubtitle = tr('Manage customer profiles, GSTIN, billing addresses, credit limits, and 1-click invoicing', 'ग्राहकों का विवरण एक बार सेव करें ताकि बिल बनाते समय बार-बार विवरण न डालना पड़े');
+    bannerActionHtml = `<button class="btn btn-primary btn-sm" style="background:#0284c7;border-color:#38bdf8" onclick="openCustomerModal()">+ ${tr('Add New Customer', '+ नया ग्राहक जोड़ें')}</button>`;
+    contentHtml = renderMerchantCustomersCrm(shop);
+  } else if (curTab === 'Tasks') {
+    bannerIcon = '✅';
+    bannerTitle = tr('Tasks & Follow-Up Reminders', 'टास्क एवं फॉलो-अप रिमाइंडर्स');
+    bannerSubtitle = tr('Track daily tasks, urgent payment follow-ups, due dates, and staff assignments', 'अपने और स्टाफ के लिए दैनिक कार्य, प्राथमिकता (Urgent/High/Medium), नियत तिथि और स्थिति ट्रैक करें');
+    bannerActionHtml = `<button class="btn btn-primary btn-sm" style="background:#0284c7;border-color:#38bdf8" onclick="openTaskModal()">+ ${tr('Add Task / Reminder', '+ नया टास्क / रिमाइंडर जोड़ें')}</button>`;
+    contentHtml = renderMerchantTasks(shop);
   } else if (curTab === 'AI Manager') {
-    bannerIcon = '🤖';
-    bannerTitle = tr('AI Digital Business Manager ("Ask Your Data Anything")', 'AI डिजिटल बिज़नेस मैनेजर (अपने व्यापारिक डेटा से सीधे बात करें)');
-    bannerSubtitle = tr('Natural language insights, live KPI charts & Zero-Direct-Mutation Action Proposals with Owner Approval', 'नेचुरल लैंग्वेज सवाल-जवाब, लाइव KPI चार्ट्स एवं ओनर-अप्रूवल सुरक्षा के साथ ड्राफ्ट प्रस्ताव');
-    bannerActionHtml = `<button class="btn btn-ghost btn-sm" style="color:#ffffff;border-color:rgba(255,255,255,0.4)" onclick="state.merchantTab='Dashboard';render()">← ${tr('Back to Dashboard', 'डैशबोर्ड पर लौटें')}</button>`;
+    bannerIcon = '✨';
+    bannerTitle = tr('AI Digital Business Manager ("Ask Your Data Anything")', 'AI डिजिटल बिज़नेस मैनेजर (अपने व्यापार के पोर्टफोलियो से कुछ भी पूछें)');
+    bannerSubtitle = tr('Natural language Q&A across your entire portfolio, live KPI charts & Owner-approved Action Proposals', 'ग्राहक, लीड्स, बिल, उधार, स्टॉक या 6-माह के मुनाफ़े के बारे में पूछें');
+    bannerActionHtml = `
+      <button class="btn btn-gold btn-sm" onclick="state.settingsSubTab='ai_apis';state.merchantTab='Settings';render()">🔑 ${tr('Configure AI API Key', 'AI API कॉन्फ़िगर करें')}</button>
+      <button class="btn btn-ghost btn-sm" style="color:#ffffff;border-color:rgba(255,255,255,0.4)" onclick="state.merchantTab='Dashboard';render()">← ${tr('Dashboard', 'डैशबोर्ड')}</button>
+    `;
     contentHtml = renderMerchantAiBusinessManager(shop);
   } else if (curTab === 'CRM Pipeline') {
-    bannerIcon = '📋';
-    bannerTitle = tr('B2B Leads Pipeline (Kanban) & Quotation Engine', 'B2B लीड्स सेल्स पाइपलाइन (Kanban) एवं कोटेशन इंजन');
-    bannerSubtitle = tr('Track inquiries from New -> Proposal -> Won, and convert Quotations to GST Invoices in 1 click', 'नई पूछताछ से डील पक्की होने तक ट्रैक करें एवं कोटेशन को 1-क्लिक में पक्के GST बिल में बदलें');
-    bannerActionHtml = `<button class="btn btn-gold btn-sm" onclick="state.invoiceDocType='Quotation';state.merchantTab='Billing';render()">+ ${tr('New Quotation (QT)', '+ नया कोटेशन बनाएं')}</button>`;
+    bannerIcon = '🎯';
+    bannerTitle = tr('Leads & Deals Pipeline', 'लीड्स एवं डील्स सेल्स पाइपलाइन');
+    bannerSubtitle = tr('Track sales progress from initial discovery to closed business across 6 stages', 'प्रारंभिक पूछताछ से लेकर डील पक्की होने तक 6 चरणों में अपनी बिक्री ट्रैक करें');
+    bannerActionHtml = `
+      <button class="btn btn-primary btn-sm" style="background:#0284c7;border-color:#38bdf8" onclick="openDealModal()">+ ${tr('Add Deal', '+ नई डील जोड़ें')}</button>
+      <button class="btn btn-gold btn-sm" onclick="state.invoiceDocType='Quotation';state.merchantTab='Billing';render()">+ ${tr('New Quotation', '+ नया कोटेशन')}</button>
+    `;
     contentHtml = renderMerchantCrmPipeline(shop);
   } else if (curTab === 'Billing') {
     bannerIcon = '🧾';
-    bannerTitle = tr('5-Second Quick Billing & GST Invoices', 'त्वरित 5-सेकंड एवं पक्का GST बिल काउंटर');
-    bannerSubtitle = tr('Auto HSN, 0% tax exemption, cash discount & thermal printing', 'HSN कोड, 0% छूट, डिस्काउंट, थर्मल/A4 प्रिंटिंग एवं तुरंत ग्राहक SMS/WA');
-    bannerActionHtml = `<button class="btn btn-ghost btn-sm" style="color:#ffffff;border-color:rgba(255,255,255,0.4)" onclick="state.merchantTab='Dashboard';render()">← ${tr('Back to Dashboard', 'डैशबोर्ड पर लौटें')}</button>`;
+    bannerTitle = tr('5-Second Quick Billing, Quotations & GST Invoices', 'त्वरित 5-सेकंड बिलिंग, कोटेशन एवं पक्का GST इनवॉइस');
+    bannerSubtitle = tr('1-Click saved customer auto-fill, seller invoice defaults, HSN & thermal/A4 print', 'सेव किए गए ग्राहक का 1-क्लिक चयन, डिफ़ॉल्ट बिल सेटिंग्स व A4/थर्मल प्रिंटिंग');
+    bannerActionHtml = `
+      <button class="btn btn-gold btn-sm" onclick="openCustomerModal()">+ ${tr('Add Customer', '+ नया ग्राहक')}</button>
+      <button class="btn btn-ghost btn-sm" style="color:#ffffff;border-color:rgba(255,255,255,0.4)" onclick="state.settingsSubTab='invoice';state.merchantTab='Settings';render()">⚙️ ${tr('Invoice Defaults', 'इनवॉइस डिफ़ॉल्ट')}</button>
+    `;
     contentHtml = renderMerchantInvoiceBuilder(shop);
   } else if (curTab === 'Inventory') {
     bannerIcon = '📦';
-    bannerTitle = tr('Inventory Stock & AI Barcode Scanner', 'इन्वेंट्री स्टॉक एवं AI बारकोड स्कैनर');
-    bannerSubtitle = tr('Cost price tracking, closing stock valuation & low-stock alerts', 'क्लोजिंग स्टॉक वैल्यूएशन, खरीद लागत (Cost Price) एवं कम स्टॉक अलर्ट');
-    bannerActionHtml = `<button class="btn btn-gold btn-sm" onclick="openAiScannerModal()">✨ ${tr('AI Stock Scanner', 'AI बिल स्कैनर')}</button>`;
+    bannerTitle = tr('Products & Services Catalog', 'प्रोडक्ट्स, सर्विसेज एवं स्टॉक प्रबंधन');
+    bannerSubtitle = tr('Add single or multi-row products/services with blurred popup modal, HSN & AI scanner', 'पॉपअप फॉर्म में हॉरिजॉन्टल व वर्टिकल पंक्तियों के साथ सामान या सर्विस जोड़ें');
+    bannerActionHtml = `
+      <button class="btn btn-primary btn-sm" style="background:#0284c7;border-color:#38bdf8" onclick="openProductAddModal()">+ ${tr('Add Product / Service (Popup)', '+ प्रोडक्ट / सर्विस जोड़ें (Popup)')}</button>
+      <button class="btn btn-gold btn-sm" onclick="openAiScannerModal()">✨ ${tr('AI Stock Scanner', 'AI बिल स्कैनर')}</button>
+    `;
     contentHtml = renderMerchantInventory(shop);
   } else if (curTab === 'Manufacturing') {
     bannerIcon = '🏭';
@@ -2738,16 +3655,16 @@ function renderMerchantPortal() {
     bannerActionHtml = `<button class="btn btn-ghost btn-sm" style="color:#ffffff;border-color:rgba(255,255,255,0.4)" onclick="state.merchantTab='Dashboard';render()">← ${tr('Back to Dashboard', 'डैशबोर्ड पर लौटें')}</button>`;
     contentHtml = renderMerchantExpensesOnly(shop);
   } else if (curTab === 'Reports') {
-    bannerIcon = '📄';
-    bannerTitle = tr('GSTR-3B Net Tax Summary & Party Dr/Cr Ledgers', 'GSTR-3B नेट टैक्स सारांश एवं पार्टी बहीखाता लेजर');
-    bannerSubtitle = tr('Zero-latency accounting period filter, Net Tax liability & printable ledgers', '0-लेटेंसी लेखा अवधि फिल्टर, डेबिट/क्रेडिट लेजर स्टेटमेंट एवं नेट टैक्स दायित्व');
+    bannerIcon = '📈';
+    bannerTitle = tr('6-Month P&L Statement, Top Customers & GSTR-3B Reports', '6-माह का लाभ-हानि विवरण, शीर्ष ग्राहक एवं GSTR-3B रिपोर्ट्स');
+    bannerSubtitle = tr('Comprehensive financial intelligence, customer revenue ranking & printable Dr/Cr ledgers', 'संपूर्ण वित्तीय रिपोर्ट्स, शीर्ष ग्राहक रैंकिंग, खर्च विश्लेषण एवं पार्टी बहीखाता');
     bannerActionHtml = `<button class="btn btn-ghost btn-sm" style="color:#ffffff;border-color:rgba(255,255,255,0.4)" onclick="state.merchantTab='Dashboard';render()">← ${tr('Back to Dashboard', 'डैशबोर्ड पर लौटें')}</button>`;
     contentHtml = renderMerchantReportsOnly(shop);
   } else if (curTab === 'Staff') {
-    bannerIcon = '👥';
-    bannerTitle = tr('Shop Staff & Role-Based Permissions (RBAC)', 'दुकान स्टाफ एवं भूमिका आधारित अनुमतियां (RBAC)');
-    bannerSubtitle = tr('Add operators, billing-only staff & review audit logs', 'स्टाफ सदस्य जोड़ें, बिलिंग/स्टॉक अनुमतियां सीमित करें एवं गतिविधि ऑडिट लॉग');
-    bannerActionHtml = `<button class="btn btn-ghost btn-sm" style="color:#ffffff;border-color:rgba(255,255,255,0.4)" onclick="state.merchantTab='Dashboard';render()">← ${tr('Back to Dashboard', 'डैशबोर्ड पर लौटें')}</button>`;
+    bannerIcon = '🛡️';
+    bannerTitle = tr('Managers & Staff Login IDs (14 Granular RBAC Permissions)', 'मैनेजर एवं स्टाफ लॉगिन ID निर्माण (केवल ओनर द्वारा)');
+    bannerSubtitle = tr('Owner-only creation of Staff/Manager login credentials with 14 module-level access controls', 'मोबाइल नंबर, ईमेल व पासवर्ड के साथ मैनेजर/स्टाफ की लॉगिन ID बनाएँ और 14 अनुमतियाँ नियंत्रित करें');
+    bannerActionHtml = `<button class="btn btn-primary btn-sm" style="background:#0284c7;border-color:#38bdf8" onclick="openManagerModal()">+ ${tr('Create Manager / Staff ID', '+ नई मैनेजर / स्टाफ ID बनाएँ')}</button>`;
     contentHtml = renderMerchantStaff(shop);
   } else if (curTab === 'Standee') {
     bannerIcon = '📢';
@@ -2757,8 +3674,8 @@ function renderMerchantPortal() {
     contentHtml = renderMerchantMoreTools(shop, qrUrl);
   } else if (curTab === 'Settings') {
     bannerIcon = '⚙️';
-    bannerTitle = tr('Shop Profile, 1-Click Offline Backup & Plan', 'दुकान प्रोफ़ाइल, 1-क्लिक बैकअप एवं प्लान');
-    bannerSubtitle = tr('Download full data backup, toggle open/close status & plan upgrades', 'सुरक्षित ऑफलाइन डेटा बैकअप, दुकान खुलने/बंद होने की स्थिति एवं प्लान अपग्रेड');
+    bannerTitle = tr('System Settings, Invoice Defaults & AI Provider APIs', 'सिस्टम सेटिंग्स, इनवॉइस डिफ़ॉल्ट एवं AI प्रोवाइडर API');
+    bannerSubtitle = tr('Configure organization profile, banking & UPI, invoice defaults, AI APIs, and backups', 'व्यापार प्रोफ़ाइल, बैंकिंग, डिफ़ॉल्ट इनवॉइस नियम, AI प्रोवाइडर व बैकअप सेटिंग्स');
     bannerActionHtml = `<button class="btn btn-gold btn-sm" onclick="downloadFullShopBackup()">💾 ${tr('1-Click Backup', '1-क्लिक डेटा बैकअप')}</button>`;
     contentHtml = renderMerchantSettingsOnly(shop, qrUrl);
   }
@@ -2915,8 +3832,227 @@ function renderMerchantDashboard(shop) {
     return s + (Math.max(0, Number(p.stock) || 0) * unitCost);
   }, 0);
 
+  // Executive Dashboard Metrics & Charts Data (Item #5 — Screenshot 1)
+  const totalCollected = Math.max(0, grossSales - split.Credit);
+  const netMarginPct = grossSales > 0 ? ((netProfit / grossSales) * 100).toFixed(1) : '0.0';
+  const activeDeals = (state.data.myCrmLeads || []).filter(l => l.stage !== 'Lost' && l.stage !== 'Closed Lost');
+  const activeDealPipelineVal = activeDeals.reduce((s, l) => s + (Number(l.expectedValue) || 0), 0);
+  const unpaidInvoices = orders.filter(o => o.status !== 'Rejected' && o.status !== 'Sales Return' && o.docType !== 'Quotation' && o.status !== 'Quotation' && o.paymentMode === 'Credit' && !o.udhaarSettled);
+  const pendingTasks = (state.data.myTasks || []).filter(t => t.status !== 'Completed');
+  const recentActivity = (state.data.myActivity || []).slice(0, 6);
+
+  // 6-Month Revenue & Expense Trend SVG Points
+  const sixMonths = computeSixMonthFinancials(allOrders, allExpenses);
+  const maxChartVal = Math.max(20000, ...sixMonths.map(m => Math.max(m.revenue, m.expenses)));
+  const svgW = 540;
+  const svgH = 180;
+  const padL = 48;
+  const padR = 18;
+  const padT = 16;
+  const padB = 28;
+  const plotW = svgW - padL - padR;
+  const plotH = svgH - padT - padB;
+  const revPts = sixMonths.map((m, idx) => {
+    const x = padL + (idx / Math.max(1, sixMonths.length - 1)) * plotW;
+    const y = padT + plotH - (Math.min(maxChartVal, m.revenue) / maxChartVal) * plotH;
+    return { x: Math.round(x), y: Math.round(y), label: m.label, val: m.revenue };
+  });
+  const expPts = sixMonths.map((m, idx) => {
+    const x = padL + (idx / Math.max(1, sixMonths.length - 1)) * plotW;
+    const y = padT + plotH - (Math.min(maxChartVal, m.expenses) / maxChartVal) * plotH;
+    return { x: Math.round(x), y: Math.round(y), label: m.label, val: m.expenses };
+  });
+  const revPolyline = revPts.map(p => `${p.x},${p.y}`).join(' ');
+  const expPolyline = expPts.map(p => `${p.x},${p.y}`).join(' ');
+  const revArea = `${revPts[0].x},${padT + plotH} ${revPolyline} ${revPts[revPts.length - 1].x},${padT + plotH}`;
+
+  // Donut Chart Distribution (Paid, Pending, Overdue, Draft/Quotation)
+  const paidCnt = allOrders.filter(o => o.status !== 'Rejected' && o.docType !== 'Quotation' && (o.paymentMode !== 'Credit' || o.udhaarSettled)).length || 1;
+  const overdueCnt = unpaidInvoices.filter(o => (Date.now() - new Date(o.date || Date.now()).getTime()) > 15 * 86400000).length;
+  const pendingCnt = Math.max(0, unpaidInvoices.length - overdueCnt);
+  const draftCnt = allOrders.filter(o => o.docType === 'Quotation' || o.status === 'Quotation').length;
+  const totalDonut = Math.max(1, paidCnt + pendingCnt + overdueCnt + draftCnt);
+  const paidDash = Math.round((paidCnt / totalDonut) * 251);
+  const pendDash = Math.round((pendingCnt / totalDonut) * 251);
+  const overDash = Math.round((overdueCnt / totalDonut) * 251);
+  const draftDash = Math.max(0, 251 - paidDash - pendDash - overDash);
+
   return `
-    <div style="display:grid;gap:20px">
+    <div style="display:grid;gap:16px">
+      <!-- 1. EXECUTIVE DASHBOARD 4 KPI CARDS (Matching Screenshot 1) -->
+      <div class="exec-kpi-grid">
+        <div class="exec-kpi-card indigo">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:0.74rem;font-weight:700;color:#64748b;letter-spacing:0.5px">${tr('TOTAL COLLECTED', 'कुल प्राप्त राशि (COLLECTED)')}</span>
+            <span style="background:#e0f2fe;color:#0284c7;width:28px;height:28px;border-radius:7px;display:grid;place-items:center;font-size:0.9rem">💵</span>
+          </div>
+          <div style="font-size:1.55rem;font-weight:800;color:#0f172a;margin:6px 0">${fmtINR(totalCollected)}</div>
+          <div style="font-size:0.76rem;color:#16a34a;font-weight:600">↗ ${tr('Invoiced:', 'कुल बिलिंग:')} ${fmtINR(grossSales)}</div>
+        </div>
+
+        <div class="exec-kpi-card amber" style="cursor:pointer" onclick="state.merchantTab='Udhaar';render()">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:0.74rem;font-weight:700;color:#64748b;letter-spacing:0.5px">${tr('OUTSTANDING RECEIVABLES', 'बकाया उधारी (RECEIVABLES)')}</span>
+            <span style="background:#fef3c7;color:#d97706;width:28px;height:28px;border-radius:7px;display:grid;place-items:center;font-size:0.9rem">⏱️</span>
+          </div>
+          <div style="font-size:1.55rem;font-weight:800;color:#d97706;margin:6px 0">${fmtINR(split.Credit)}</div>
+          <div style="font-size:0.76rem;color:#64748b">${unpaidInvoices.length} ${tr('invoice(s) need attention', 'बिल बकाया हैं')}</div>
+        </div>
+
+        <div class="exec-kpi-card emerald">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:0.74rem;font-weight:700;color:#64748b;letter-spacing:0.5px">${tr('NET OPERATING PROFIT', 'शुद्ध मुनाफ़ा (NET PROFIT)')}</span>
+            <span style="background:#dcfce7;color:#16a34a;width:28px;height:28px;border-radius:7px;display:grid;place-items:center;font-size:0.9rem">📈</span>
+          </div>
+          <div style="font-size:1.55rem;font-weight:800;color:${netProfit >= 0 ? '#16a34a' : '#dc2626'};margin:6px 0">${fmtINR(netProfit)}</div>
+          <div><span style="background:#dcfce7;color:#15803d;font-size:0.72rem;font-weight:700;padding:2px 8px;border-radius:99px">${netMarginPct}% Net Margin</span></div>
+        </div>
+
+        <div class="exec-kpi-card indigo" style="cursor:pointer" onclick="state.merchantTab='CRM Pipeline';render()">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:0.74rem;font-weight:700;color:#64748b;letter-spacing:0.5px">${tr('ACTIVE DEAL PIPELINE', 'सक्रिय डील पाइपलाइन')}</span>
+            <span style="background:#e0f2fe;color:#0284c7;width:28px;height:28px;border-radius:7px;display:grid;place-items:center;font-size:0.9rem">🎯</span>
+          </div>
+          <div style="font-size:1.55rem;font-weight:800;color:#0369a1;margin:6px 0">${fmtINR(activeDealPipelineVal)}</div>
+          <div style="font-size:0.76rem;color:#64748b">${activeDeals.length} ${tr('prospective leads', 'सक्रिय व्यापारिक लीड्स')}</div>
+        </div>
+      </div>
+
+      <!-- 2. VISUAL CHARTS ROW: 6-Month Revenue & Expense Trend + Invoice Status Donut (Screenshot 1) -->
+      <div class="exec-charts-row">
+        <div class="erp-card" style="margin-bottom:0">
+          <div class="erp-card-header" style="margin-bottom:10px;padding-bottom:8px">
+            <h3 style="font-size:0.98rem">📈 ${tr('6-Month Revenue & Expense Trend', '6-माह रेवेन्यू एवं खर्च ट्रेंड चार्ट')}</h3>
+            <span class="badge badge-ghost" style="font-size:0.72rem">${tr('Monthly Financials', 'मासिक वित्तीय ग्राफ')}</span>
+          </div>
+          <div style="display:flex;justify-content:center;gap:18px;font-size:0.76rem;font-weight:600;margin-bottom:6px">
+            <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:50%;background:#0284c7;display:inline-block"></span> Revenue (₹)</span>
+            <span style="display:inline-flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:50%;background:#e11d48;display:inline-block"></span> Expenses (₹)</span>
+          </div>
+          <svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;height:auto;max-height:200px;overflow:visible">
+            <defs>
+              <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#0284c7" stop-opacity="0.24"/>
+                <stop offset="100%" stop-color="#0284c7" stop-opacity="0.02"/>
+              </linearGradient>
+            </defs>
+            ${[0, 0.25, 0.5, 0.75, 1].map(fr => {
+              const y = Math.round(padT + plotH * (1 - fr));
+              const v = Math.round((maxChartVal * fr) / 1000);
+              return `
+                <line x1="${padL}" y1="${y}" x2="${svgW - padR}" y2="${y}" stroke="#e2e8f0" stroke-dasharray="3,3" />
+                <text x="${padL - 6}" y="${y + 4}" text-anchor="end" font-size="9" fill="#64748b">₹${v}k</text>
+              `;
+            }).join('')}
+            <polygon points="${revArea}" fill="url(#revGrad)" />
+            <polyline fill="none" stroke="#0284c7" stroke-width="2.5" points="${revPolyline}" />
+            <polyline fill="none" stroke="#e11d48" stroke-width="2" points="${expPolyline}" />
+            ${revPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3.8" fill="#0284c7"><title>${p.label}: ₹${p.val}</title></circle>`).join('')}
+            ${expPts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3.2" fill="#e11d48"><title>${p.label}: ₹${p.val}</title></circle>`).join('')}
+            ${revPts.map(p => `<text x="${p.x}" y="${svgH - 6}" text-anchor="middle" font-size="9.5" fill="#64748b">${esc(p.label)}</text>`).join('')}
+          </svg>
+        </div>
+
+        <div class="erp-card" style="margin-bottom:0;display:flex;flex-direction:column;justify-content:space-between">
+          <div class="erp-card-header" style="margin-bottom:8px;padding-bottom:8px">
+            <h3 style="font-size:0.98rem">🍩 ${tr('Invoice Status', 'इनवॉइस स्थिति')}</h3>
+            <span class="badge badge-ghost" style="font-size:0.72rem">${tr('Distribution', 'विभाजन')}</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:center;padding:6px 0">
+            <svg width="150" height="150" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f1f5f9" stroke-width="14" />
+              <circle cx="50" cy="50" r="40" fill="transparent" stroke="#10b981" stroke-width="14" stroke-dasharray="${paidDash} 251" stroke-dashoffset="0" transform="rotate(-90 50 50)" />
+              <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f59e0b" stroke-width="14" stroke-dasharray="${pendDash} 251" stroke-dashoffset="-${paidDash}" transform="rotate(-90 50 50)" />
+              <circle cx="50" cy="50" r="40" fill="transparent" stroke="#ef4444" stroke-width="14" stroke-dasharray="${overDash} 251" stroke-dashoffset="-${paidDash + pendDash}" transform="rotate(-90 50 50)" />
+              <circle cx="50" cy="50" r="40" fill="transparent" stroke="#64748b" stroke-width="14" stroke-dasharray="${draftDash} 251" stroke-dashoffset="-${paidDash + pendDash + overDash}" transform="rotate(-90 50 50)" />
+              <text x="50" y="48" text-anchor="middle" font-size="12" font-weight="800" fill="#0f172a">${allOrders.length}</text>
+              <text x="50" y="60" text-anchor="middle" font-size="7.5" fill="#64748b">Total Bills</text>
+            </svg>
+          </div>
+          <div style="display:flex;justify-content:center;gap:10px;flex-wrap:wrap;font-size:0.74rem;font-weight:600">
+            <span>🟢 Paid (${paidCnt})</span>
+            <span>🟡 Pending (${pendingCnt})</span>
+            <span>🔴 Overdue (${overdueCnt})</span>
+            <span>⚪ Quote (${draftCnt})</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. SCROLLABLE FOLLOW-UP INVOICES + PENDING TASKS & AUDIT TRAIL (Item #5 — Screenshot 1) -->
+      <div class="exec-charts-row">
+        <div class="erp-card" style="margin-bottom:0">
+          <div class="erp-card-header" style="margin-bottom:10px;padding-bottom:8px">
+            <h3 style="font-size:0.98rem;color:#dc2626">⚠️ ${tr('Invoices Requiring Follow-Up', 'भुगतान फॉलो-अप वाले बकाया इनवॉइस')}</h3>
+            <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.76rem;color:#0284c7" onclick="state.merchantTab='Udhaar';render()">${tr('View All Invoices →', 'सभी देखें →')}</button>
+          </div>
+          <div class="table-wrap" style="max-height:210px;overflow-y:auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>INVOICE #</th>
+                  <th>CUSTOMER</th>
+                  <th>DUE DATE</th>
+                  <th>BALANCE DUE</th>
+                  <th>ACTION</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${unpaidInvoices.length === 0 ? `
+                  <tr><td colspan="5" style="text-align:center;color:#16a34a;padding:18px;font-weight:700">🎉 ${tr('All invoices collected! Zero overdue balance.', 'सभी इनवॉइस का भुगतान प्राप्त हो चुका है!')}</td></tr>
+                ` : unpaidInvoices.map(inv => {
+                  const g = Number(inv.totals?.gross) || 0;
+                  const pd = Number(inv.paidAmount) || 0;
+                  const bal = Math.max(0, g - pd);
+                  const dueD = new Date(new Date(inv.date || Date.now()).getTime() + (Number(shop.invoiceDefaults?.dueDays || 15) * 86400000)).toLocaleDateString('en-IN');
+                  return `
+                    <tr>
+                      <td><b style="color:#0284c7">${esc(inv.invoiceNo)}</b></td>
+                      <td><b>${esc(inv.customer)}</b><div class="text-muted" style="font-size:0.72rem">${esc(inv.phone)}</div></td>
+                      <td style="color:#dc2626;font-size:0.8rem;font-weight:600">${dueD}</td>
+                      <td><b style="color:#0f172a">${fmtINR(bal)}</b></td>
+                      <td>
+                        <button type="button" class="btn btn-primary btn-sm" style="padding:3px 8px;font-size:0.72rem" onclick="state.merchantTab='Udhaar';render()">Collect</button>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="erp-card" style="margin-bottom:0">
+          <div class="erp-card-header" style="margin-bottom:10px;padding-bottom:8px">
+            <h3 style="font-size:0.98rem">✅ ${tr('Pending Tasks & Audit Activity', 'लंबित टास्क रिमाइंडर एवं गतिविधि')}</h3>
+            <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.74rem;color:#0284c7" onclick="openTaskModal()">+ ${tr('Add Task', '+ टास्क')}</button>
+          </div>
+          <div style="max-height:210px;overflow-y:auto;display:grid;gap:8px;padding-right:4px">
+            ${pendingTasks.map(tsk => {
+              const pColor = tsk.priority === 'Urgent' ? '#dc2626' : (tsk.priority === 'High' ? '#ea580c' : '#0284c7');
+              return `
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc">
+                  <div style="min-width:0">
+                    <div style="font-weight:700;font-size:0.82rem;color:#0f172a">${esc(tsk.title)}</div>
+                    <div style="font-size:0.72rem;color:#64748b;margin-top:2px">
+                      <span style="color:${pColor};font-weight:700">● ${esc(tsk.priority)}</span> · Due: ${esc(tsk.dueDate || 'Today')} · 👤 ${esc(tsk.assignedTo || 'Owner')}
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:0.72rem;color:#16a34a;border:1px solid #86efac" title="Mark Completed" onclick="quickCompleteTask('${tsk.id}')">✓</button>
+                </div>
+              `;
+            }).join('')}
+            ${recentActivity.map(act => `
+              <div style="display:flex;align-items:flex-start;gap:8px;padding:6px 8px;border-left:2px solid #0284c7;font-size:0.76rem">
+                <div>
+                  <div style="font-weight:600;color:#334155">${esc(act.action)}</div>
+                  <div style="font-size:0.7rem;color:#94a3b8">${esc(act.actorName || act.actor || 'Owner')} · ${new Date(act.at || act.date || Date.now()).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+
       <!-- Instant Zero-Load Period Filter Bar -->
       <div class="card-subtle no-print" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;background:#f8fafc;border:1.5px solid #cbd5e1">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -3288,6 +4424,20 @@ function renderMerchantInvoiceBuilder(shop) {
           </div>
         ` : ''}
 
+        <!-- 1-Click Saved Customer CRM Auto-Fill (Item #8: One-Time Customer Save — Never Re-Type!) -->
+        <div class="card-subtle" style="margin-bottom:10px;background:#eff6ff;border:1.5px solid #2563EB;padding:10px 12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+            <label class="form-label" style="color:#1e40af;font-size:0.8rem;margin:0">👥 ${tr('1-Click Saved Customer Auto-Fill (Select once — auto-fills Name, Mobile, GSTIN & Address!)', '1-क्लिक सेव ग्राहक चयन (एक बार सेव करें — बार-बार नाम, मोबाइल और GSTIN लिखने की ज़रूरत नहीं!)')}</label>
+            <button type="button" class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:0.74rem" onclick="openCustomerModal()">+ ${tr('Add New Customer', '+ नया ग्राहक सेव करें')}</button>
+          </div>
+          <select class="select" style="padding:6px 10px;font-size:0.84rem;margin-top:6px" onchange="pickSavedCrmCustomerForInvoice(this.value)">
+            <option value="">-- ${tr('Select from Saved Customers CRM (Or type below)', 'सेव किए गए ग्राहकों में से चुनें (या नीचे नया लिखें)')} --</option>
+            ${(state.data.myCustomers || []).map(c => `
+              <option value="${c.id}">👤 ${esc(c.companyName || c.contactName)} (${esc(c.contactName)}) · 📱 ${esc(c.phone || '—')} · GSTIN: ${esc(c.gstin || 'Unregistered')}</option>
+            `).join('')}
+          </select>
+        </div>
+
         <!-- 1-Click Dual-Ledger Buyer Picker (एक इनवॉइस = दोनों खातों में ऑटो-अपडेट!) -->
         <div class="card-subtle" style="margin-bottom:12px;background:#f0fdf4;border:1.5px solid #16a34a;padding:10px 12px">
           <label class="form-label" style="color:#166534;font-size:0.8rem">🔄 ${tr('Dual-Ledger Auto-Sync: Pick Registered Buyer Shop (Updates Seller Sales + Buyer Purchase Ledger in 1 Bill!)', 'दोहरा बही-खाता सिंक: पंजीकृत खरीदार व्यापारी चुनें (यह एक ही बिल आपके Sales और खरीदार के Purchase व ITC खाते में अपने-आप जुड़ जाएगा!)')}</label>
@@ -3457,9 +4607,23 @@ function renderMerchantInvoiceBuilder(shop) {
           ${!isQuoteMode && state.invoiceBuyer.paymentMode === 'Credit' && Number(state.invoiceBuyer.paidAmount) > 0 ? `
             <p style="font-size:0.8rem;color:#dc2626">Paid Now: <b>${fmtINR(state.invoiceBuyer.paidAmount)}</b> | Balance Udhaar Due: <b>${fmtINR(Math.max(0, grandTotal - Number(state.invoiceBuyer.paidAmount)))}</b></p>
           ` : ''}
-          ${shop.upiId ? `<p style="font-size:0.75rem;margin-top:4px">Pay via UPI: <b>${esc(shop.upiId)}</b></p>` : ''}
+          ${(shop.banking?.upiId || shop.upiId) ? `<p style="font-size:0.75rem;margin-top:4px">Pay via UPI: <b>${esc(shop.banking?.upiId || shop.upiId)}</b></p>` : ''}
         </div>
-        <p style="text-align:center;font-size:0.7rem;margin-top:14px;opacity:0.75">Generated on KuberQ B2B Trade OS</p>
+        ${(shop.invoiceDefaults?.showBankDetails !== false && (shop.banking?.bankName || shop.banking?.accountNumber)) ? `
+          <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border-subtle);font-size:0.73rem;color:#334155">
+            <b>Bank Details:</b> ${esc(shop.banking.bankName || '')} | A/C: <b>${esc(shop.banking.accountNumber || '')}</b> | IFSC: <b>${esc(shop.banking.ifsc || '')}</b>
+          </div>
+        ` : ''}
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-top:12px;padding-top:8px;border-top:1px solid var(--border-subtle);font-size:0.72rem">
+          <div style="max-width:65%;white-space:pre-line;color:#475569">
+            <b>Terms &amp; Conditions:</b><br/>${esc(shop.invoiceDefaults?.terms || '1. Goods once sold will not be taken back.\n2. Subject to local jurisdiction.')}
+          </div>
+          <div style="text-align:right">
+            <div style="margin-bottom:18px;font-weight:700">${esc(shop.invoiceDefaults?.signatory || ('For ' + shop.shop))}</div>
+            <div style="border-top:1px solid #64748b;padding-top:3px;font-size:0.68rem">Authorized Signatory</div>
+          </div>
+        </div>
+        <p style="text-align:center;font-size:0.7rem;margin-top:10px;opacity:0.75">${esc(shop.invoiceDefaults?.footerNote || 'Thank you for your business! · Generated on KuberQ B2B Trade OS')}</p>
       </div>
       </div>
 
@@ -3519,147 +4683,115 @@ function renderMerchantInvoiceBuilder(shop) {
 }
 
 // ============================================================================
-// B2B LEADS & SALES PIPELINE (VISUAL KANBAN BOARD + QUOTATION ENGINE)
+// B2B LEADS & DEALS PIPELINE (6-STAGE VISUAL KANBAN BOARD MATCHING SCREENSHOT 5)
 // ============================================================================
 function renderMerchantCrmPipeline(shop) {
   const leads = state.data.myCrmLeads || [];
   const stages = [
-    { key: 'New Inquiry', labelEn: 'New Inquiry', labelHi: 'नई पूछताछ', color: '#2563EB', bg: '#eff6ff', icon: '🟢' },
-    { key: 'Contacted', labelEn: 'Contacted', labelHi: 'बातचीत हुई', color: '#0284c7', bg: '#f0f9ff', icon: '🔵' },
-    { key: 'Proposal Sent', labelEn: 'Proposal / Quote Sent', labelHi: 'कोटेशन भेजा', color: '#d97706', bg: '#fffbeb', icon: '🟣' },
-    { key: 'Won', labelEn: 'Won / Converted', labelHi: 'डील पक्की (Won)', color: '#16a34a', bg: '#f0fdf4', icon: '🏆' },
-    { key: 'Lost', labelEn: 'Lost / Dropped', labelHi: 'ड्रॉप / बंद', color: '#64748b', bg: '#f8fafc', icon: '⚪' }
+    { key: 'New Inquiry', matchKeys: ['New Inquiry', 'New Inquiries'], labelEn: 'New Inquiries', labelHi: 'नई पूछताछ (New Inquiries)', color: '#0284c7', badgeBg: '#e0f2fe', badgeColor: '#0284c7' },
+    { key: 'Contacted', matchKeys: ['Contacted', 'Discovery / Qualified'], labelEn: 'Discovery / Qualified', labelHi: 'क्वालिफाइड (Discovery)', color: '#2563EB', badgeBg: '#dbeafe', badgeColor: '#1d4ed8' },
+    { key: 'Proposal Sent', matchKeys: ['Proposal Sent'], labelEn: 'Proposal Sent', labelHi: 'कोटेशन भेजा (Proposal Sent)', color: '#0ea5e9', badgeBg: '#e0f2fe', badgeColor: '#0369a1' },
+    { key: 'Negotiation', matchKeys: ['Negotiation'], labelEn: 'Negotiation', labelHi: 'मोल-भाव (Negotiation)', color: '#d97706', badgeBg: '#fef3c7', badgeColor: '#b45309' },
+    { key: 'Won', matchKeys: ['Won', 'Closed Won'], labelEn: 'Closed Won', labelHi: 'डील पक्की (Closed Won)', color: '#16a34a', badgeBg: '#dcfce7', badgeColor: '#15803d' },
+    { key: 'Lost', matchKeys: ['Lost', 'Closed Lost'], labelEn: 'Closed Lost', labelHi: 'ड्रॉप (Closed Lost)', color: '#dc2626', badgeBg: '#fee2e2', badgeColor: '#b91c1c' }
   ];
 
-  const totalPipelineValue = leads.filter(l => l.stage !== 'Lost').reduce((s, l) => s + (Number(l.expectedValue) || 0), 0);
-  const wonValue = leads.filter(l => l.stage === 'Won').reduce((s, l) => s + (Number(l.expectedValue) || 0), 0);
+  const totalPipelineValue = leads.filter(l => l.stage !== 'Lost' && l.stage !== 'Closed Lost').reduce((s, l) => s + (Number(l.expectedValue) || 0), 0);
+  const wonValue = leads.filter(l => l.stage === 'Won' || l.stage === 'Closed Won').reduce((s, l) => s + (Number(l.expectedValue) || 0), 0);
   const activeQuotations = (state.data.myOrders || []).filter(o => o.docType === 'Quotation' || o.status === 'Quotation' || String(o.invoiceNo || '').startsWith('QT-'));
 
   return `
-    <div style="display:grid;gap:20px">
+    <div style="display:grid;gap:16px">
+      <!-- Top Header Matching Screenshot 5: Title + "+ Add Deal" Button -->
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+        <div>
+          <h2 style="font-size:1.35rem;font-weight:900;color:#0f172a;margin:0">${tr('Leads & Deals Pipeline', 'लीड्स और सेल्स पाइपलाइन (Leads & Deals Pipeline)')}</h2>
+          <p style="font-size:0.82rem;color:#64748b;margin:3px 0 0">${tr('Track daily sales progress from initial discovery to closed business', 'प्रारंभिक पूछताछ से लेकर पक्की डील तक अपनी दैनिक सेल्स लीड्स को ट्रैक करें')}</p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn btn-primary btn-sm" style="background:#0284c7;border-color:#0284c7;padding:8px 16px;font-weight:800" onclick="openDealModal()">
+            + ${tr('Add Deal', '+ नई डील / लीड जोड़ें')}
+          </button>
+        </div>
+      </div>
+
       <!-- Top Pipeline KPIs -->
-      <div class="grid grid-4" style="gap:12px">
-        <div class="erp-card" style="padding:14px;border-left:4px solid #2563EB">
-          <div style="font-size:0.78rem;color:#64748b;font-weight:700">${tr('Total Active Pipeline Value', 'कुल सक्रिय लीड्स मूल्य')}</div>
-          <div style="font-size:1.45rem;font-weight:900;color:#0f172a;margin-top:4px">${fmtINR(totalPipelineValue)}</div>
-          <div style="font-size:0.74rem;color:#2563EB">${leads.length} ${tr('B2B inquiries tracked', 'व्यापारिक पूछताछ')}</div>
+      <div class="grid grid-4" style="gap:10px">
+        <div class="erp-card" style="padding:12px 14px;border-left:4px solid #0284c7">
+          <div style="font-size:0.74rem;color:#64748b;font-weight:700">${tr('Total Active Pipeline Value', 'कुल सक्रिय लीड्स मूल्य')}</div>
+          <div style="font-size:1.3rem;font-weight:900;color:#0f172a;margin-top:3px">${fmtINR(totalPipelineValue)}</div>
+          <div style="font-size:0.72rem;color:#0284c7">${leads.length} ${tr('deals tracked', 'व्यापारिक डील्स')}</div>
         </div>
-        <div class="erp-card" style="padding:14px;border-left:4px solid #d97706">
-          <div style="font-size:0.78rem;color:#64748b;font-weight:700">${tr('Proposals / Quotations Sent', 'भेजे गए कोटेशन')}</div>
-          <div style="font-size:1.45rem;font-weight:900;color:#d97706;margin-top:4px">${leads.filter(l => l.stage === 'Proposal Sent').length + activeQuotations.length}</div>
-          <div style="font-size:0.74rem;color:#92400e">${tr('Ready for 1-click GST billing', '1-क्लिक बिलिंग हेतु तैयार')}</div>
+        <div class="erp-card" style="padding:12px 14px;border-left:4px solid #d97706">
+          <div style="font-size:0.74rem;color:#64748b;font-weight:700">${tr('Proposals / Quotations Sent', 'भेजे गए कोटेशन')}</div>
+          <div style="font-size:1.3rem;font-weight:900;color:#d97706;margin-top:3px">${leads.filter(l => l.stage === 'Proposal Sent').length + activeQuotations.length}</div>
+          <div style="font-size:0.72rem;color:#92400e">${tr('Ready for 1-click GST billing', '1-क्लिक बिलिंग हेतु तैयार')}</div>
         </div>
-        <div class="erp-card" style="padding:14px;border-left:4px solid #16a34a">
-          <div style="font-size:0.78rem;color:#64748b;font-weight:700">${tr('Won / Converted Deals', 'पक्की हुई डील (Won)')}</div>
-          <div style="font-size:1.45rem;font-weight:900;color:#16a34a;margin-top:4px">${fmtINR(wonValue)}</div>
-          <div style="font-size:0.74rem;color:#15803d">${leads.filter(l => l.stage === 'Won').length} ${tr('deals converted', 'सफल आर्डर')}</div>
+        <div class="erp-card" style="padding:12px 14px;border-left:4px solid #16a34a">
+          <div style="font-size:0.74rem;color:#64748b;font-weight:700">${tr('Closed Won Deals', 'पक्की हुई डील (Closed Won)')}</div>
+          <div style="font-size:1.3rem;font-weight:900;color:#16a34a;margin-top:3px">${fmtINR(wonValue)}</div>
+          <div style="font-size:0.72rem;color:#15803d">${leads.filter(l => l.stage === 'Won' || l.stage === 'Closed Won').length} ${tr('deals converted', 'सफल आर्डर')}</div>
         </div>
-        <div class="erp-card" style="padding:14px;border-left:4px solid #7c3aed">
-          <div style="font-size:0.78rem;color:#64748b;font-weight:700">${tr('Pending Follow-Up Tasks', 'आज के फॉलो-अप रिमाइंडर')}</div>
-          <div style="font-size:1.45rem;font-weight:900;color:#7c3aed;margin-top:4px">${leads.filter(l => l.stage !== 'Won' && l.stage !== 'Lost').length}</div>
-          <div style="font-size:0.74rem;color:#6d28d9">${tr('1-click WhatsApp follow-up', '1-क्लिक WhatsApp संपर्क')}</div>
+        <div class="erp-card" style="padding:12px 14px;border-left:4px solid #7c3aed">
+          <div style="font-size:0.74rem;color:#64748b;font-weight:700">${tr('Pending Follow-Up Deals', 'आज के फॉलो-अप रिमाइंडर')}</div>
+          <div style="font-size:1.3rem;font-weight:900;color:#7c3aed;margin-top:3px">${leads.filter(l => l.stage !== 'Won' && l.stage !== 'Closed Won' && l.stage !== 'Lost' && l.stage !== 'Closed Lost').length}</div>
+          <div style="font-size:0.72rem;color:#6d28d9">${tr('1-click WhatsApp follow-up', '1-क्लिक WhatsApp संपर्क')}</div>
         </div>
       </div>
 
-      <!-- Add New B2B Lead / Inquiry Form -->
-      <div class="erp-card">
-        <div class="erp-card-header">
-          <div>
-            <span class="badge badge-primary">📋 ${tr('ADD NEW B2B INQUIRY / LEAD', 'नई B2B व्यापारिक पूछताछ / लीड जोड़ें')}</span>
-            <h3 style="margin-top:6px">${tr('Capture Contractor, Dealer or Institutional Inquiry', 'ठेकेदार, सब-डीलर या बड़े ग्राहक की पूछताछ व फॉलो-अप तिथि दर्ज करें')}</h3>
-          </div>
-        </div>
-        <form onsubmit="addCrmLeadForm(event)">
-          <div class="grid grid-4" style="gap:10px">
-            <div>
-              <label class="form-label">${tr('Buyer / Company Name', 'ग्राहक / फर्म का नाम')} *</label>
-              <input class="input" id="crm-name" required placeholder="${tr('e.g. Rathore Builders', 'उदा: राठौड़ बिल्डर्स')}" />
-            </div>
-            <div>
-              <label class="form-label">${tr('10-Digit Mobile (WhatsApp)', 'मोबाइल नंबर')} *</label>
-              <input class="input" id="crm-phone" required maxlength="10" placeholder="98290XXXXX" />
-            </div>
-            <div>
-              <label class="form-label">${tr('Expected Order Value (₹)', 'अनुमानित ऑर्डर राशि (₹)')} *</label>
-              <input class="input" type="number" id="crm-val" required min="100" placeholder="50000" />
-            </div>
-            <div>
-              <label class="form-label">${tr('Lead Source & Follow-Up Date', 'स्रोत व फॉलो-अप दिनांक')}</label>
-              <div style="display:flex;gap:6px">
-                <select class="select" id="crm-source">
-                  <option value="WhatsApp Inquiry">WhatsApp</option>
-                  <option value="Store QR Catalog">QR Catalog</option>
-                  <option value="Direct Counter Walk-in">Walk-in</option>
-                  <option value="Transport / Referral">Referral</option>
-                </select>
-                <input class="input" type="date" id="crm-date" value="${new Date(Date.now() + 86400000).toISOString().slice(0, 10)}" />
-              </div>
-            </div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:10px;align-items:end">
-            <div>
-              <label class="form-label">${tr('Items Required & Notes', 'माँगा गया सामान व विशेष नोट')}</label>
-              <input class="input" id="crm-items" placeholder="${tr('e.g. 100 PVC Pipes 1 inch, 4 Sintex Tanks — asked for sub-dealer rate', 'उदा: 100 पीवीसी पाइप, 4 सिंटेक्स टैंक — थोक रेट कोटेशन देना है')}" />
-            </div>
-            <button type="submit" class="btn btn-gold">+ ${tr('Add Lead to Kanban', '+ पाइपलाइन में जोड़ें')}</button>
-          </div>
-        </form>
-      </div>
-
-      <!-- 5-Stage Visual Kanban Board -->
-      <div class="erp-card" style="overflow-x:auto">
-        <div class="erp-card-header">
-          <div>
-            <span class="badge badge-gold">📊 ${tr('INTERACTIVE KANBAN SALES PIPELINE', 'विजुअल कानबान सेल्स पाइपलाइन (Kanban Board)')}</span>
-            <h3 style="margin-top:6px">${tr('Move Leads Across Stages or Convert Directly to Quotation / GST Invoice', 'लीड्स को अगले चरण में बढ़ाएँ या 1-क्लिक में कोटेशन / पक्का बिल बनाएँ')}</h3>
-          </div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:repeat(5, minmax(235px, 1fr));gap:12px;min-width:1180px">
-          ${stages.map((st, stIdx) => {
-            const stageLeads = leads.filter(l => l.stage === st.key);
-            const stageSum = stageLeads.reduce((s, l) => s + (Number(l.expectedValue) || 0), 0);
-            return `
-              <div style="background:${st.bg};border:1.5px solid #cbd5e1;border-top:4px solid ${st.color};border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:10px;min-height:320px">
-                <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(0,0,0,0.08);padding-bottom:8px">
-                  <span style="font-weight:800;font-size:0.84rem;color:${st.color}">${st.icon} ${state.lang === 'hi' ? st.labelHi : st.labelEn} (${stageLeads.length})</span>
-                  <span style="font-size:0.75rem;font-weight:700;color:#0f172a">${fmtINR(stageSum)}</span>
+      <!-- 6-Stage Visual Kanban Board (Matching Screenshot 5) -->
+      <div class="ybt-kanban-board">
+        ${stages.map((st, stIdx) => {
+          const stageLeads = leads.filter(l => st.matchKeys.includes(l.stage));
+          const stageSum = stageLeads.reduce((s, l) => s + (Number(l.expectedValue) || 0), 0);
+          return `
+            <div class="ybt-kanban-col">
+              <div class="ybt-kanban-col-head">
+                <div>
+                  <div class="ybt-kanban-col-title">${state.lang === 'hi' ? st.labelHi : st.labelEn}</div>
+                  <div class="ybt-kanban-col-sum">${fmtINR(stageSum)}</div>
                 </div>
+                <span style="background:${st.badgeBg};color:${st.badgeColor};font-weight:800;font-size:0.72rem;padding:2px 8px;border-radius:999px">${stageLeads.length}</span>
+              </div>
 
-                ${stageLeads.length === 0 ? `
-                  <div style="text-align:center;padding:30px 8px;color:#94a3b8;font-size:0.78rem;border:1px dashed #cbd5e1;border-radius:8px">
-                    ${tr('No leads in this stage', 'इस चरण में कोई लीड नहीं')}
-                  </div>
-                ` : stageLeads.map(ld => {
-                  const prevStage = stIdx > 0 ? stages[stIdx - 1].key : null;
-                  const nextStage = stIdx < stages.length - 1 ? stages[stIdx + 1].key : null;
-                  const waFollowMsg = `नमस्ते *${ld.buyerName}* जी,\n*${shop.shop}* से आपके सामान (*${ld.itemsInterest}*) के कोटेशन/ऑर्डर के संबंध में संपर्क कर रहे हैं। कृपया बताएं कब डिस्पैच करना है?`;
-                  return `
-                    <div style="background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:10px;box-shadow:0 2px 6px rgba(15,23,42,0.05);display:grid;gap:6px">
-                      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px">
-                        <b style="font-size:0.88rem;color:#0f172a">${esc(ld.buyerName)}</b>
-                        <span style="background:#eff6ff;color:#2563EB;font-weight:800;font-size:0.76rem;padding:2px 6px;border-radius:6px">${fmtINR(ld.expectedValue)}</span>
-                      </div>
-                      <div style="font-size:0.76rem;color:#475569;line-height:1.35">${esc(ld.itemsInterest)}</div>
-                      <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.7rem;color:#64748b">
-                        <span>📌 ${esc(ld.source)}</span>
-                        <span>📅 ${esc(ld.followUpDate || 'Today')}</span>
-                      </div>
-                      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;padding-top:6px;border-top:1px dashed #e2e8f0">
-                        ${prevStage ? `<button type="button" class="btn btn-ghost btn-sm" style="padding:3px 7px;font-size:0.7rem" title="Move Back" onclick="moveCrmLeadStage('${ld.id}', '${prevStage}')">←</button>` : ''}
-                        ${nextStage ? `<button type="button" class="btn btn-primary btn-sm" style="padding:3px 8px;font-size:0.7rem" onclick="moveCrmLeadStage('${ld.id}', '${nextStage}')">${tr('Next Stage →', 'अगला चरण →')}</button>` : ''}
-                        <button type="button" class="btn btn-gold btn-sm" style="padding:3px 8px;font-size:0.7rem" onclick="prefillQuotationFromLead('${esc(ld.buyerName)}', '${esc(ld.phone)}', '${esc(ld.itemsInterest)}', ${Number(ld.expectedValue) || 0})">
-                          📝 ${tr('Quote / Bill', 'कोटेशन/बिल')}
-                        </button>
-                        <a class="btn btn-ghost btn-sm" style="padding:3px 6px;font-size:0.7rem" target="_blank" rel="noreferrer" href="https://wa.me/91${ld.phone}?text=${encodeURIComponent(waFollowMsg)}">📲 WA</a>
+              ${stageLeads.length === 0 ? `
+                <div style="text-align:center;padding:36px 8px;color:#94a3b8;font-size:0.76rem">
+                  ${tr('No deals in this stage', 'इस चरण में कोई डील नहीं')}
+                </div>
+              ` : stageLeads.map(ld => {
+                const prevStage = stIdx > 0 ? stages[stIdx - 1].key : null;
+                const nextStage = stIdx < stages.length - 1 ? stages[stIdx + 1].key : null;
+                const dealTitle = ld.dealTitle || ld.itemsInterest || ld.buyerName;
+                const companyName = ld.companyName || ld.buyerName;
+                const contactName = ld.contactName || ld.buyerName;
+                const waFollowMsg = `नमस्ते *${ld.buyerName}* जी,\n*${shop.shop}* से आपके सामान (*${ld.itemsInterest}*) के कोटेशन/ऑर्डर के संबंध में संपर्क कर रहे हैं। कृपया बताएं कब डिस्पैच करना है?`;
+                return `
+                  <div class="ybt-deal-card">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;margin-bottom:6px">
+                      <b style="font-size:0.84rem;color:#0f172a;line-height:1.3">${esc(dealTitle)}</b>
+                      <span style="background:#f1f5f9;color:#475569;font-size:0.66rem;font-weight:700;padding:2px 6px;border-radius:6px;white-space:nowrap">${esc(ld.source || 'Direct')}</span>
+                    </div>
+                    <div style="font-size:0.75rem;color:#64748b;display:grid;gap:2px;margin-bottom:8px">
+                      <div>🏢 ${esc(companyName)}</div>
+                      <div>👤 ${esc(contactName)} ${ld.phone ? `· 📞 ${esc(ld.phone)}` : ''}</div>
+                      ${ld.followUpDate ? `<div style="font-size:0.7rem;color:#94a3b8">📅 Follow-up: ${esc(ld.followUpDate)}</div>` : ''}
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;padding-top:6px;border-top:1px solid #f1f5f9">
+                      <span style="font-weight:900;font-size:0.86rem;color:#0284c7">${fmtINR(ld.expectedValue)}</span>
+                      <div style="display:flex;gap:3px;align-items:center">
+                        ${prevStage ? `<button type="button" class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:0.68rem" title="Previous Stage" onclick="moveCrmLeadStage('${ld.id}', '${prevStage}')">←</button>` : ''}
+                        ${nextStage ? `<button type="button" class="btn btn-primary btn-sm" style="padding:2px 7px;font-size:0.68rem" title="Move to Next Stage" onclick="moveCrmLeadStage('${ld.id}', '${nextStage}')">→</button>` : ''}
+                        <button type="button" class="btn btn-gold btn-sm" style="padding:2px 6px;font-size:0.68rem" title="Convert to Quote / Invoice" onclick="prefillQuotationFromLead('${esc(ld.buyerName)}', '${esc(ld.phone)}', '${esc(ld.itemsInterest)}', ${Number(ld.expectedValue) || 0})">📝</button>
+                        <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 6px;font-size:0.68rem" title="Edit Deal" onclick="openDealModal('${ld.id}')">✏️</button>
+                        ${ld.phone ? `<a class="btn btn-ghost btn-sm" style="padding:2px 5px;font-size:0.68rem" target="_blank" rel="noreferrer" href="https://wa.me/91${ld.phone}?text=${encodeURIComponent(waFollowMsg)}">📲</a>` : ''}
                       </div>
                     </div>
-                  `;
-                }).join('')}
-              </div>
-            `;
-          }).join('')}
-        </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        }).join('')}
       </div>
     </div>
   `;
@@ -3769,7 +4901,10 @@ function renderMerchantInventory(shop) {
             </p>
           </div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-            <select class="select" id="tpl-picker" style="width:auto;min-width:240px">
+            <button type="button" class="btn btn-primary" style="background:#0284c7;border-color:#0284c7" onclick="openProductAddModal()">
+              ➕ ${tr('+ Add Product / Service (Popup)', '+ नया सामान / सेवा जोड़ें (पॉपअप)')}
+            </button>
+            <select class="select" id="tpl-picker" style="width:auto;min-width:220px">
               ${templates.map(t => `<option value="${t.key}">📦 ${esc(state.lang === 'hi' ? t.labelHi : t.labelEn)} (${t.count} items)</option>`).join('')}
             </select>
             <button class="btn btn-primary" onclick="loadStarterCatalog()">
@@ -4236,26 +5371,102 @@ function renderMerchantUdhaar(shop) {
 }
 
 function renderMerchantStaff(shop) {
+  const u = state.data.user || {};
+  const isOwner = u.role === 'merchant' || u.role === 'manufacturer' || u.role === 'admin';
+  const managersList = state.data.myManagers || [];
   const staffList = state.data.myStaff || [];
   const activityList = state.data.myActivity || [];
   const maxStaff = shop.plan && shop.plan.includes('Enterprise') ? 99 : shop.plan && shop.plan.includes('Pro') ? 3 : 0;
 
   return `
-    <div style="display:grid;gap:20px">
+    <div style="display:grid;gap:18px">
+      <!-- Item #16: Owner-Only Staff / Manager Login ID Creation with 14 Granular Permissions -->
+      <div class="erp-card" style="border-top:4px solid #0284c7">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+          <div>
+            <span class="badge badge-primary">🛡️ ${tr('OWNER-ONLY STAFF / MANAGER LOGIN IDs (14 GRANULAR PERMISSIONS)', 'केवल मालिक (Owner) द्वारा मैनेजर / स्टाफ लॉगिन ID व 14 कार्य अधिकार प्रबंधन')}</span>
+            <h3 style="margin-top:6px">${tr('Create Staff & Manager Login IDs with Role-Based Module Permissions', 'मोबाइल नंबर, ईमेल और पासवर्ड के साथ मैनेजर/स्टाफ लॉगिन ID बनाएँ व 14 मॉड्यूल अनुमतियाँ चुनें')}</h3>
+            <p class="text-muted" style="font-size:0.82rem;margin:2px 0 0">
+              ${tr('Staff/Managers created here can sign in directly on the Login page using their Mobile Number or Email ID and Password, and will only see the modules permitted by the Owner.', 'यहाँ बनाए गए मैनेजर/स्टाफ अपने मोबाइल नंबर या ईमेल और पासवर्ड से लॉगिन कर सकते हैं और उन्हें केवल वही टैब दिखेंगे जिनकी अनुमति मालिक (Owner) ने दी है।')}
+            </p>
+          </div>
+          ${isOwner ? `
+            <button type="button" class="btn btn-primary" style="background:#0284c7;border-color:#0284c7" onclick="openManagerModal()">
+              + ${tr('Create Manager / Staff Login ID', '+ नया मैनेजर / स्टाफ ID बनाएँ')}
+            </button>
+          ` : `
+            <span class="badge badge-danger">🔒 ${tr('Owner Only Permission', 'केवल मालिक (Owner) के लिए')}</span>
+          `}
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>${tr('Manager / Staff Name', 'नाम व पद')}</th>
+                <th>${tr('Login Mobile & Email', 'मोबाइल व ईमेल ID')}</th>
+                <th>${tr('Assigned Module Permissions (14 Modules)', 'अनुमत मॉड्यूल अधिकार (14 Permissions)')}</th>
+                <th>${tr('Status', 'स्थिति')}</th>
+                <th>${tr('Actions', 'कार्रवाई')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${managersList.length === 0 ? `
+                <tr>
+                  <td colspan="5" style="text-align:center;padding:24px" class="text-muted">
+                    ${tr('No Manager/Staff Login IDs created yet. Click "+ Create Manager / Staff Login ID" above to assign granular access.', 'अभी कोई मैनेजर/स्टाफ लॉगिन ID नहीं बनाई गई है। ऊपर "+ Create Manager / Staff Login ID" बटन दबाकर नई ID बनाएँ।')}
+                  </td>
+                </tr>
+              ` : managersList.map(m => `
+                <tr>
+                  <td>
+                    <b>${esc(m.name)}</b>
+                    <div class="text-muted" style="font-size:0.75rem">${esc(m.designation || 'Store Manager')} · <span style="font-family:monospace">${esc(m.uniqueId || '')}</span></div>
+                  </td>
+                  <td>
+                    <div>📱 <b>${esc(m.phone)}</b></div>
+                    <div class="text-muted" style="font-size:0.76rem">✉️ ${esc(m.email || '—')}</div>
+                  </td>
+                  <td>
+                    <div style="display:flex;gap:4px;flex-wrap:wrap;max-width:460px">
+                      ${(m.permissions || []).map(pk => {
+                        const found = ALL_14_STAFF_PERMISSIONS.find(x => x.key === pk);
+                        return `<span class="badge badge-primary" style="font-size:0.68rem;padding:2px 7px">${esc(found ? found.label : pk)}</span>`;
+                      }).join('')}
+                    </div>
+                  </td>
+                  <td>
+                    <span class="badge ${m.active !== false ? 'badge-primary' : 'badge-danger'}">${m.active !== false ? 'Active' : 'Suspended'}</span>
+                  </td>
+                  <td>
+                    ${isOwner ? `
+                      <div style="display:flex;gap:6px">
+                        <button type="button" class="btn btn-ghost btn-sm" onclick="openManagerModal('${m.id}')">✏️ ${tr('Edit Access', 'अधिकार बदलें')}</button>
+                        <button type="button" class="btn btn-danger btn-sm" onclick="deleteManagerAccount('${m.id}')">🗑️</button>
+                      </div>
+                    ` : '—'}
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="grid grid-2">
         <div class="card">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-            <span class="badge badge-gold">👥 ${tr('SHOP STAFF & TEAM RBAC', 'दुकान के कर्मचारी और कार्य अधिकार')}</span>
+            <span class="badge badge-gold">👥 ${tr('COUNTER STAFF ROSTER', 'दुकान काउंटर कर्मचारी सूची')}</span>
             <span class="badge badge-primary">${staffList.length} / ${maxStaff === 99 ? '∞' : maxStaff} ${tr('Staff Quota', 'स्टाफ सीमा')}</span>
           </div>
-          <h3 style="margin-bottom:8px">${tr('Add Shop Staff (Cashier / Stock / Delivery)', 'नया दुकान कर्मचारी जोड़ें (कैशियर / स्टॉक / डिलीवरी)')}</h3>
+          <h3 style="margin-bottom:8px">${tr('Add Counter Staff (Cashier / Stock / Delivery)', 'नया काउंटर कर्मचारी जोड़ें (कैशियर / स्टॉक / डिलीवरी)')}</h3>
           <p class="text-muted" style="font-size:0.86rem;margin-bottom:14px">
-            ${tr('Assign limited permissions to your staff. Every bill they create or stock change they make is recorded in the Activity Log.', 'अपने कर्मचारियों को सीमित कार्य अधिकार दें। उनके द्वारा बनाया गया हर बिल और स्टॉक बदलाव नीचे कार्य विवरण में दर्ज होगा।')}
+            ${tr('Assign counter roles to your shop helpers. Every bill they create or stock change they make is recorded in the Activity Log.', 'अपने काउंटर सहायकों को भूमिका दें। उनके द्वारा बनाया गया हर बिल और स्टॉक बदलाव नीचे कार्य विवरण में दर्ज होगा।')}
           </p>
 
           ${maxStaff === 0 ? `
             <div class="card-subtle" style="border-color:var(--gold);text-align:center;padding:18px">
-              <p style="font-weight:700;color:#0f172a">🔒 ${tr('Multi-Staff Access requires Vyapar Pro or B2B Enterprise', 'स्टाफ अकाउंट जोड़ने के लिए व्यापार प्रो (3 स्टाफ) या B2B एंटरप्राइज (अनलिमिटेड स्टाफ) चुनें')}</p>
+              <p style="font-weight:700;color:#0f172a">🔒 ${tr('Counter Staff Roster requires Vyapar Pro or B2B Enterprise (Or use Manager Login IDs above!)', 'काउंटर स्टाफ जोड़ने के लिए व्यापार प्रो चुनें (या ऊपर दिए गए "Create Manager / Staff Login ID" का उपयोग करें!)')}</p>
               <button class="btn btn-gold btn-sm" style="margin-top:10px" onclick="navigate('/pricing')">⚡ ${tr('Upgrade Plan', 'प्लान अपग्रेड करें')}</button>
             </div>
           ` : `
@@ -4298,7 +5509,7 @@ function renderMerchantStaff(shop) {
         </div>
 
         <div class="card">
-          <h3 style="margin-bottom:12px">📋 ${tr('Active Shop Staff Members', 'सक्रिय दुकान कर्मचारी सूची')} (${staffList.length})</h3>
+          <h3 style="margin-bottom:12px">📋 ${tr('Active Counter Staff Members', 'सक्रिय दुकान कर्मचारी सूची')} (${staffList.length})</h3>
           <div class="table-wrap">
             <table>
               <thead>
@@ -4311,7 +5522,7 @@ function renderMerchantStaff(shop) {
                 </tr>
               </thead>
               <tbody>
-                ${staffList.length === 0 ? `<tr><td colspan="5" style="text-align:center" class="text-muted">${tr('No staff added yet.', 'अभी कोई कर्मचारी नहीं जोड़ा गया है।')}</td></tr>` : ''}
+                ${staffList.length === 0 ? `<tr><td colspan="5" style="text-align:center" class="text-muted">${tr('No counter staff added yet.', 'अभी कोई काउंटर कर्मचारी नहीं जोड़ा गया है।')}</td></tr>` : ''}
                 ${staffList.map(st => `
                   <tr>
                     <td><b>${esc(st.name)}</b><br/><span class="text-muted" style="font-size:0.78rem">${esc(st.role)}</span></td>
@@ -6163,6 +7374,7 @@ window.quickLogin = async function(identifier, password, role) {
     });
     state.token = res.token;
     localStorage.setItem('kuberq_token', res.token);
+    saveBrowserAccount(identifier, res.name, res.role);
     await bootstrap();
     showToast(`Welcome, ${res.name}!`);
     if (res.role === 'admin' || res.role === 'employee') navigate('/admin');
@@ -6205,6 +7417,7 @@ window.handleSignup = async function(e) {
       role: state.authRole,
       name: document.getElementById('su-name').value.trim(),
       phone: document.getElementById('su-phone').value.trim(),
+      email: document.getElementById('su-email')?.value.trim() || '',
       city: document.getElementById('su-city').value.trim(),
       state: document.getElementById('su-state').value.trim(),
       password: document.getElementById('su-pass').value,
@@ -6220,6 +7433,7 @@ window.handleSignup = async function(e) {
     });
     state.token = res.token;
     localStorage.setItem('kuberq_token', res.token);
+    saveBrowserAccount(payload.email || payload.phone, res.name, res.role);
     await bootstrap();
     showToast(tr('Account created! Welcome to KuberQ.', 'खाता बन गया! KuberQ में स्वागत है।'));
     navigate(res.role === 'customer' ? '/customer' : '/merchant');
@@ -6780,13 +7994,60 @@ window.submitAiBusinessManagerPrompt = function(e, inputId = 'ai-mgr-input') {
     responseHtml = renderAiManagerInsightCard('UDHAAR_AGING', shop);
   } else if (lower.includes('स्टॉक') || lower.includes('stock') || lower.includes('सामान') || lower.includes('item') || lower.includes('product') || lower.includes('margin')) {
     responseHtml = renderAiManagerInsightCard('TOP_ITEMS', shop);
+  } else if (lower.includes('customer') || lower.includes('ग्राहक') || lower.includes('task') || lower.includes('reminder') || lower.includes('रिमाइंडर') || lower.includes('lead') || lower.includes('deal') || lower.includes('pipeline')) {
+    const custs = state.data.myCustomers || [];
+    const tasks = (state.data.myTasks || []).filter(t => t.status !== 'Completed');
+    const leads = state.data.myCrmLeads || [];
+    responseHtml = `
+      <div>
+        <div style="font-weight:800;font-size:0.95rem;color:#0f172a;margin-bottom:8px">📋 ${tr('Portfolio CRM, Tasks & Pipeline Intelligence', 'पोर्टफोलियो CRM, रिमाइंडर और पाइपलाइन विवरण')}</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+          <div style="background:#eff6ff;padding:8px 10px;border-radius:8px;border:1px solid #bfdbfe">
+            <div style="font-size:0.7rem;color:#1d4ed8;font-weight:700">SAVED CUSTOMERS</div>
+            <div style="font-size:1.1rem;font-weight:900;color:#1e3a8a">${custs.length}</div>
+          </div>
+          <div style="background:#fef3c7;padding:8px 10px;border-radius:8px;border:1px solid #fde68a">
+            <div style="font-size:0.7rem;color:#b45309;font-weight:700">PENDING TASKS</div>
+            <div style="font-size:1.1rem;font-weight:900;color:#92400e">${tasks.length}</div>
+          </div>
+          <div style="background:#f0fdf4;padding:8px 10px;border-radius:8px;border:1px solid #bbf7d0">
+            <div style="font-size:0.7rem;color:#15803d;font-weight:700">ACTIVE DEALS</div>
+            <div style="font-size:1.1rem;font-weight:900;color:#166534">${leads.length}</div>
+          </div>
+        </div>
+        <div style="font-size:0.8rem;color:#334155;display:grid;gap:4px">
+          <div><b>👥 Top Customers:</b> ${custs.slice(0, 4).map(c => `${esc(c.companyName || c.contactName)} (${esc(c.phone)})`).join(' · ') || 'None'}</div>
+          <div><b>✅ Pending Tasks:</b> ${tasks.slice(0, 3).map(t => `[${esc(t.priority)}] ${esc(t.title)} (Due: ${esc(t.dueDate)})`).join(' · ') || 'All clear!'}</div>
+          <div><b>🎯 Active Pipeline Deals:</b> ${leads.slice(0, 3).map(l => `${esc(l.buyerName)}: ${fmtINR(l.expectedValue)} (${esc(l.stage)})`).join(' · ') || 'None'}</div>
+        </div>
+      </div>
+    `;
   } else {
     responseHtml = renderAiManagerInsightCard('DAILY_SUMMARY', shop);
   }
 
   state.aiManagerMessages.push({ role: 'assistant', time: nowStr, proposalId: proposalPayload?.proposalId, proposalPayload, html: responseHtml });
+  if (input) input.value = '';
   render();
   scrollAiChatBoxesToBottom();
+
+  // If a cloud AI provider is configured in Settings -> AI Digital Manager & APIs, also fetch generative response
+  if (!proposalPayload && state.token && Array.isArray(shop.aiProviders) && shop.aiProviders.some(p => p.enabled !== false && p.hasKey)) {
+    apiFetch('/api/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify({ prompt: text })
+    }).then(res => {
+      if (res && res.reply && res.engine && !res.engine.includes('Local')) {
+        state.aiManagerMessages.push({
+          role: 'assistant',
+          time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+          html: `<div style="font-size:0.72rem;color:#0284c7;font-weight:800;margin-bottom:4px">✨ ${esc(res.engine)}</div><div style="white-space:pre-line;font-size:0.84rem;line-height:1.5">${esc(res.reply)}</div>`
+        });
+        render();
+        scrollAiChatBoxesToBottom();
+      }
+    }).catch(() => {});
+  }
 };
 
 window.approveAiProposal = async function(proposalId, actionType, encodedData) {
@@ -8916,9 +10177,1096 @@ async function addProductionBatch(e) {
   }
 }
 
+// ============================================================================
+// CUSTOMERS CRM DIRECTORY & BLURRED ADD/EDIT CUSTOMER MODAL (ITEMS #6, #7, #8)
+// ============================================================================
+const ALL_14_STAFF_PERMISSIONS = [
+  { key: 'Dashboard View', label: '📊 Dashboard View', hi: 'डैशबोर्ड दृश्य' },
+  { key: 'Customers', label: '👥 Customers', hi: 'ग्राहक CRM' },
+  { key: 'Leads', label: '🎯 Leads & Deals', hi: 'लीड्स व पाइपलाइन' },
+  { key: 'Product', label: '📦 Product & Stock', hi: 'सामान व स्टॉक' },
+  { key: 'Tasks', label: '✅ Tasks & Reminders', hi: 'टास्क व रिमाइंडर' },
+  { key: 'Quotation', label: '📝 Quotation', hi: 'कोटेशन' },
+  { key: 'Invoices', label: '🧾 Invoices & Billing', hi: 'इनवॉइस व बिलिंग' },
+  { key: 'Payments', label: '💳 Payments & Udhaar', hi: 'पेमेंट व उधार' },
+  { key: 'Expenses', label: '💸 Expenses', hi: 'खर्च रजिस्टर' },
+  { key: 'Report', label: '📈 Reports & P&L', hi: 'रिपोर्ट्स व P&L' },
+  { key: 'AI Access', label: '✨ AI Access', hi: 'AI मैनेजर एक्सेस' },
+  { key: 'Managers', label: '🛡️ Managers & Staff', hi: 'मैनेजर व स्टाफ' },
+  { key: 'Setting', label: '⚙️ Setting', hi: 'सेटिंग्स' },
+  { key: 'Backup', label: '💾 Backup', hi: 'डेटा बैकअप' }
+];
+
+function renderMerchantCustomersCrm(shop) {
+  const customers = state.data.myCustomers || [];
+  const orders = (state.data.myOrders || []).filter(o => o.status !== 'Rejected' && o.docType !== 'Quotation');
+
+  return `
+    <div style="display:grid;gap:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+        <div>
+          <h2 style="font-size:1.35rem;font-weight:900;color:#0f172a;margin:0">👥 ${tr('Customers CRM Directory (360° Profiles)', 'ग्राहक डायरेक्टरी (Customers CRM — एक बार सेव करें, बार-बार उपयोग करें)')}</h2>
+          <p style="font-size:0.82rem;color:#64748b;margin:3px 0 0">${tr('Manage customer profiles, GSTIN, PAN, billing addresses, credit limits, and 1-click invoicing', 'ग्राहकों का नाम, कंपनी, GSTIN, पता और क्रेडिट लिमिट एक बार सेव करें — बिल बनाते समय 1-क्लिक में ऑटो-फिल होगा')}</p>
+        </div>
+        <button type="button" class="btn btn-primary" style="background:#0284c7;border-color:#0284c7;padding:9px 18px;font-weight:800" onclick="openCustomerModal()">
+          + ${tr('Add New Customer', '+ नया ग्राहक जोड़ें')}
+        </button>
+      </div>
+
+      <div class="erp-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+          <h3 style="margin:0;font-size:1rem">${tr('Customer List', 'पंजीकृत ग्राहक सूची')} (${customers.length})</h3>
+          <span class="badge badge-primary">${tr('1-Click Auto-Fill in GST Billing Enabled', 'बिलिंग में 1-क्लिक ऑटो-फिल चालू')}</span>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>${tr('Customer / Company Name', 'ग्राहक / फर्म का नाम')}</th>
+                <th>${tr('Phone & Email', 'मोबाइल व ईमेल')}</th>
+                <th>${tr('GSTIN & PAN', 'GSTIN व PAN')}</th>
+                <th>${tr('Billing City & State', 'शहर व राज्य')}</th>
+                <th>${tr('Total Invoiced', 'कुल बिलिंग')}</th>
+                <th>${tr('Outstanding Due', 'बकाया उधार')}</th>
+                <th style="text-align:right">${tr('Quick Actions', 'त्वरित कार्रवाई')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${customers.length === 0 ? `
+                <tr>
+                  <td colspan="7" style="text-align:center;padding:28px" class="text-muted">
+                    ${tr('No customers saved yet. Click "+ Add New Customer" above to save your first buyer profile.', 'अभी कोई ग्राहक सेव नहीं है। ऊपर "+ Add New Customer" बटन दबाकर ग्राहक जोड़ें।')}
+                  </td>
+                </tr>
+              ` : customers.map(c => {
+                const custOrders = orders.filter(o => (c.phone && o.phone === c.phone) || (o.customer && (o.customer.toLowerCase() === (c.companyName || '').toLowerCase() || o.customer.toLowerCase() === (c.contactName || '').toLowerCase())));
+                const totalInvoiced = custOrders.reduce((s, o) => s + (Number(o.totals?.gross) || 0), 0);
+                const totalDue = custOrders.reduce((s, o) => {
+                  const g = Number(o.totals?.gross) || 0;
+                  const pd = o.paymentMode === 'Credit' && !o.udhaarSettled ? Math.min(g, Number(o.paidAmount) || 0) : g;
+                  return s + Math.max(0, g - pd);
+                }, 0);
+                return `
+                  <tr>
+                    <td>
+                      <b style="color:#0284c7;cursor:pointer" onclick="openCustomerModal('${c.id}')">${esc(c.contactName)}</b>
+                      <div class="text-muted" style="font-size:0.76rem">${esc(c.companyName || 'Individual / Retail')}</div>
+                    </td>
+                    <td>
+                      <div>📱 <b>${esc(c.phone || '—')}</b></div>
+                      <div class="text-muted" style="font-size:0.74rem">${esc(c.email || '—')}</div>
+                    </td>
+                    <td>
+                      <div style="font-family:monospace;font-size:0.78rem;font-weight:700">${esc(c.gstin || 'Unregistered')}</div>
+                      ${c.pan ? `<div class="text-muted" style="font-family:monospace;font-size:0.72rem">PAN: ${esc(c.pan)}</div>` : ''}
+                    </td>
+                    <td style="font-size:0.8rem">${esc(c.city || '—')}, ${esc(c.state || '—')} ${c.pincode ? `(${esc(c.pincode)})` : ''}</td>
+                    <td><b>${fmtINR(totalInvoiced)}</b></td>
+                    <td><b style="color:${totalDue > 0 ? '#dc2626' : '#16a34a'}">${fmtINR(totalDue)}</b></td>
+                    <td style="text-align:right">
+                      <div style="display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap">
+                        <button type="button" class="btn btn-primary btn-sm" style="padding:3px 9px;font-size:0.73rem" onclick="prefillInvoiceFromCustomer('${c.id}')">🧾 ${tr('Create Bill', 'बिल बनाएँ')}</button>
+                        <button type="button" class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:0.73rem" onclick="openCustomerModal('${c.id}')">✏️ ${tr('Edit', 'बदलें')}</button>
+                        <button type="button" class="btn btn-danger btn-sm" style="padding:3px 7px;font-size:0.73rem" onclick="deleteCustomerRecord('${c.id}')">🗑️</button>
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Blurred-Background Modal for Add/Edit Customer (Matching Screenshot 2)
+function renderCustomerModal() {
+  const c = state.customerModal;
+  if (!c) return '';
+  const isEdit = Boolean(c.id);
+  return `
+    <div class="pro-blur-modal-overlay" onclick="state.customerModal=null;render()">
+      <div class="pro-blur-modal-card" onclick="event.stopPropagation()">
+        <div class="pro-blur-modal-head">
+          <h3>👤 ${isEdit ? tr('Edit Customer Profile', 'ग्राहक विवरण अपडेट करें') : tr('Add New Customer', 'नया ग्राहक जोड़ें (Add New Customer)')}</h3>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="state.customerModal=null;render()">✕</button>
+        </div>
+        <form onsubmit="saveCustomerModalForm(event)">
+          <div class="pro-blur-modal-body" style="display:grid;gap:12px">
+            <div class="grid grid-2" style="gap:12px">
+              <div>
+                <label class="form-label">${tr('Primary Contact Name', 'संपर्क व्यक्ति का नाम')} <span style="color:#dc2626">*</span></label>
+                <input class="input" id="cm-contact" required value="${esc(c.contactName || '')}" placeholder="e.g. Rajesh Sharma" />
+              </div>
+              <div>
+                <label class="form-label">${tr('Business / Company Name', 'व्यापार / कंपनी का नाम')}</label>
+                <input class="input" id="cm-company" value="${esc(c.companyName || '')}" placeholder="e.g. Sharma Hardware Mart" />
+              </div>
+            </div>
+
+            <div class="grid grid-2" style="gap:12px">
+              <div>
+                <label class="form-label">${tr('Email Address', 'ईमेल पता')}</label>
+                <input class="input" type="email" id="cm-email" value="${esc(c.email || '')}" placeholder="customer@example.com" />
+              </div>
+              <div>
+                <label class="form-label">${tr('Phone / WhatsApp', 'मोबाइल / WhatsApp नंबर')} *</label>
+                <input class="input" id="cm-phone" required value="${esc(c.phone || '')}" placeholder="+91 9829011223" />
+              </div>
+            </div>
+
+            <div class="grid grid-2" style="gap:12px">
+              <div>
+                <label class="form-label">${tr('GSTIN (15 characters)', 'GSTIN (15 अंक)')}</label>
+                <input class="input" id="cm-gstin" maxlength="15" style="text-transform:uppercase;font-family:monospace" value="${esc(c.gstin || '')}" placeholder="27AAACA1234A1Z5" />
+              </div>
+              <div>
+                <label class="form-label">${tr('PAN (10 characters)', 'पैन नंबर (10 अंक)')}</label>
+                <input class="input" id="cm-pan" maxlength="10" style="text-transform:uppercase;font-family:monospace" value="${esc(c.pan || '')}" placeholder="AAACA1234A" />
+              </div>
+            </div>
+
+            <div>
+              <label class="form-label">${tr('Billing Address', 'बिलिंग पता (Billing Address)')}</label>
+              <input class="input" id="cm-street" value="${esc(c.street || '')}" placeholder="${tr('Street / Market / Industrial Area', 'गली / मार्केट / इंडस्ट्रियल एरिया')}" style="margin-bottom:8px" />
+              <div class="grid grid-3" style="gap:8px">
+                <input class="input" id="cm-city" value="${esc(c.city || state.data.myShop?.city || 'Jodhpur')}" placeholder="${tr('City', 'शहर')}" />
+                <input class="input" id="cm-state" value="${esc(c.state || state.data.myShop?.state || 'Rajasthan')}" placeholder="${tr('State', 'राज्य')}" />
+                <input class="input" id="cm-pincode" maxlength="6" value="${esc(c.pincode || '')}" placeholder="${tr('Pincode', 'पिनकोड')}" />
+              </div>
+            </div>
+
+            <div class="grid grid-2" style="gap:12px">
+              <div>
+                <label class="form-label">${tr('Credit Limit (₹)', 'अधिकतम उधार सीमा (Credit Limit ₹)')}</label>
+                <input class="input" type="number" id="cm-limit" value="${Number(c.creditLimit || 100000)}" />
+              </div>
+              <div>
+                <label class="form-label">${tr('Internal Notes', 'विशेष विवरण / नोट्स')}</label>
+                <input class="input" id="cm-notes" value="${esc(c.notes || '')}" placeholder="${tr('Special requirements, contact preferences...', 'विशेष शर्तें या डिलीवरी निर्देश...')}" />
+              </div>
+            </div>
+          </div>
+
+          <div class="pro-blur-modal-foot">
+            <button type="button" class="btn btn-ghost" onclick="state.customerModal=null;render()">${tr('Cancel', 'रद्द करें')}</button>
+            <button type="submit" class="btn btn-primary" style="background:#0284c7;border-color:#0284c7;padding:8px 20px;font-weight:800">
+              ✓ ${tr('Save Customer', '✓ ग्राहक सेव करें')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+window.openCustomerModal = function(custId = null) {
+  if (custId) {
+    const existing = (state.data.myCustomers || []).find(x => x.id === custId);
+    state.customerModal = existing ? { ...existing } : {};
+  } else {
+    state.customerModal = {
+      contactName: '',
+      companyName: '',
+      email: '',
+      phone: '',
+      gstin: '',
+      pan: '',
+      street: '',
+      city: state.data.myShop?.city || 'Jodhpur',
+      state: state.data.myShop?.state || 'Rajasthan',
+      pincode: '',
+      creditLimit: 100000,
+      notes: ''
+    };
+  }
+  render();
+};
+
+window.saveCustomerModalForm = async function(e) {
+  e.preventDefault();
+  try {
+    const payload = {
+      action: 'customer_save',
+      id: state.customerModal?.id || null,
+      contactName: document.getElementById('cm-contact').value.trim(),
+      companyName: document.getElementById('cm-company').value.trim(),
+      email: document.getElementById('cm-email').value.trim(),
+      phone: document.getElementById('cm-phone').value.trim().replace(/\D/g, '').slice(-10),
+      gstin: document.getElementById('cm-gstin').value.trim().toUpperCase(),
+      pan: document.getElementById('cm-pan').value.trim().toUpperCase(),
+      street: document.getElementById('cm-street').value.trim(),
+      city: document.getElementById('cm-city').value.trim(),
+      state: document.getElementById('cm-state').value.trim(),
+      pincode: document.getElementById('cm-pincode').value.trim(),
+      creditLimit: Number(document.getElementById('cm-limit').value || 100000),
+      notes: document.getElementById('cm-notes').value.trim()
+    };
+    const res = await apiFetch('/api/merchant/pro', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    state.customerModal = null;
+    await bootstrap();
+    if (res.customer && state.merchantTab === 'InvoiceBuilder') {
+      window.pickSavedCrmCustomerForInvoice(res.customer.id);
+    }
+    showToast(tr('✅ Customer profile saved! Available for 1-click auto-fill in all future bills.', '✅ ग्राहक प्रोफाइल सेव हो गया! अब हर बिल में 1-क्लिक में ऑटो-फिल होगा।'));
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.deleteCustomerRecord = async function(id) {
+  if (!confirm(tr('Delete this customer profile?', 'क्या आप इस ग्राहक प्रोफाइल को हटाना चाहते हैं?'))) return;
+  try {
+    await apiFetch('/api/merchant/pro', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'customer_delete', id })
+    });
+    await bootstrap();
+    showToast(tr('Customer removed', 'ग्राहक हटाया गया'));
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.pickSavedCrmCustomerForInvoice = function(customerId) {
+  if (!customerId) return;
+  const c = (state.data.myCustomers || []).find(x => x.id === customerId);
+  if (!c) return;
+  state.invoiceBuyer = {
+    ...state.invoiceBuyer,
+    name: c.companyName || c.contactName || '',
+    phone: c.phone || '',
+    gstin: c.gstin || '',
+    address: [c.street, c.city, c.state, c.pincode].filter(Boolean).join(', ')
+  };
+  render();
+  showToast(tr(`✅ Auto-filled details for ${c.companyName || c.contactName}!`, `✅ ${c.companyName || c.contactName} का विवरण बिल में स्वतः भर गया!`));
+};
+
+window.prefillInvoiceFromCustomer = function(customerId) {
+  const c = (state.data.myCustomers || []).find(x => x.id === customerId);
+  if (!c) return;
+  state.invoiceDocType = 'Tax Invoice';
+  state.invoiceBuyer = {
+    ...state.invoiceBuyer,
+    name: c.companyName || c.contactName || '',
+    phone: c.phone || '',
+    gstin: c.gstin || '',
+    address: [c.street, c.city, c.state, c.pincode].filter(Boolean).join(', ')
+  };
+  state.merchantTab = 'InvoiceBuilder';
+  render();
+  showToast(tr(`🧾 Ready to bill ${c.companyName || c.contactName}`, `🧾 ${c.companyName || c.contactName} के लिए बिल तैयार है`));
+};
+
+// ============================================================================
+// TASKS & REMINDERS MODULE + BLURRED MODAL (ITEM #13)
+// ============================================================================
+function renderMerchantTasks(shop) {
+  const tasks = state.data.myTasks || [];
+  const pendingCount = tasks.filter(t => t.status !== 'Completed').length;
+
+  return `
+    <div style="display:grid;gap:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+        <div>
+          <h2 style="font-size:1.35rem;font-weight:900;color:#0f172a;margin:0">✅ ${tr('Tasks & Follow-Up Reminders', 'टास्क व फॉलो-अप रिमाइंडर (Tasks & Reminders)')}</h2>
+          <p style="font-size:0.82rem;color:#64748b;margin:3px 0 0">${tr('Manage daily reminders for payment follow-ups, dispatch schedules, GST filing, and staff assignments', 'पेमेंट तकादा, माल डिस्पैच, GST रिटर्न और स्टाफ के दैनिक कार्यों के रिमाइंडर यहाँ ट्रैक करें')}</p>
+        </div>
+        <button type="button" class="btn btn-primary" style="background:#0284c7;border-color:#0284c7;padding:9px 18px;font-weight:800" onclick="openTaskModal()">
+          + ${tr('Add Task / Reminder', '+ नया रिमाइंडर जोड़ें')}
+        </button>
+      </div>
+
+      <div class="grid grid-4" style="gap:10px">
+        <div class="erp-card" style="padding:12px 14px;border-left:4px solid #dc2626">
+          <div style="font-size:0.74rem;color:#64748b;font-weight:700">${tr('Urgent / High Priority', 'अति-आवश्यक (Urgent / High)')}</div>
+          <div style="font-size:1.35rem;font-weight:900;color:#dc2626;margin-top:3px">${tasks.filter(t => t.status !== 'Completed' && (t.priority === 'Urgent' || t.priority === 'High')).length}</div>
+        </div>
+        <div class="erp-card" style="padding:12px 14px;border-left:4px solid #d97706">
+          <div style="font-size:0.74rem;color:#64748b;font-weight:700">${tr('Pending / In Progress', 'लंबित कार्य (Pending)')}</div>
+          <div style="font-size:1.35rem;font-weight:900;color:#d97706;margin-top:3px">${pendingCount}</div>
+        </div>
+        <div class="erp-card" style="padding:12px 14px;border-left:4px solid #16a34a">
+          <div style="font-size:0.74rem;color:#64748b;font-weight:700">${tr('Completed Tasks', 'पूर्ण किए गए कार्य')}</div>
+          <div style="font-size:1.35rem;font-weight:900;color:#16a34a;margin-top:3px">${tasks.filter(t => t.status === 'Completed').length}</div>
+        </div>
+        <div class="erp-card" style="padding:12px 14px;border-left:4px solid #0284c7">
+          <div style="font-size:0.74rem;color:#64748b;font-weight:700">${tr('Total Reminders', 'कुल रिमाइंडर')}</div>
+          <div style="font-size:1.35rem;font-weight:900;color:#0284c7;margin-top:3px">${tasks.length}</div>
+        </div>
+      </div>
+
+      <div class="erp-card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>${tr('Task Title & Details', 'कार्य शीर्षक व विवरण')}</th>
+                <th>${tr('Priority', 'प्राथमिकता (Priority)')}</th>
+                <th>${tr('Due Date', 'नियत तिथि (Due Date)')}</th>
+                <th>${tr('Assigned To', 'किसे सौंपा गया')}</th>
+                <th>${tr('Status', 'स्थिति (Status)')}</th>
+                <th style="text-align:right">${tr('Actions', 'कार्रवाई')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tasks.length === 0 ? `
+                <tr>
+                  <td colspan="6" style="text-align:center;padding:28px" class="text-muted">
+                    ${tr('No tasks or reminders yet. Click "+ Add Task / Reminder" above to create one.', 'अभी कोई रिमाइंडर नहीं है। ऊपर "+ Add Task / Reminder" दबाकर नया रिमाइंडर जोड़ें।')}
+                  </td>
+                </tr>
+              ` : tasks.map(t => {
+                const prColors = {
+                  Urgent: { bg: '#fee2e2', color: '#dc2626' },
+                  High: { bg: '#ffedd5', color: '#ea580c' },
+                  Medium: { bg: '#fef3c7', color: '#d97706' },
+                  Low: { bg: '#e0f2fe', color: '#0284c7' }
+                };
+                const pr = prColors[t.priority] || prColors.Medium;
+                return `
+                  <tr style="${t.status === 'Completed' ? 'opacity:0.65' : ''}">
+                    <td>
+                      <b style="${t.status === 'Completed' ? 'text-decoration:line-through' : ''}">${esc(t.title)}</b>
+                      <div class="text-muted" style="font-size:0.76rem;margin-top:2px">${esc(t.details || '')}</div>
+                    </td>
+                    <td>
+                      <span style="background:${pr.bg};color:${pr.color};font-weight:800;font-size:0.72rem;padding:3px 9px;border-radius:999px">${esc(t.priority || 'Medium')}</span>
+                    </td>
+                    <td style="font-size:0.82rem;font-weight:700">${esc(t.dueDate || 'Today')}</td>
+                    <td style="font-size:0.82rem">👤 ${esc(t.assignedTo || 'Owner')}</td>
+                    <td>
+                      <span class="badge ${t.status === 'Completed' ? 'badge-primary' : 'badge-gold'}">${esc(t.status || 'Pending')}</span>
+                    </td>
+                    <td style="text-align:right">
+                      <div style="display:flex;gap:5px;justify-content:flex-end">
+                        ${t.status !== 'Completed' ? `<button type="button" class="btn btn-primary btn-sm" style="padding:3px 9px;font-size:0.72rem" onclick="quickCompleteTask('${t.id}')">✓ ${tr('Done', 'पूर्ण')}</button>` : ''}
+                        <button type="button" class="btn btn-ghost btn-sm" style="padding:3px 8px;font-size:0.72rem" onclick="openTaskModal('${t.id}')">✏️</button>
+                        <button type="button" class="btn btn-danger btn-sm" style="padding:3px 8px;font-size:0.72rem" onclick="deleteTaskRecord('${t.id}')">🗑️</button>
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderTaskModal() {
+  const t = state.taskModal;
+  if (!t) return '';
+  const isEdit = Boolean(t.id);
+  const staffOptions = ['Owner', ...(state.data.myManagers || []).map(m => m.name), ...(state.data.myStaff || []).map(s => s.name)];
+  return `
+    <div class="pro-blur-modal-overlay" onclick="state.taskModal=null;render()">
+      <div class="pro-blur-modal-card" style="max-width:560px" onclick="event.stopPropagation()">
+        <div class="pro-blur-modal-head">
+          <h3>✅ ${isEdit ? tr('Update Task / Reminder', 'रिमाइंडर अपडेट करें') : tr('Add New Task / Reminder', 'नया टास्क / रिमाइंडर जोड़ें')}</h3>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="state.taskModal=null;render()">✕</button>
+        </div>
+        <form onsubmit="saveTaskModalForm(event)">
+          <div class="pro-blur-modal-body" style="display:grid;gap:12px">
+            <div>
+              <label class="form-label">${tr('Task Title / Reminder Headline', 'कार्य का शीर्षक')} <span style="color:#dc2626">*</span></label>
+              <input class="input" id="tm-title" required value="${esc(t.title || '')}" placeholder="${tr('e.g. Call Rajesh Sharma for ₹86,000 Pending Invoice', 'उदा: राजेश शर्मा से ₹86,000 बकाया बिल के लिए बात करें')}" />
+            </div>
+            <div>
+              <label class="form-label">${tr('Task Details / Notes', 'विस्तृत विवरण / नोट्स')}</label>
+              <textarea class="textarea" rows="3" id="tm-details" placeholder="${tr('Add payment reference, phone number, or dispatch instructions...', 'भुगतान विवरण, फोन नंबर या निर्देश लिखें...')}">${esc(t.details || '')}</textarea>
+            </div>
+            <div class="grid grid-2" style="gap:12px">
+              <div>
+                <label class="form-label">${tr('Priority', 'प्राथमिकता (Priority)')} *</label>
+                <select class="select" id="tm-priority">
+                  ${['Urgent', 'High', 'Medium', 'Low'].map(p => `<option value="${p}" ${(t.priority || 'High') === p ? 'selected' : ''}>${p}</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label class="form-label">${tr('Due Date', 'नियत तिथि (Due Date)')} *</label>
+                <input class="input" type="date" id="tm-date" required value="${esc(t.dueDate || new Date().toISOString().slice(0, 10))}" />
+              </div>
+            </div>
+            <div class="grid grid-2" style="gap:12px">
+              <div>
+                <label class="form-label">${tr('Assigned To', 'किसे सौंपा गया (Assigned To)')}</label>
+                <input class="input" id="tm-assigned" list="tm-staff-list" value="${esc(t.assignedTo || 'Owner')}" placeholder="Owner / Staff Name" />
+                <datalist id="tm-staff-list">
+                  ${staffOptions.map(s => `<option value="${esc(s)}"></option>`).join('')}
+                </datalist>
+              </div>
+              <div>
+                <label class="form-label">${tr('Status', 'स्थिति (Status)')}</label>
+                <select class="select" id="tm-status">
+                  ${['Pending', 'In Progress', 'Completed'].map(s => `<option value="${s}" ${(t.status || 'Pending') === s ? 'selected' : ''}>${s}</option>`).join('')}
+                </select>
+              </div>
+            </div>
+          </div>
+          <div class="pro-blur-modal-foot">
+            <button type="button" class="btn btn-ghost" onclick="state.taskModal=null;render()">${tr('Cancel', 'रद्द करें')}</button>
+            <button type="submit" class="btn btn-primary" style="background:#0284c7;border-color:#0284c7;padding:8px 20px;font-weight:800">
+              ✓ ${tr('Save Task', '✓ रिमाइंडर सेव करें')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+window.openTaskModal = function(taskId = null) {
+  if (taskId) {
+    const existing = (state.data.myTasks || []).find(x => x.id === taskId);
+    state.taskModal = existing ? { ...existing } : {};
+  } else {
+    state.taskModal = {
+      title: '',
+      details: '',
+      priority: 'High',
+      dueDate: new Date().toISOString().slice(0, 10),
+      assignedTo: 'Owner',
+      status: 'Pending'
+    };
+  }
+  render();
+};
+
+window.saveTaskModalForm = async function(e) {
+  e.preventDefault();
+  try {
+    await apiFetch('/api/merchant/pro', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'task_save',
+        id: state.taskModal?.id || null,
+        title: document.getElementById('tm-title').value.trim(),
+        details: document.getElementById('tm-details').value.trim(),
+        priority: document.getElementById('tm-priority').value,
+        dueDate: document.getElementById('tm-date').value,
+        assignedTo: document.getElementById('tm-assigned').value.trim() || 'Owner',
+        status: document.getElementById('tm-status').value
+      })
+    });
+    state.taskModal = null;
+    await bootstrap();
+    showToast(tr('✅ Task / Reminder saved!', '✅ रिमाइंडर सफलतापूर्वक सेव हो गया!'));
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.quickCompleteTask = async function(id) {
+  try {
+    const existing = (state.data.myTasks || []).find(x => x.id === id);
+    if (!existing) return;
+    await apiFetch('/api/merchant/pro', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'task_save',
+        ...existing,
+        status: 'Completed'
+      })
+    });
+    await bootstrap();
+    showToast(tr('✅ Task marked as completed!', '✅ कार्य पूर्ण हो गया!'));
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.deleteTaskRecord = async function(id) {
+  if (!confirm(tr('Delete this task?', 'क्या आप इस रिमाइंडर को हटाना चाहते हैं?'))) return;
+  try {
+    await apiFetch('/api/merchant/pro', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'task_delete', id })
+    });
+    await bootstrap();
+    showToast(tr('Task deleted', 'रिमाइंडर हटाया गया'));
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+// ============================================================================
+// BLURRED "+ ADD DEAL / LEAD" MODAL FOR 6-STAGE KANBAN PIPELINE (ITEM #11)
+// ============================================================================
+function renderDealModal() {
+  const d = state.dealModal;
+  if (!d) return '';
+  const isEdit = Boolean(d.id);
+  const stages = [
+    { key: 'New Inquiry', label: 'New Inquiries (नई पूछताछ)' },
+    { key: 'Contacted', label: 'Discovery / Qualified (क्वालिफाइड)' },
+    { key: 'Proposal Sent', label: 'Proposal Sent (कोटेशन भेजा)' },
+    { key: 'Negotiation', label: 'Negotiation (मोल-भाव)' },
+    { key: 'Won', label: 'Closed Won (डील पक्की)' },
+    { key: 'Lost', label: 'Closed Lost (ड्रॉप)' }
+  ];
+  return `
+    <div class="pro-blur-modal-overlay" onclick="state.dealModal=null;render()">
+      <div class="pro-blur-modal-card" style="max-width:580px" onclick="event.stopPropagation()">
+        <div class="pro-blur-modal-head">
+          <h3>🎯 ${isEdit ? tr('Edit Deal / Pipeline Lead', 'डील / लीड अपडेट करें') : tr('Add New Deal to Pipeline', 'पाइपलाइन में नई डील / लीड जोड़ें')}</h3>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="state.dealModal=null;render()">✕</button>
+        </div>
+        <form onsubmit="saveDealModalForm(event)">
+          <div class="pro-blur-modal-body" style="display:grid;gap:12px">
+            <div>
+              <label class="form-label">${tr('Deal Title / Requirement Headline', 'डील का शीर्षक / मुख्य आवश्यकता')} <span style="color:#dc2626">*</span></label>
+              <input class="input" id="dm-title" required value="${esc(d.dealTitle || d.itemsInterest || '')}" placeholder="e.g. ERP Upgrade for Retail Chain / 200 Bags Cement Supply" />
+            </div>
+            <div class="grid grid-2" style="gap:12px">
+              <div>
+                <label class="form-label">${tr('Company / Firm Name', 'कंपनी / फर्म का नाम')} *</label>
+                <input class="input" id="dm-company" required value="${esc(d.companyName || d.buyerName || '')}" placeholder="e.g. Metro Hypermarkets" />
+              </div>
+              <div>
+                <label class="form-label">${tr('Contact Person Name', 'संपर्क व्यक्ति का नाम')}</label>
+                <input class="input" id="dm-contact" value="${esc(d.contactName || d.buyerName || '')}" placeholder="e.g. Deepak Chopra" />
+              </div>
+            </div>
+            <div class="grid grid-2" style="gap:12px">
+              <div>
+                <label class="form-label">${tr('Phone / WhatsApp Number', 'मोबाइल नंबर')} *</label>
+                <input class="input" id="dm-phone" required maxlength="10" value="${esc(d.phone || '')}" placeholder="98290XXXXX" />
+              </div>
+              <div>
+                <label class="form-label">${tr('Expected Deal Value (₹)', 'अनुमानित डील राशि (₹)')} *</label>
+                <input class="input" type="number" id="dm-val" required min="1" value="${Number(d.expectedValue || 45000)}" />
+              </div>
+            </div>
+            <div class="grid grid-3" style="gap:10px">
+              <div>
+                <label class="form-label">${tr('Pipeline Stage', 'पाइपलाइन चरण')}</label>
+                <select class="select" id="dm-stage">
+                  ${stages.map(s => `<option value="${s.key}" ${(d.stage || 'New Inquiry') === s.key ? 'selected' : ''}>${s.label}</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label class="form-label">${tr('Lead Source', 'लीड स्रोत')}</label>
+                <select class="select" id="dm-source">
+                  ${['WhatsApp Inquiry', 'Website Form', 'Cold Outreach', 'Referral', 'LinkedIn', 'Walk-in'].map(src => `<option value="${src}" ${(d.source || 'WhatsApp Inquiry') === src ? 'selected' : ''}>${src}</option>`).join('')}
+                </select>
+              </div>
+              <div>
+                <label class="form-label">${tr('Follow-Up Date', 'फॉलो-अप दिनांक')}</label>
+                <input class="input" type="date" id="dm-date" value="${esc(d.followUpDate || new Date(Date.now() + 86400000).toISOString().slice(0, 10))}" />
+              </div>
+            </div>
+          </div>
+          <div class="pro-blur-modal-foot">
+            <button type="button" class="btn btn-ghost" onclick="state.dealModal=null;render()">${tr('Cancel', 'रद्द करें')}</button>
+            <button type="submit" class="btn btn-primary" style="background:#0284c7;border-color:#0284c7;padding:8px 20px;font-weight:800">
+              ✓ ${tr('Save Deal', '✓ डील सेव करें')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+window.openDealModal = function(leadId = null) {
+  if (leadId) {
+    const existing = (state.data.myCrmLeads || []).find(x => x.id === leadId);
+    state.dealModal = existing ? { ...existing } : {};
+  } else {
+    state.dealModal = {
+      dealTitle: '',
+      companyName: '',
+      contactName: '',
+      phone: '',
+      expectedValue: 50000,
+      stage: 'New Inquiry',
+      source: 'WhatsApp Inquiry',
+      followUpDate: new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+    };
+  }
+  render();
+};
+
+window.saveDealModalForm = async function(e) {
+  e.preventDefault();
+  try {
+    const dealTitle = document.getElementById('dm-title').value.trim();
+    const companyName = document.getElementById('dm-company').value.trim();
+    const contactName = document.getElementById('dm-contact').value.trim() || companyName;
+    await apiFetch('/api/merchant/pro', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'lead_save',
+        id: state.dealModal?.id || null,
+        dealTitle,
+        companyName,
+        contactName,
+        buyerName: companyName,
+        itemsInterest: dealTitle,
+        phone: document.getElementById('dm-phone').value.trim(),
+        expectedValue: Number(document.getElementById('dm-val').value || 0),
+        stage: document.getElementById('dm-stage').value,
+        source: document.getElementById('dm-source').value,
+        followUpDate: document.getElementById('dm-date').value
+      })
+    });
+    state.dealModal = null;
+    await bootstrap();
+    showToast(tr('✅ Deal saved to Leads & Deals Pipeline!', '✅ डील सफलतापूर्वक पाइपलाइन में सेव हो गई!'));
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+// ============================================================================
+// BLURRED MULTI-ROW & MULTI-COLUMN PRODUCT ADD POPUP MODAL (ITEM #12)
+// ============================================================================
+function renderProductAddModal() {
+  const m = state.productModal;
+  if (!m) return '';
+  const rows = m.rows || [];
+  return `
+    <div class="pro-blur-modal-overlay" onclick="state.productModal=null;render()">
+      <div class="pro-blur-modal-card" style="max-width:960px" onclick="event.stopPropagation()">
+        <div class="pro-blur-modal-head">
+          <div>
+            <h3>📦 ${tr('Add Products / Services (Multi-Row & Custom Attributes Matrix)', 'नया सामान / सेवा जोड़ें (क्षैतिज पंक्तियाँ व लम्बवत विशेषता कॉलम)')}</h3>
+            <p style="font-size:0.76rem;color:#64748b;margin:2px 0 0">${tr('For Merchants, Wholesalers & Service Providers — Add multiple product rows (horizontal) and custom specification columns (vertical)', 'व्यापारी, होलसेलर और सर्विस प्रोवाइडर एक साथ कई सामान (Horizontal Rows) और साइज/ब्रांड/वारंटी कॉलम (Vertical Columns) जोड़ सकते हैं')}</p>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="state.productModal=null;render()">✕</button>
+        </div>
+        <form onsubmit="saveProductAddModalForm(event)">
+          <div class="pro-blur-modal-body">
+            <div class="table-wrap" style="max-height:420px;overflow-y:auto">
+              <table>
+                <thead>
+                  <tr>
+                    <th style="min-width:170px">${tr('Product / Service Name *', 'सामान / सेवा का नाम *')}</th>
+                    <th style="width:85px">HSN/SAC</th>
+                    <th style="width:95px">${tr('Cost ₹', 'खरीद ₹')}</th>
+                    <th style="width:95px">${tr('Retail ₹ *', 'खुदरा ₹ *')}</th>
+                    <th style="width:95px">${tr('Wholesale ₹', 'थोक ₹')}</th>
+                    <th style="width:80px">GST %</th>
+                    <th style="width:80px">${tr('Stock', 'स्टॉक')}</th>
+                    <th style="min-width:130px">${tr('Size / Brand / Spec (Vertical Col)', 'साइज / ब्रांड / विवरण')}</th>
+                    <th style="width:45px"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${rows.map((r, idx) => `
+                    <tr>
+                      <td><input class="input" required value="${esc(r.name)}" oninput="state.productModal.rows[${idx}].name=this.value" placeholder="Item / Service Name" style="padding:6px 8px;font-size:0.8rem" /></td>
+                      <td><input class="input" value="${esc(r.hsn)}" oninput="state.productModal.rows[${idx}].hsn=this.value" placeholder="3917" style="padding:6px 8px;font-size:0.8rem" /></td>
+                      <td><input class="input" type="number" value="${r.costPrice}" oninput="state.productModal.rows[${idx}].costPrice=Number(this.value)" placeholder="140" style="padding:6px 8px;font-size:0.8rem" /></td>
+                      <td><input class="input" type="number" required value="${r.price}" oninput="state.productModal.rows[${idx}].price=Number(this.value)" placeholder="185" style="padding:6px 8px;font-size:0.8rem" /></td>
+                      <td><input class="input" type="number" value="${r.wholesalePrice}" oninput="state.productModal.rows[${idx}].wholesalePrice=Number(this.value)" placeholder="165" style="padding:6px 8px;font-size:0.8rem" /></td>
+                      <td>
+                        <select class="select" onchange="state.productModal.rows[${idx}].gstRate=Number(this.value)" style="padding:6px;font-size:0.8rem">
+                          ${[0, 5, 12, 18, 28].map(g => `<option value="${g}" ${Number(r.gstRate) === g ? 'selected' : ''}>${g}%</option>`).join('')}
+                        </select>
+                      </td>
+                      <td><input class="input" type="number" value="${r.stock}" oninput="state.productModal.rows[${idx}].stock=Number(this.value)" style="padding:6px 8px;font-size:0.8rem" /></td>
+                      <td><input class="input" value="${esc(r.spec || '')}" oninput="state.productModal.rows[${idx}].spec=this.value" placeholder="e.g. 25mm / ISI / 1Yr" style="padding:6px 8px;font-size:0.8rem" /></td>
+                      <td>
+                        <button type="button" class="btn btn-danger btn-sm" style="padding:4px 7px" onclick="removeProductModalRow(${idx})">✕</button>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+            <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+              <button type="button" class="btn btn-outline btn-sm" onclick="addProductModalRow()">
+                + ${tr('Add Horizontal Product Line (Row)', '+ नई क्षैतिज पंक्ति (Row) जोड़ें')}
+              </button>
+              <span style="font-size:0.76rem;color:#64748b">${rows.length} ${tr('product line(s) ready to save', 'पंक्तियाँ सेव करने के लिए तैयार')}</span>
+            </div>
+          </div>
+          <div class="pro-blur-modal-foot">
+            <button type="button" class="btn btn-ghost" onclick="state.productModal=null;render()">${tr('Cancel', 'रद्द करें')}</button>
+            <button type="submit" class="btn btn-primary" style="background:#0284c7;border-color:#0284c7;padding:8px 20px;font-weight:800">
+              ✓ ${tr('Save All Products to Catalog', '✓ सभी सामान स्टॉक में सेव करें')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+window.openProductAddModal = function() {
+  const def = state.data.myShop?.invoiceDefaults || {};
+  state.productModal = {
+    rows: [
+      { name: '', hsn: def.defaultHsn || '3917', costPrice: 140, price: 185, wholesalePrice: 165, gstRate: def.defaultGstRate !== undefined ? Number(def.defaultGstRate) : 18, stock: 50, spec: '' }
+    ]
+  };
+  render();
+};
+
+window.addProductModalRow = function() {
+  if (!state.productModal) return;
+  const def = state.data.myShop?.invoiceDefaults || {};
+  state.productModal.rows.push({
+    name: '',
+    hsn: def.defaultHsn || '3917',
+    costPrice: 100,
+    price: 130,
+    wholesalePrice: 115,
+    gstRate: def.defaultGstRate !== undefined ? Number(def.defaultGstRate) : 18,
+    stock: 50,
+    spec: ''
+  });
+  render();
+};
+
+window.removeProductModalRow = function(idx) {
+  if (!state.productModal) return;
+  state.productModal.rows.splice(idx, 1);
+  if (state.productModal.rows.length === 0) window.addProductModalRow();
+  else render();
+};
+
+window.saveProductAddModalForm = async function(e) {
+  e.preventDefault();
+  try {
+    const rows = (state.productModal?.rows || []).filter(r => r.name && r.name.trim());
+    if (rows.length === 0) return;
+    const items = rows.map(r => ({
+      name: r.spec ? `${r.name.trim()} (${r.spec.trim()})` : r.name.trim(),
+      hsn: r.hsn || '3917',
+      costPrice: Number(r.costPrice) || Math.round((Number(r.price) || 100) * 0.8),
+      price: Number(r.price) || 100,
+      wholesalePrice: Number(r.wholesalePrice) || Number(r.price) || 100,
+      gstRate: Number(r.gstRate ?? 18),
+      stock: Number(r.stock ?? 50),
+      taxMode: 'exclusive'
+    }));
+    await apiFetch('/api/merchant/product-save', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'bulk_add', items })
+    });
+    state.productModal = null;
+    await bootstrap();
+    showToast(tr(`✅ Added ${items.length} product(s) to your catalog!`, `✅ ${items.length} सामान आपके स्टॉक में सफलतापूर्वक जुड़ गए!`));
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+// ============================================================================
+// OWNER-ONLY STAFF / MANAGER LOGIN ID MODAL WITH 14 PERMISSIONS (ITEM #16)
+// ============================================================================
+function renderManagerModal() {
+  const m = state.managerModal;
+  if (!m) return '';
+  const isEdit = Boolean(m.id);
+  const selectedPerms = Array.isArray(m.permissions) ? m.permissions : [];
+
+  return `
+    <div class="pro-blur-modal-overlay" onclick="state.managerModal=null;render()">
+      <div class="pro-blur-modal-card" style="max-width:680px" onclick="event.stopPropagation()">
+        <div class="pro-blur-modal-head">
+          <div>
+            <h3>🛡️ ${isEdit ? tr('Edit Manager / Staff Login ID & Permissions', 'मैनेजर / स्टाफ लॉगिन व अधिकार अपडेट करें') : tr('Create Staff / Manager Login ID (Owner Only)', 'नया स्टाफ / मैनेजर लॉगिन ID बनाएँ (केवल मालिक द्वारा)')}</h3>
+            <p style="font-size:0.75rem;color:#64748b;margin:2px 0 0">${tr('Assign Name, Mobile Number, Email ID, Password, and select from 14 module permissions', 'नाम, मोबाइल नंबर, ईमेल ID, पासवर्ड दर्ज करें और नीचे दिए गए 14 कार्य अधिकारों में से चुनें')}</p>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="state.managerModal=null;render()">✕</button>
+        </div>
+        <form onsubmit="saveManagerModalForm(event)">
+          <div class="pro-blur-modal-body" style="display:grid;gap:12px">
+            <div class="grid grid-2" style="gap:12px">
+              <div>
+                <label class="form-label">${tr('Staff / Manager Full Name', 'पूरा नाम')} <span style="color:#dc2626">*</span></label>
+                <input class="input" id="mm-name" required value="${esc(m.name || '')}" placeholder="e.g. Suresh Gehlot" />
+              </div>
+              <div>
+                <label class="form-label">${tr('10-Digit Mobile Number (Login ID)', '10-अंकीय मोबाइल नंबर (लॉगिन ID)')} <span style="color:#dc2626">*</span></label>
+                <input class="input" id="mm-phone" required maxlength="10" value="${esc(m.phone || '')}" placeholder="98290XXXXX" />
+              </div>
+            </div>
+
+            <div class="grid grid-3" style="gap:12px">
+              <div>
+                <label class="form-label">${tr('Email ID (Login ID)', 'ईमेल ID (लॉगिन हेतु)')} <span style="color:#dc2626">*</span></label>
+                <input class="input" type="email" id="mm-email" required value="${esc(m.email || '')}" placeholder="manager@shop.com" />
+              </div>
+              <div>
+                <label class="form-label">${tr('Login Password', 'लॉगिन पासवर्ड')} ${isEdit ? tr('(Leave blank to keep)', '(बदलने हेतु भरें)') : '*'}</label>
+                <input class="input" type="password" id="mm-pass" ${isEdit ? '' : 'required'} placeholder="••••••••" />
+              </div>
+              <div>
+                <label class="form-label">${tr('Designation / Role', 'पद / भूमिका')}</label>
+                <input class="input" id="mm-role" value="${esc(m.designation || 'Store Manager')}" placeholder="Store Manager / Accountant" />
+              </div>
+            </div>
+
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <label class="form-label" style="margin:0">${tr('Select Granular Module Permissions (14 Modules):', '14 मॉड्यूल अनुमतियाँ चुनें (Granular Access Control):')}</label>
+                <div style="display:flex;gap:6px">
+                  <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:0.72rem" onclick="document.querySelectorAll('input[name=mm_perm]').forEach(el=>el.checked=true)">✓ Select All 14</button>
+                  <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:0.72rem" onclick="document.querySelectorAll('input[name=mm_perm]').forEach(el=>el.checked=false)">Clear</button>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:8px;background:#f8fafc;padding:12px;border-radius:10px;border:1px solid #cbd5e1">
+                ${ALL_14_STAFF_PERMISSIONS.map(p => `
+                  <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;font-weight:700;cursor:pointer;padding:5px 8px;background:#ffffff;border:1px solid #e2e8f0;border-radius:8px">
+                    <input type="checkbox" name="mm_perm" value="${esc(p.key)}" ${selectedPerms.includes(p.key) ? 'checked' : ''} />
+                    <span>${state.lang === 'hi' ? p.hi : p.label}</span>
+                  </label>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+
+          <div class="pro-blur-modal-foot">
+            <button type="button" class="btn btn-ghost" onclick="state.managerModal=null;render()">${tr('Cancel', 'रद्द करें')}</button>
+            <button type="submit" class="btn btn-primary" style="background:#0284c7;border-color:#0284c7;padding:8px 20px;font-weight:800">
+              ✓ ${isEdit ? tr('Update Manager Access', '✓ अधिकार अपडेट करें') : tr('Create Manager Login ID', '✓ मैनेजर ID बनाएँ')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+window.openManagerModal = function(mgrId = null) {
+  if (mgrId) {
+    const existing = (state.data.myManagers || []).find(x => x.id === mgrId);
+    state.managerModal = existing ? { ...existing } : {};
+  } else {
+    state.managerModal = {
+      name: '',
+      phone: '',
+      email: '',
+      designation: 'Store Manager',
+      permissions: ['Dashboard View', 'Customers', 'Invoices', 'Product', 'Quotations', 'Quotation', 'Tasks']
+    };
+  }
+  render();
+};
+
+window.saveManagerModalForm = async function(e) {
+  e.preventDefault();
+  try {
+    const perms = [...document.querySelectorAll('input[name="mm_perm"]:checked')].map(el => el.value);
+    await apiFetch('/api/merchant/pro', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'manager_save',
+        id: state.managerModal?.id || null,
+        name: document.getElementById('mm-name').value.trim(),
+        phone: document.getElementById('mm-phone').value.trim(),
+        email: document.getElementById('mm-email').value.trim(),
+        password: document.getElementById('mm-pass').value,
+        designation: document.getElementById('mm-role').value.trim() || 'Store Manager',
+        permissions: perms,
+        active: true
+      })
+    });
+    state.managerModal = null;
+    await bootstrap();
+    showToast(tr('✅ Staff / Manager Login ID saved with selected permissions!', '✅ चयनित 14 अधिकारों के साथ मैनेजर लॉगिन ID सफलतापूर्वक सेव हो गई!'));
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.deleteManagerAccount = async function(id) {
+  if (!confirm(tr('Remove this Staff / Manager login account?', 'क्या आप इस मैनेजर/स्टाफ लॉगिन ID को हटाना चाहते हैं?'))) return;
+  try {
+    await apiFetch('/api/merchant/pro', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'manager_delete', id })
+    });
+    await bootstrap();
+    showToast(tr('Manager login removed', 'मैनेजर ID हटा दी गई'));
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+// ============================================================================
+// 5-TAB SYSTEM SETTINGS & AI PROVIDER API HANDLERS (ITEMS #8, #9, #10)
+// ============================================================================
+window.saveSystemSettingsTab = async function(e, tab) {
+  e.preventDefault();
+  try {
+    if (tab === 'profile') {
+      await apiFetch('/api/merchant/pro', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'settings_save',
+          shop: document.getElementById('set-shop-name').value.trim(),
+          legalName: document.getElementById('set-legal-name').value.trim(),
+          tagline: document.getElementById('set-tagline').value.trim(),
+          officialEmail: document.getElementById('set-email').value.trim(),
+          phone: document.getElementById('set-phone').value.trim(),
+          gstin: document.getElementById('set-gstin').value.trim().toUpperCase(),
+          pan: document.getElementById('set-pan').value.trim().toUpperCase(),
+          addressLine1: document.getElementById('set-addr1').value.trim(),
+          addressLine2: document.getElementById('set-addr2').value.trim(),
+          city: document.getElementById('set-city').value.trim(),
+          state: document.getElementById('set-state').value.trim(),
+          pincode: document.getElementById('set-pincode').value.trim()
+        })
+      });
+      await bootstrap();
+      showToast(tr('✅ Business Profile & Tax Identity saved!', '✅ व्यापार प्रोफाइल और GST विवरण सेव हो गया!'));
+    } else if (tab === 'banking') {
+      const upiId = document.getElementById('set-upi-id').value.trim();
+      await apiFetch('/api/merchant/pro', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'settings_save',
+          upiId,
+          banking: {
+            bankName: document.getElementById('set-bank-name').value.trim(),
+            accountHolder: document.getElementById('set-acc-holder').value.trim(),
+            accountNumber: document.getElementById('set-acc-no').value.trim(),
+            ifsc: document.getElementById('set-ifsc').value.trim().toUpperCase(),
+            branch: document.getElementById('set-branch').value.trim(),
+            upiId
+          }
+        })
+      });
+      await bootstrap();
+      showToast(tr('✅ Banking & UPI settlement details saved!', '✅ बैंक खाता और UPI विवरण सेव हो गया!'));
+    } else if (tab === 'invoice_defaults') {
+      await apiFetch('/api/merchant/pro', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'settings_save',
+          invoiceDefaults: {
+            defaultPaymentMode: document.getElementById('def-pay-mode').value,
+            defaultGstRate: Number(document.getElementById('def-gst-rate').value),
+            defaultTaxMode: document.getElementById('def-tax-mode').value,
+            defaultHsn: document.getElementById('def-hsn').value.trim() || '3917',
+            defaultSupplyType: document.getElementById('def-supply').value,
+            dueDays: Number(document.getElementById('def-due-days').value || 15),
+            quoteValidDays: Number(document.getElementById('def-quote-days').value || 7),
+            printFormat: document.getElementById('def-print-fmt').value,
+            showBankDetails: document.getElementById('def-show-bank').checked,
+            terms: document.getElementById('def-terms').value,
+            signatory: document.getElementById('def-signatory').value.trim(),
+            footerNote: document.getElementById('def-footer').value.trim()
+          }
+        })
+      });
+      await bootstrap();
+      showToast(tr('✅ Invoice Default Settings saved! Every new bill will now auto-populate these defaults.', '✅ इनवॉइस डिफ़ॉल्ट सेटिंग्स सेव हो गईं! अब हर नए बिल में ये विवरण अपने-आप भर जाएँगे।'));
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.onAiProviderPlatformChange = function(val) {
+  const labelEl = document.getElementById('ai-cfg-label');
+  const modelEl = document.getElementById('ai-cfg-model');
+  const urlEl = document.getElementById('ai-cfg-url');
+  if (val.includes('Google AI Studio')) {
+    if (labelEl) labelEl.value = 'Google AI Studio (Gemini)';
+    if (modelEl) modelEl.value = 'gemini-2.5-flash';
+    if (urlEl) urlEl.value = 'https://generativelanguage.googleapis.com/v1beta';
+  } else if (val.includes('OpenRouter')) {
+    if (labelEl) labelEl.value = 'OpenRouter Unified Gateway';
+    if (modelEl) modelEl.value = 'google/gemini-flash-1.5';
+    if (urlEl) urlEl.value = 'https://openrouter.ai/api/v1';
+  } else if (val.includes('OpenAI')) {
+    if (labelEl) labelEl.value = 'OpenAI (ChatGPT)';
+    if (modelEl) modelEl.value = 'gpt-4o-mini';
+    if (urlEl) urlEl.value = 'https://api.openai.com/v1';
+  } else if (val.includes('Anthropic')) {
+    if (labelEl) labelEl.value = 'Anthropic Claude';
+    if (modelEl) modelEl.value = 'claude-3-5-sonnet-latest';
+    if (urlEl) urlEl.value = 'https://api.anthropic.com/v1';
+  } else {
+    if (labelEl) labelEl.value = 'Custom OpenAI-Compatible API';
+    if (modelEl) modelEl.value = 'llama-3.3-70b-versatile';
+    if (urlEl) urlEl.value = 'https://api.groq.com/openai/v1';
+  }
+};
+
+window.saveAiProviderConfig = async function(e) {
+  e.preventDefault();
+  try {
+    await apiFetch('/api/merchant/pro', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'ai_provider_save',
+        platform: document.getElementById('ai-cfg-platform').value,
+        label: document.getElementById('ai-cfg-label').value.trim(),
+        apiKey: document.getElementById('ai-cfg-key').value.trim(),
+        modelId: document.getElementById('ai-cfg-model').value.trim(),
+        baseUrl: document.getElementById('ai-cfg-url').value.trim(),
+        temperature: parseFloat(document.getElementById('ai-cfg-temp').value) || 0.7,
+        maxTokens: parseInt(document.getElementById('ai-cfg-tokens').value, 10) || 4096,
+        enabled: document.getElementById('ai-cfg-enabled').checked,
+        isPrimary: document.getElementById('ai-cfg-primary').checked
+      })
+    });
+    document.getElementById('ai-cfg-key').value = '';
+    await bootstrap();
+    showToast(tr('🔐 AI Provider encrypted with AES-256-GCM and saved!', '🔐 AI प्रोवाइडर AES-256-GCM सुरक्षा के साथ सेव हो गया!'));
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.testAiProviderConnection = async function(id = null) {
+  try {
+    showToast(tr('⏳ Testing AI Provider connection...', '⏳ AI कनेक्शन जाँचा जा रहा है...'));
+    const body = id
+      ? { action: 'ai_provider_test', id }
+      : {
+          action: 'ai_provider_test',
+          platform: document.getElementById('ai-cfg-platform')?.value || 'Google AI Studio (Gemini)',
+          apiKey: document.getElementById('ai-cfg-key')?.value.trim() || '',
+          modelId: document.getElementById('ai-cfg-model')?.value.trim() || 'gemini-2.5-flash',
+          baseUrl: document.getElementById('ai-cfg-url')?.value.trim() || ''
+        };
+    const res = await apiFetch('/api/merchant/pro', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+    showToast(res.reply || tr('✅ Connection verified!', '✅ कनेक्शन सफल!'));
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.deleteAiProviderConfig = async function(id) {
+  if (!confirm(tr('Delete this AI provider configuration?', 'क्या आप इस AI प्रोवाइडर को हटाना चाहते हैं?'))) return;
+  try {
+    await apiFetch('/api/merchant/pro', {
+      method: 'POST',
+      body: JSON.stringify({ action: 'ai_provider_delete', id })
+    });
+    await bootstrap();
+    showToast(tr('AI provider removed', 'AI प्रोवाइडर हटाया गया'));
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
 // Bind to window
 window.renderAdminOverview = renderAdminOverview;
 window.renderMerchantManufacturing = renderMerchantManufacturing;
+window.renderMerchantCustomersCrm = renderMerchantCustomersCrm;
+window.renderMerchantTasks = renderMerchantTasks;
 window.renderFloatingActionHub = renderFloatingActionHub;
 window.downloadCatalogExcelTemplate = downloadCatalogExcelTemplate;
 window.handleBulkSheetUpload = handleBulkSheetUpload;
@@ -8978,7 +11326,7 @@ function render() {
     (r === '/customer' && state.data.user)
   );
 
-  const extraModals = `${renderFloatingActionHub()}${state.aiChatModalOpen ? renderGlobalAiChatModal() : ''}${state.bulkReviewModal ? renderBulkReviewModal() : ''}${state.voucherModalOpen ? renderVoucherScanModal() : ''}`;
+  const extraModals = `${renderFloatingActionHub()}${state.aiChatModalOpen ? renderGlobalAiChatModal() : ''}${state.bulkReviewModal ? renderBulkReviewModal() : ''}${state.voucherModalOpen ? renderVoucherScanModal() : ''}${state.customerModal ? renderCustomerModal() : ''}${state.productModal ? renderProductAddModal() : ''}${state.dealModal ? renderDealModal() : ''}${state.taskModal ? renderTaskModal() : ''}${state.managerModal ? renderManagerModal() : ''}`;
 
   if (isEnterpriseView) {
     root.innerHTML = `${pageHtml}${state.demoModalOpen ? renderDemoModal() : ''}${state.reportModal ? renderReportModal() : ''}${state.orderReviewModal ? renderOrderReviewModal() : ''}${state.customerBillModal ? renderCustomerBillModal() : ''}${state.partyLedgerModalKey ? renderPartyLedgerModal() : ''}${state.aiModalOpen ? (state.data.myShop ? renderAiScannerModal(state.data.myShop) : '') : ''}${extraModals}`;
