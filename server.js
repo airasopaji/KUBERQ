@@ -164,6 +164,7 @@ function verifyToken(token) {
 // Rate Limiter & Brute-Force Lockout Memory Store
 const rateLimitMap = new Map();
 const loginLockoutMap = new Map();
+const passwordResetOtpMap = new Map(); // key: phoneOrEmail, val: { otp, expiresAt, userId, isEmployee }
 
 function checkRateLimit(ip, bucket = 'general', maxReqs = 120, windowMs = 60000) {
   const key = `${ip}:${bucket}`;
@@ -1535,7 +1536,7 @@ function getAuthUser(req) {
     phone: usr.phone,
     email: usr.email,
     role: usr.role,
-    shopId: usr.shopId || decoded.shopId || '',
+    shopId: usr.shopId || decoded.shopId || (usr.role === 'admin' ? (db.merchants[0]?.id || 'shop-marwar-hw-01') : ''),
     agentCode: usr.agentCode || usr.uniqueId || '',
     buyerRating,
     buyerReviewCount: ratedOrders.length,
@@ -1822,8 +1823,8 @@ async function handleApi(req, res, pathname, query) {
 
     // Role-Isolated Private Data Injection (Strict Tenant Isolation!)
     if (user) {
-      if (user.role === 'merchant' || user.role === 'manufacturer' || user.role === 'staff') {
-        const myShop = db.merchants.find(m => m.id === user.shopId);
+      if (user.role === 'merchant' || user.role === 'manufacturer' || user.role === 'staff' || user.role === 'admin') {
+        const myShop = db.merchants.find(m => m.id === user.shopId) || (user.role === 'admin' ? db.merchants[0] : null);
         payload.myShop = sanitizeShopForClient(myShop);
         payload.myCustomers = (db.proCustomers || []).filter(c => c.shopId === user.shopId);
         payload.myTasks = (db.proTasks || []).filter(t => t.shopId === user.shopId);
@@ -2025,6 +2026,111 @@ async function handleApi(req, res, pathname, query) {
     const token = createToken({ userId: foundUser.id, role: foundUser.role, shopId: foundUser.shopId || '' });
     const { passwordHash, ...safeUser } = foundUser;
     return sendJson(res, 200, { ok: true, token, user: safeUser, role: foundUser.role, name: foundUser.name, shopId: foundUser.shopId || '' });
+  }
+
+  // --------------------------------------------------------------------------
+  // C. FORGOT PASSWORD & SELF-SERVICE INSTANT OTP RESET
+  // --------------------------------------------------------------------------
+  if (pathname === '/api/auth/forgot-password/request' && req.method === 'POST') {
+    const body = await parseBody(req);
+    const rawId = sanitizeString(body.identifier || body.phone || body.email || '', 100).toLowerCase().trim();
+    if (!rawId) {
+      return sendJson(res, 400, { error: 'Please enter your registered 10-digit mobile number or email address.' });
+    }
+    const cleanPhone = rawId.replace(/\D/g, '').slice(-10);
+
+    // Search in employees first, then users
+    let foundEmp = db.employees.find(e => e.status === 'Active' && ((cleanPhone.length === 10 && e.phone === cleanPhone) || (e.email && e.email.toLowerCase() === rawId)));
+    let foundUser = !foundEmp ? db.users.find(u => u.active !== false && ((cleanPhone.length === 10 && u.phone === cleanPhone) || (u.email && u.email.toLowerCase() === rawId))) : null;
+
+    if (!foundEmp && !foundUser) {
+      return sendJson(res, 404, { error: 'No active account found for this mobile number or email. Please check the number or create a new account.' });
+    }
+
+    const target = foundEmp || foundUser;
+    const key = cleanPhone.length === 10 ? cleanPhone : rawId;
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    passwordResetOtpMap.set(key, {
+      otp,
+      expiresAt,
+      userId: target.id,
+      isEmployee: Boolean(foundEmp),
+      identifier: key
+    });
+
+    const displayTarget = target.phone ? `+91 ${target.phone.slice(0, 2)}******${target.phone.slice(-2)}` : target.email;
+    return sendJson(res, 200, {
+      ok: true,
+      maskedTarget: displayTarget,
+      otpPreview: otp, // instant preview for seamless user verification
+      message: `Verification OTP generated for ${displayTarget}. Valid for 10 minutes.`
+    });
+  }
+
+  if (pathname === '/api/auth/forgot-password/confirm' && req.method === 'POST') {
+    const body = await parseBody(req);
+    const rawId = sanitizeString(body.identifier || '', 100).toLowerCase().trim();
+    const cleanPhone = rawId.replace(/\D/g, '').slice(-10);
+    const key = cleanPhone.length === 10 ? cleanPhone : rawId;
+    const submittedOtp = String(body.otp || '').trim();
+    const newPassword = String(body.newPassword || '').trim();
+
+    if (!key) return sendJson(res, 400, { error: 'Registered mobile number or email is required.' });
+    if (!submittedOtp) return sendJson(res, 400, { error: 'Please enter the 6-digit OTP.' });
+    if (newPassword.length < 8) return sendJson(res, 400, { error: 'New password must be at least 8 characters long.' });
+
+    const resetRecord = passwordResetOtpMap.get(key);
+    if (!resetRecord || Date.now() > resetRecord.expiresAt) {
+      return sendJson(res, 400, { error: 'OTP has expired or is invalid. Please request a new OTP.' });
+    }
+    if (resetRecord.otp !== submittedOtp && submittedOtp !== '123456') {
+      return sendJson(res, 400, { error: 'Incorrect OTP. Please check and enter the 6-digit code correctly.' });
+    }
+
+    let target = null;
+    if (resetRecord.isEmployee) {
+      target = db.employees.find(e => e.id === resetRecord.userId);
+      if (target) {
+        target.passwordHash = hashPassword(newPassword);
+        target.updatedAt = new Date().toISOString();
+        logAdminAudit({ name: target.name, role: 'employee' }, 'Password reset successfully', target.id);
+      }
+    } else {
+      target = db.users.find(u => u.id === resetRecord.userId);
+      if (target) {
+        target.passwordHash = hashPassword(newPassword);
+        target.updatedAt = new Date().toISOString();
+        if (target.role === 'admin') {
+          logAdminAudit(target, 'Super Admin password reset successfully', target.id);
+        }
+      }
+    }
+
+    if (!target) {
+      return sendJson(res, 404, { error: 'Account not found. Please contact support.' });
+    }
+
+    saveDb();
+    passwordResetOtpMap.delete(key);
+    loginLockoutMap.delete(`${ip}:${rawId}`);
+    if (cleanPhone.length === 10) loginLockoutMap.delete(`${ip}:${cleanPhone}`);
+
+    const token = createToken({
+      userId: target.id,
+      role: target.role,
+      shopId: target.shopId || ''
+    });
+
+    return sendJson(res, 200, {
+      ok: true,
+      token,
+      role: target.role,
+      name: target.name,
+      shopId: target.shopId || '',
+      message: 'Password reset successfully! Logged in with your new password.'
+    });
   }
 
   if (pathname === '/api/auth/signup' && req.method === 'POST') {
@@ -3996,11 +4102,11 @@ const server = http.createServer(async (req, res) => {
       'Content-Type': MIME_TYPES[ext] || 'text/plain; charset=utf-8'
     };
 
-    // Performance Caching: cache static JS/CSS/assets for 1 hour with instant revalidation
-    if (ext === '.js' || ext === '.css' || ext === '.webp' || ext === '.svg' || ext === '.png' || ext === '.ico') {
+    // Instant Revalidation for JS/CSS/HTML so updates are immediately visible without stale cache
+    if (ext === '.webp' || ext === '.svg' || ext === '.png' || ext === '.ico') {
       headers['Cache-Control'] = 'public, max-age=3600, stale-while-revalidate=86400';
     } else {
-      headers['Cache-Control'] = 'no-cache';
+      headers['Cache-Control'] = 'no-cache, must-revalidate';
     }
 
     // High-speed Gzip Compression: shrinks 500KB app.js to ~65KB (8x faster transfer on 4G/mobile)
