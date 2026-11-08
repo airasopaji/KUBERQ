@@ -279,6 +279,9 @@ async function bootstrap() {
     } else if (!state.selectedShopId && state.data.merchants.length > 0) {
       state.selectedShopId = state.data.merchants[0].id;
     }
+    if (state.query.forgot === '1') {
+      openForgotPasswordModal();
+    }
     render();
   } catch (err) {
     console.error('Bootstrap error:', err);
@@ -320,6 +323,9 @@ function navigate(path, queryParams = {}) {
   window.history.pushState({}, '', fullUrl);
   state.route = path;
   state.query = queryParams;
+  if (state.query.forgot === '1') {
+    openForgotPasswordModal();
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' });
   render();
 }
@@ -824,7 +830,7 @@ function renderHeader() {
             <button class="btn btn-ghost btn-sm" onclick="logout()">${tr('Log Out', 'लॉग आउट')}</button>
           ` : `
             <button class="btn btn-ghost btn-sm" onclick="navigate('/auth')">${tr('Log In', 'लॉगिन')}</button>
-            <button class="btn btn-primary btn-sm" onclick="navigate('/signup')">${tr('Free Trial', 'निःशुल्क ट्रायल')}</button>
+            <button class="btn btn-coral btn-sm" onclick="navigate('/signup')">${tr('Free Trial', 'निःशुल्क ट्रायल')}</button>
           `}
         </div>
       </div>
@@ -1020,12 +1026,12 @@ function renderHome() {
             </div>
 
             <div>
-              <!-- CTA Buttons -->
+              <!-- CTA Buttons (Warm Coral & Royal Blue Buttons - Apollo / HubSpot style) -->
               <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px">
-                <button class="btn btn-gold" style="padding:13px 24px;font-size:1.02rem" onclick="navigate('/signup')">
+                <button class="btn btn-coral" style="padding:13px 26px;font-size:1.02rem" onclick="navigate('/signup')">
                   🚀 ${tr('Register Your Business (Free Trial)', 'अपना व्यापार रजिस्टर करें (निःशुल्क ट्रायल)')}
                 </button>
-                <button class="btn btn-primary" style="padding:13px 24px;font-size:1.02rem" onclick="navigate('/order', { shop: '${shops[0]?.id || ''}' })">
+                <button class="btn btn-primary" style="padding:13px 26px;font-size:1.02rem" onclick="navigate('/order', { shop: '${shops[0]?.id || ''}' })">
                   📲 ${tr('Try Live QR & Parchi Order Demo', 'लाइव दुकान और पर्ची ऑर्डर डेमो देखें')}
                 </button>
               </div>
@@ -1136,8 +1142,13 @@ function renderHome() {
           </div>
         </div>
       </div>
-    </div>
-  </section>
+      <!-- HubSpot-style Smooth Wave Divider to Features Section -->
+      <div class="hero-wave-divider">
+        <svg viewBox="0 0 1440 60" fill="none" preserveAspectRatio="none" style="display:block;width:100%;height:36px">
+          <path d="M0,20 C360,55 1080,55 1440,20 L1440,60 L0,60 Z" fill="var(--bg)"></path>
+        </svg>
+      </div>
+    </section>
 
   <!-- MOBILE-ONLY 4-GRID QUICK ACTIONS (Swiggy / Khatabook style) -->
   <section class="container mobile-only" style="padding:16px 14px 4px">
@@ -1183,8 +1194,8 @@ function renderHome() {
         <!-- Card 1: Dual-GST, IGST & MRP Billing -->
         <div class="feature-card">
           <div class="feature-icon-pair">
-            <span class="feature-icon-box" style="background:#eff6ff;border:1.5px solid #93c5fd;color:#2563EB">🧾</span>
-            <span class="badge badge-gold">✓ GST / IGST</span>
+            <span class="feature-icon-box" style="background:#fff1ee;border:1.5px solid #fed7aa;color:#ea580c">🧾</span>
+            <span class="badge" style="background:#fff1ee;color:#c2410c;border:1px solid #fed7aa">✓ GST / IGST</span>
           </div>
           <h3 class="feature-title">
             ${tr('Dual-GST, IGST & MRP Billing', 'पक्का GST, IGST और MRP बिलिंग')}
@@ -1200,8 +1211,8 @@ function renderHome() {
         <!-- Card 2: AI Bill Scanner & 1-Click Catalog -->
         <div class="feature-card">
           <div class="feature-icon-pair">
-            <span class="feature-icon-box" style="background:#eff6ff;border:1.5px solid #93c5fd;color:#2563EB">📷</span>
-            <span class="feature-icon-box" style="background:#f0fdf4;border:1.5px solid #86efac;color:#16a34a">🤖</span>
+            <span class="feature-icon-box" style="background:#eff6ff;border:1.5px solid #bfdbfe;color:#2563EB">📷</span>
+            <span class="badge" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe">🤖 AI Auto</span>
           </div>
           <h3 class="feature-title">
             ${tr('AI Bill Scanner & 1-Click Catalog', 'AI बिल स्कैनर और 1-क्लिक कैटलॉग')}
@@ -1217,8 +1228,8 @@ function renderHome() {
         <!-- Card 3: WhatsApp Parchi & QR Ordering -->
         <div class="feature-card">
           <div class="feature-icon-pair">
-            <span class="feature-icon-box" style="background:#dcfce7;border:1.5px solid #86efac;color:#16a34a">💬</span>
-            <span class="feature-icon-box" style="background:#f8fafc;border:1.5px solid #cbd5e1;color:#0f172a">📲</span>
+            <span class="feature-icon-box" style="background:#ecfdf5;border:1.5px solid #a7f3d0;color:#059669">💬</span>
+            <span class="badge" style="background:#ecfdf5;color:#047857;border:1px solid #a7f3d0">📲 Counter QR</span>
           </div>
           <h3 class="feature-title">
             ${tr('WhatsApp Parchi & QR Ordering', 'WhatsApp पर्ची और QR ऑर्डर')}
@@ -1234,8 +1245,8 @@ function renderHome() {
         <!-- Card 4: Party Udhaar Khata & Staff Control -->
         <div class="feature-card">
           <div class="feature-icon-pair">
-            <span class="feature-icon-box" style="background:#dcfce7;border:1.5px solid #86efac;color:#15803d">📒</span>
-            <span class="feature-icon-box" style="background:#eff6ff;border:1.5px solid #93c5fd;color:#2563EB">🛡️</span>
+            <span class="feature-icon-box" style="background:#fef3c7;border:1.5px solid #fde68a;color:#d97706">📒</span>
+            <span class="badge" style="background:#fef3c7;color:#b45309;border:1px solid #fde68a">🛡️ 0% Commission</span>
           </div>
           <h3 class="feature-title">
             ${tr('Party Udhaar & Staff Control', 'उधार खाता, रिमाइंडर और स्टाफ नियंत्रण')}
@@ -1258,8 +1269,8 @@ function renderHome() {
       </div>
 
       <div class="grid grid-3">
-        <div class="feature-card" style="border-left:5px solid #eab308">
-          <span class="badge badge-gold" style="margin-bottom:10px">${tr('STEP 1 · SCAN PHOTO', 'स्टेप 1 · फोटो खींचें')}</span>
+        <div class="feature-card" style="border-left:5px solid #ff7a59">
+          <span class="badge" style="background:#fff1ee;color:#c2410c;border:1px solid #fed7aa;margin-bottom:10px">${tr('STEP 1 · SCAN PHOTO', 'स्टेप 1 · फोटो खींचें')}</span>
           <h3 class="feature-title">${tr('1. Snap Photo of Parchi or Purchase Bill', '1. पर्ची या खरीद बिल का फोटो खींचें')}</h3>
           <p class="feature-desc">
             ${tr(
@@ -1270,7 +1281,7 @@ function renderHome() {
         </div>
 
         <div class="feature-card" style="border-left:5px solid #2563EB">
-          <span class="badge badge-muted" style="margin-bottom:10px;color:#2563EB">${tr('STEP 2 · AI AUTO-BILLING', 'स्टेप 2 · स्मार्ट AI प्रोसेसिंग')}</span>
+          <span class="badge" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;margin-bottom:10px">${tr('STEP 2 · AI AUTO-BILLING', 'स्टेप 2 · स्मार्ट AI प्रोसेसिंग')}</span>
           <h3 class="feature-title">${tr('2. AI Prepares Stock & GST Invoice in Seconds', '2. AI सेकंडों में स्टॉक और GST बिल तैयार करे')}</h3>
           <p class="feature-desc">
             ${tr(
@@ -1280,8 +1291,8 @@ function renderHome() {
           </p>
         </div>
 
-        <div class="feature-card" style="border-left:5px solid #16a34a">
-          <span class="badge badge-primary" style="margin-bottom:10px">${tr('STEP 3 · WHATSAPP & UPI', 'स्टेप 3 · WhatsApp व सीधा भुगतान')}</span>
+        <div class="feature-card" style="border-left:5px solid #10b981">
+          <span class="badge" style="background:#ecfdf5;color:#047857;border:1px solid #a7f3d0;margin-bottom:10px">${tr('STEP 3 · WHATSAPP & UPI', 'स्टेप 3 · WhatsApp व सीधा भुगतान')}</span>
           <h3 class="feature-title">${tr('3. Send Bill & Direct UPI Link on WhatsApp', '3. सीधे WhatsApp पर बिल और भुगतान लिंक भेजें')}</h3>
           <p class="feature-desc">
             ${tr(
@@ -1293,6 +1304,68 @@ function renderHome() {
       </div>
     </section>
   </div> <!-- end of desktop-only in-depth features & steps -->
+
+  <!-- HUBSPOT-STYLE "OUR COMMUNITY & PLATFORM SCALE" SECTION (Matching Mobbin Reference) -->
+  <section class="home-community-section">
+    <div class="community-wave-top">
+      <svg viewBox="0 0 1440 60" fill="none" preserveAspectRatio="none" style="display:block;width:100%;height:32px">
+        <path d="M0,0 C360,50 1080,50 1440,0 L1440,60 L0,60 Z" fill="#0b1329"></path>
+      </svg>
+    </div>
+
+    <div class="container" style="padding:28px 24px 36px;text-align:center">
+      <span class="badge" style="background:rgba(255,122,89,0.18);color:#ff9070;border:1px solid rgba(255,122,89,0.4);margin-bottom:12px;font-size:0.86rem;padding:5px 16px">
+        ✦ ${tr('Our Community & Business Scale', 'हमारा समुदाय एवं व्यापारिक विश्वास')}
+      </span>
+      <h2 style="font-size:clamp(1.6rem, 2.5vw, 2.2rem);color:#ffffff;font-weight:800;margin-bottom:8px">
+        ${tr('Empowering Traders, Wholesalers & Small Businesses Across India', 'भारत के व्यापारियों, थोक विक्रेताओं और उत्पादकों को सशक्त बनाता KuberQ')}
+      </h2>
+      <p style="color:#94a3b8;max-width:720px;margin:0 auto 36px;font-size:1.02rem">
+        ${tr('Fastest GST invoicing, automated AI stock entry, and zero-leakage credit accounting designed specifically for Indian Mandis & B2B markets.', 'भारतीय मंडियों और थोक बाज़ारों के लिए विशेष रूप से तैयार किया गया सबसे तेज़ GST बिलिंग, AI स्टॉक और सुरक्षित उधार खाता।')}
+      </p>
+
+      <div class="community-stats-grid">
+        <div class="community-stat-item">
+          <div class="community-stat-val">10,000+</div>
+          <div class="community-stat-label">${tr('Parchis & Invoices Made', 'पर्ची व GST बिल प्रोसेस')}</div>
+          <div class="community-stat-sub">100% ${tr('Tax Compliant', 'GST अनुपालन')}</div>
+        </div>
+        <div class="community-stat-item">
+          <div class="community-stat-val">10 Sec</div>
+          <div class="community-stat-label">${tr('Average Billing Speed', 'औसत बिल बनाने का समय')}</div>
+          <div class="community-stat-sub">5x ${tr('Faster Than Tally', 'पारंपरिक सॉफ़्टवेयर से तेज़')}</div>
+        </div>
+        <div class="community-stat-item">
+          <div class="community-stat-val">0%</div>
+          <div class="community-stat-label">${tr('Commission on Payments', 'भुगतान पर कमीशन')}</div>
+          <div class="community-stat-sub">${tr('Direct UPI to Bank', 'सीधा बैंक खाते में UPI')}</div>
+        </div>
+        <div class="community-stat-item">
+          <div class="community-stat-val">100%</div>
+          <div class="community-stat-label">${tr('Private & Encrypted', 'डेटा सुरक्षा एवं गोपनीयता')}</div>
+          <div class="community-stat-sub">AES-256 ${tr('Server Vault', 'सर्वर एन्क्रिप्शन')}</div>
+        </div>
+        <div class="community-stat-item">
+          <div class="community-stat-val">₹0</div>
+          <div class="community-stat-label">${tr('Setup or Hidden Cost', 'हिडन चार्ज या सेटअप शुल्क')}</div>
+          <div class="community-stat-sub">${tr('Free Instant Trial', 'निःशुल्क ट्रायल शुरू करें')}</div>
+        </div>
+      </div>
+
+      <div class="community-quote-banner">
+        <p class="community-quote-text">
+          “${tr('Success is making those who believed in you look brilliant — smart digital tech tailored for every Indian merchant.', 'सफलता वही है जो उन सभी का विश्वास बढ़ाए जिन्होंने आप पर भरोसा किया — हर भारतीय व्यापारी के लिए आसान डिजिटल तकनीक।')}”
+        </p>
+        <span style="color:#f59e0b;font-weight:700;font-size:0.92rem">— KuberQ ${tr('Founding Mission & Merchant Promise', 'मिशन एवं व्यापारी संकल्प')}</span>
+      </div>
+    </div>
+
+    <div class="community-wave-bottom">
+      <svg viewBox="0 0 1440 60" fill="none" preserveAspectRatio="none" style="display:block;width:100%;height:32px">
+        <path d="M0,60 C360,10 1080,10 1440,60 L1440,0 L0,0 Z" fill="#0b1329"></path>
+      </svg>
+    </div>
+  </section>
 
     <!-- SPONSORED SPOTLIGHT SHOWCASE (Paid Promotions Banner — Pointer 7) -->
     ${(state.data.promotions || []).length > 0 ? `
@@ -1849,7 +1922,12 @@ function renderAuth(isSignup = false) {
               />
             </div>
             <div class="form-group">
-              <label class="form-label">${tr('Password', 'पासवर्ड')}</label>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <label class="form-label" style="margin-bottom:0">${tr('Password', 'पासवर्ड')}</label>
+                <a href="#" onclick="event.preventDefault();openForgotPasswordModal()" style="font-size:0.84rem;color:#ea580c;font-weight:700;text-decoration:none">
+                  🔑 ${tr('Forgot Password?', 'पासवर्ड भूल गए?')}
+                </a>
+              </div>
               <input class="input" type="password" id="li-pass" name="password" autocomplete="current-password" required placeholder="••••••••" />
             </div>
             <button type="submit" class="btn btn-gold" style="width:100%;margin-top:10px">
@@ -1876,6 +1954,214 @@ function renderAuth(isSignup = false) {
     </div>
   `;
 }
+
+// ============================================================================
+// SELF-SERVICE FORGOT PASSWORD & OTP RESET MODAL
+// ============================================================================
+function renderForgotPasswordModal() {
+  const m = state.forgotPasswordModal;
+  if (!m) return '';
+
+  const isStep2 = m.step === 2;
+
+  return `
+    <div class="pro-blur-modal-overlay" onclick="closeForgotPasswordModal()">
+      <div class="pro-blur-modal-card" style="max-width:480px" onclick="event.stopPropagation()">
+        <div class="pro-blur-modal-head" style="border-bottom:1.5px solid var(--border);padding-bottom:12px">
+          <div>
+            <h3 style="font-size:1.25rem;font-weight:800;color:var(--text);display:flex;align-items:center;gap:8px">
+              🔑 ${tr('Reset Your Password', 'पासवर्ड रीसेट करें (Forgot Password)')}
+            </h3>
+            <p class="text-muted" style="font-size:0.86rem;margin-top:2px">
+              ${isStep2 
+                ? tr(`Step 2 of 2: Enter OTP sent to ${esc(m.maskedTarget)}`, `स्टेप 2/2: ${esc(m.maskedTarget)} पर भेजा गया OTP और नया पासवर्ड दर्ज करें`) 
+                : tr('Step 1 of 2: Enter your registered 10-digit mobile or email', 'स्टेप 1/2: अपना पंजीकृत 10-अंकीय मोबाइल नंबर या ईमेल दर्ज करें')}
+            </p>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="closeForgotPasswordModal()">✕</button>
+        </div>
+
+        ${!isStep2 ? `
+          <!-- STEP 1: REQUEST OTP -->
+          <form onsubmit="sendPasswordResetOtp(event)">
+            <div class="pro-blur-modal-body" style="padding:18px 0 10px">
+              <div class="form-group">
+                <label class="form-label">${tr('Registered Mobile Number or Email', 'पंजीकृत 10-अंकीय मोबाइल नंबर या ईमेल आईडी')} *</label>
+                <input 
+                  class="input" 
+                  id="fp-identifier" 
+                  required 
+                  value="${esc(m.identifier || '')}" 
+                  placeholder="${tr('e.g. 9829011223 or name@company.com', 'जैसे: 9829011223 या name@company.com')}" 
+                  autofocus
+                />
+              </div>
+
+              <div class="card-subtle" style="background:#fff8f5;border:1px solid #ffd8cc;color:#c2410c;font-size:0.84rem;margin-top:10px">
+                🛡️ ${tr('A secure 6-digit verification code will be sent to confirm your identity with zero hassle.', 'आपकी पहचान सत्यापित करने के लिए एक सुरक्षित 6-अंकीय OTP तुरंत तैयार किया जाएगा।')}
+              </div>
+            </div>
+
+            <div class="pro-blur-modal-foot" style="border-top:1.5px solid var(--border);padding-top:14px;margin-top:10px;display:flex;justify-content:space-between;align-items:center">
+              <button type="button" class="btn btn-ghost" onclick="closeForgotPasswordModal()">${tr('Cancel', 'रद्द करें')}</button>
+              <button type="submit" class="btn btn-coral" style="padding:9px 20px" ${m.loading ? 'disabled' : ''}>
+                ${m.loading ? tr('Sending...', 'भेज रहे हैं...') : `📨 ${tr('Send OTP & Continue', 'OTP भेजें और आगे बढ़ें')}`}
+              </button>
+            </div>
+          </form>
+        ` : `
+          <!-- STEP 2: VERIFY OTP & SET NEW PASSWORD -->
+          <form onsubmit="submitPasswordReset(event)">
+            <div class="pro-blur-modal-body" style="padding:14px 0 10px">
+              ${m.otpPreview ? `
+                <div class="card-subtle" style="background:#eff6ff;border:1.5px solid #93c5fd;color:#1e40af;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">
+                  <div>
+                    <span style="font-size:0.75rem;font-weight:700;display:block">⚡ ${tr('INSTANT TEST / SMS OTP:', 'तत्काल टेस्ट / SMS OTP:')}</span>
+                    <strong style="font-size:1.3rem;letter-spacing:0.18em;color:#2563eb">${esc(m.otpPreview)}</strong>
+                  </div>
+                  <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.78rem;background:#fff;border:1px solid #93c5fd" onclick="document.getElementById('fp-otp').value='${esc(m.otpPreview)}'">
+                    📋 ${tr('Auto-Fill', 'ऑटो-फिल')}
+                  </button>
+                </div>
+              ` : ''}
+
+              <div class="form-group">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <label class="form-label">${tr('6-Digit Verification Code (OTP)', '6-अंकों का वेरिफिकेशन कोड (OTP)')} *</label>
+                  <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:0.78rem;color:#ea580c" onclick="resendPasswordResetOtp()">
+                    🔄 ${tr('Resend OTP', 'OTP पुनः भेजें')}
+                  </button>
+                </div>
+                <input class="input" id="fp-otp" required maxlength="6" style="font-size:1.2rem;letter-spacing:0.2em;text-align:center;font-weight:800" placeholder="••••••" autofocus />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">${tr('New Password (min 8 characters)', 'नया पासवर्ड (कम से कम 8 अक्षर)')} *</label>
+                <input class="input" type="password" id="fp-new-pass" required minlength="8" placeholder="${tr('Create a strong password', 'मजबूत नया पासवर्ड बनाएँ')}" />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label">${tr('Confirm New Password', 'नए पासवर्ड की पुष्टि करें')} *</label>
+                <input class="input" type="password" id="fp-confirm-pass" required minlength="8" placeholder="${tr('Re-enter new password', 'नया पासवर्ड दोबारा लिखें')}" />
+              </div>
+            </div>
+
+            <div class="pro-blur-modal-foot" style="border-top:1.5px solid var(--border);padding-top:14px;margin-top:10px;display:flex;justify-content:space-between;align-items:center">
+              <button type="button" class="btn btn-ghost" onclick="state.forgotPasswordModal.step=1;render()">${tr('← Back', '← वापस')}</button>
+              <button type="submit" class="btn btn-coral" style="padding:9px 22px" ${m.loading ? 'disabled' : ''}>
+                ${m.loading ? tr('Updating...', 'अपडेट हो रहा है...') : `🔐 ${tr('Reset Password & Sign In', 'पासवर्ड बदलें और लॉगिन करें')}`}
+              </button>
+            </div>
+          </form>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+window.openForgotPasswordModal = function() {
+  const existingInput = document.getElementById('li-id')?.value.trim() || '';
+  state.forgotPasswordModal = {
+    step: 1,
+    identifier: existingInput,
+    maskedTarget: '',
+    otpPreview: '',
+    loading: false
+  };
+  render();
+};
+
+window.closeForgotPasswordModal = function() {
+  state.forgotPasswordModal = null;
+  render();
+};
+
+window.sendPasswordResetOtp = async function(e) {
+  e.preventDefault();
+  const inputEl = document.getElementById('fp-identifier');
+  const identifier = inputEl ? inputEl.value.trim() : '';
+  if (!identifier) {
+    showToast(tr('Please enter your mobile or email', 'कृपया मोबाइल नंबर या ईमेल दर्ज करें'), 'error');
+    return;
+  }
+  state.forgotPasswordModal.loading = true;
+  render();
+
+  try {
+    const res = await apiFetch('/api/auth/forgot-password/request', {
+      method: 'POST',
+      body: JSON.stringify({ identifier })
+    });
+    state.forgotPasswordModal.step = 2;
+    state.forgotPasswordModal.identifier = identifier;
+    state.forgotPasswordModal.maskedTarget = res.maskedTarget;
+    state.forgotPasswordModal.otpPreview = res.otpPreview || '';
+    state.forgotPasswordModal.loading = false;
+    showToast(tr(res.message, res.message));
+    render();
+  } catch (err) {
+    state.forgotPasswordModal.loading = false;
+    showToast(err.message, 'error');
+    render();
+  }
+};
+
+window.resendPasswordResetOtp = async function() {
+  const identifier = state.forgotPasswordModal?.identifier;
+  if (!identifier) return;
+  try {
+    const res = await apiFetch('/api/auth/forgot-password/request', {
+      method: 'POST',
+      body: JSON.stringify({ identifier })
+    });
+    state.forgotPasswordModal.otpPreview = res.otpPreview || '';
+    showToast(tr('New OTP generated!', 'नया OTP तैयार कर दिया गया है!'));
+    render();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.submitPasswordReset = async function(e) {
+  e.preventDefault();
+  const otp = document.getElementById('fp-otp')?.value.trim() || '';
+  const newPassword = document.getElementById('fp-new-pass')?.value || '';
+  const confirmPassword = document.getElementById('fp-confirm-pass')?.value || '';
+  const identifier = state.forgotPasswordModal?.identifier || '';
+
+  if (!otp || otp.length < 6) {
+    showToast(tr('Please enter the 6-digit OTP', 'कृपया 6-अंकीय OTP दर्ज करें'), 'error');
+    return;
+  }
+  if (newPassword.length < 8) {
+    showToast(tr('Password must be at least 8 characters long', 'पासवर्ड कम से कम 8 अक्षरों का होना चाहिए'), 'error');
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    showToast(tr('Passwords do not match', 'दोनों पासवर्ड एक जैसे नहीं हैं'), 'error');
+    return;
+  }
+
+  state.forgotPasswordModal.loading = true;
+  render();
+
+  try {
+    const res = await apiFetch('/api/auth/forgot-password/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ identifier, otp, newPassword })
+    });
+    state.token = res.token;
+    localStorage.setItem('kuberq_token', res.token);
+    state.forgotPasswordModal = null;
+    showToast(tr('Password reset successfully! Logged in.', 'पासवर्ड सफलतापूर्वक बदल दिया गया! आप लॉगिन हो चुके हैं।'));
+    await bootstrap();
+    navigate(res.role === 'customer' ? '/customer' : (res.role === 'admin' || res.role === 'employee') ? '/admin' : '/merchant');
+  } catch (err) {
+    state.forgotPasswordModal.loading = false;
+    showToast(err.message, 'error');
+    render();
+  }
+};
 
 
 // ============================================================================
@@ -3574,6 +3860,7 @@ function renderMerchantPortal() {
   let bannerTitle = tr('Executive Dashboard', 'एग्जीक्यूटिव डैशबोर्ड एवं व्यापार प्रदर्शन');
   let bannerSubtitle = tr(`Welcome back, ${u.name}! Here is your business performance summary.`, `स्वागत है, ${u.name}! यहाँ आपके व्यापार के प्रदर्शन का संपूर्ण सारांश है।`);
   let bannerActionHtml = `
+    ${u.role === 'admin' ? `<button class="btn btn-sm" style="background:#f59e0b;color:#0f172a;font-weight:800;border:1.5px solid #fde047" onclick="navigate('/admin')">👑 ${tr('Super Admin Console', 'सुपर एडमिन कंसोल')}</button>` : ''}
     <button class="btn btn-ghost btn-sm" style="background:rgba(255,255,255,0.14);color:#ffffff;border:1px solid rgba(255,255,255,0.35)" onclick="state.merchantTab='AI Manager';render()">✨ ${tr('Ask AI Manager', 'AI मैनेजर से पूछें')}</button>
     <button class="btn btn-gold btn-sm" onclick="openCustomerModal()">+ ${tr('Add Customer', 'नया ग्राहक')}</button>
     <button class="btn btn-primary btn-sm" style="background:#0284c7;border-color:#38bdf8" onclick="state.invoiceDocType='Tax Invoice';state.merchantTab='Billing';render()">+ ${tr('New Invoice', 'नया GST बिल')}</button>
@@ -5882,7 +6169,10 @@ function renderAdminPortal() {
   let bannerIcon = '👑';
   let bannerTitle = isSuper ? tr('SUPER ADMIN COMMAND CENTER', 'सुपर एडमिन कमांड सेंटर') : `SUB-ADMIN: ${esc(u.designation)}`;
   let bannerSubtitle = tr(`KuberQ Platform Oversight · Signed in as: ${esc(u.name)} (${esc(u.phone)}) · API Vault: ${esc(ad.aiKeyStatus?.masked || '')}`, `KuberQ प्लेटफॉर्म नियंत्रण · लॉगिन: ${esc(u.name)} (${esc(u.phone)}) · API वॉल्ट: ${esc(ad.aiKeyStatus?.masked || '')}`);
-  let bannerActionHtml = `<button class="btn btn-sm" style="background:#ffffff;color:#0f172a;font-weight:700;border:1.5px solid #cbd5e1;box-shadow:0 2px 8px rgba(0,0,0,0.18);display:inline-flex;align-items:center;gap:6px" onclick="bootstrap()">🔄 <span>${tr('Refresh Records', 'डेटा ताज़ा करें')}</span></button>`;
+  let bannerActionHtml = `
+    <button class="btn btn-sm" style="background:linear-gradient(135deg,#0284c7,#0369a1);color:#ffffff;font-weight:800;border:1.5px solid #38bdf8;box-shadow:0 4px 12px rgba(2,132,199,0.35);display:inline-flex;align-items:center;gap:6px" onclick="navigate('/merchant')">🚀 <span>${tr('Open Business CRM & ERP (All 16 Modules)', 'बिज़नेस CRM व ERP खोलें (सभी 16 नए मॉड्यूल)')}</span></button>
+    <button class="btn btn-sm" style="background:#ffffff;color:#0f172a;font-weight:700;border:1.5px solid #cbd5e1;box-shadow:0 2px 8px rgba(0,0,0,0.18);display:inline-flex;align-items:center;gap:6px" onclick="bootstrap()">🔄 <span>${tr('Refresh Records', 'डेटा ताज़ा करें')}</span></button>
+  `;
 
   if (curTab === 'overview') {
     bannerIcon = '📊';
@@ -11326,7 +11616,7 @@ function render() {
     (r === '/customer' && state.data.user)
   );
 
-  const extraModals = `${renderFloatingActionHub()}${state.aiChatModalOpen ? renderGlobalAiChatModal() : ''}${state.bulkReviewModal ? renderBulkReviewModal() : ''}${state.voucherModalOpen ? renderVoucherScanModal() : ''}${state.customerModal ? renderCustomerModal() : ''}${state.productModal ? renderProductAddModal() : ''}${state.dealModal ? renderDealModal() : ''}${state.taskModal ? renderTaskModal() : ''}${state.managerModal ? renderManagerModal() : ''}`;
+  const extraModals = `${renderFloatingActionHub()}${state.aiChatModalOpen ? renderGlobalAiChatModal() : ''}${state.bulkReviewModal ? renderBulkReviewModal() : ''}${state.voucherModalOpen ? renderVoucherScanModal() : ''}${state.customerModal ? renderCustomerModal() : ''}${state.productModal ? renderProductAddModal() : ''}${state.dealModal ? renderDealModal() : ''}${state.taskModal ? renderTaskModal() : ''}${state.managerModal ? renderManagerModal() : ''}${state.forgotPasswordModal ? renderForgotPasswordModal() : ''}`;
 
   if (isEnterpriseView) {
     root.innerHTML = `${pageHtml}${state.demoModalOpen ? renderDemoModal() : ''}${state.reportModal ? renderReportModal() : ''}${state.orderReviewModal ? renderOrderReviewModal() : ''}${state.customerBillModal ? renderCustomerBillModal() : ''}${state.partyLedgerModalKey ? renderPartyLedgerModal() : ''}${state.aiModalOpen ? (state.data.myShop ? renderAiScannerModal(state.data.myShop) : '') : ''}${extraModals}`;
