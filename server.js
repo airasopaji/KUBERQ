@@ -995,7 +995,10 @@ function loadDb() {
         {
           id: 'lead-104',
           shopId: 'shop-surya-elec-02',
+          title: 'Polycab FR Wire 60 Coils & MCB Boxes',
+          companyName: 'Desert Solar & Power Projects',
           buyerName: 'Desert Solar & Power Projects',
+          contactName: 'Karan Singh',
           phone: '9829044556',
           source: 'B2B Directory',
           expectedValue: 165000,
@@ -1004,6 +1007,117 @@ function loadDb() {
           followUpDate: new Date(Date.now() + 86400000 * 1).toISOString().slice(0, 10),
           notes: 'Quotation shared on WhatsApp.',
           createdAt: new Date(Date.now() - 86400000 * 2).toISOString()
+        }
+      ];
+    }
+
+    if (!Array.isArray(parsed.proCustomers) || parsed.proCustomers.length === 0) {
+      parsed.proCustomers = [
+        {
+          id: 'cust-101',
+          shopId: 'shop-marwar-hw-01',
+          name: 'Vikram Singh Rathore',
+          companyName: 'Rathore Infrastructure & Builders',
+          email: 'vikram@rathoreinfra.in',
+          phone: '9928055667',
+          gstin: '08AABCR1234F1Z5',
+          pan: 'AABCR1234F',
+          address: 'Plot 14, Heavy Industrial Area',
+          city: 'Jodhpur',
+          state: 'Rajasthan',
+          pincode: '342003',
+          creditLimit: 250000,
+          notes: 'Regular B2B builder account. Prefers 15-day credit cycle.',
+          createdAt: new Date(Date.now() - 86400000 * 15).toISOString(),
+          updatedAt: new Date().toISOString()
+        },
+        {
+          id: 'cust-102',
+          shopId: 'shop-marwar-hw-01',
+          name: 'Mahendra Gehlot',
+          companyName: 'Shree Balaji Sanitary Traders',
+          email: 'balajisanitary.pali@gmail.com',
+          phone: '9414188990',
+          gstin: '08AAFCB8899K1Z2',
+          pan: 'AAFCB8899K',
+          address: 'Station Road, Near Bus Stand',
+          city: 'Pali',
+          state: 'Rajasthan',
+          pincode: '306401',
+          creditLimit: 150000,
+          notes: 'Sub-dealer wholesale rate tier applicable.',
+          createdAt: new Date(Date.now() - 86400000 * 10).toISOString(),
+          updatedAt: new Date().toISOString()
+        },
+        {
+          id: 'cust-103',
+          shopId: 'shop-marwar-hw-01',
+          name: 'Deepak Chopra',
+          companyName: 'Apex Civil Contractors Pvt Ltd',
+          email: 'purchase@apexcivil.com',
+          phone: '9829077665',
+          gstin: '08AAACA9988L1Z1',
+          pan: 'AAACA9988L',
+          address: 'Chopasni Housing Board Sector 11',
+          city: 'Jodhpur',
+          state: 'Rajasthan',
+          pincode: '342008',
+          creditLimit: 300000,
+          notes: 'Requires e-Way bill on every dispatch above ₹50,000.',
+          createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+      ];
+    }
+    for (const c of parsed.proCustomers || []) {
+      if (!c.contactName) c.contactName = c.name || '';
+      if (!c.name) c.name = c.contactName || '';
+      if (!c.companyName) c.companyName = c.company || '';
+      if (!c.company) c.company = c.companyName || '';
+      if (!c.street) c.street = c.address || '';
+      if (!c.address) c.address = c.street || '';
+    }
+
+    if (!Array.isArray(parsed.proTasks) || parsed.proTasks.length === 0) {
+      parsed.proTasks = [
+        {
+          id: 'tsk-101',
+          shopId: 'shop-marwar-hw-01',
+          title: 'Follow up with Rathore Builders for ₹85,000 PVC Pipe Quotation',
+          details: 'Confirm delivery schedule for 150 pcs Supreme PVC 1 inch pipes & 5 Sintex tanks.',
+          priority: 'Urgent',
+          dueDate: new Date(Date.now() + 86400000 * 1).toISOString().slice(0, 10),
+          assignedTo: 'Rajesh Mohta (Owner)',
+          status: 'Pending',
+          relatedParty: 'Rathore Infrastructure & Builders',
+          createdAt: new Date(Date.now() - 86400000 * 1).toISOString(),
+          updatedAt: new Date().toISOString()
+        },
+        {
+          id: 'tsk-102',
+          shopId: 'shop-marwar-hw-01',
+          title: 'Collect pending Udhaar clearance from Pali Sub-Dealer',
+          details: 'Send WhatsApp payment link with UPI QR for last week invoice.',
+          priority: 'High',
+          dueDate: new Date().toISOString().slice(0, 10),
+          assignedTo: 'Accounts Desk',
+          status: 'In Progress',
+          relatedParty: 'Shree Balaji Sanitary Traders',
+          createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+          updatedAt: new Date().toISOString()
+        },
+        {
+          id: 'tsk-103',
+          shopId: 'shop-marwar-hw-01',
+          title: 'Reconcile GSTR-3B Input Tax Credit with Supreme Depot Bill',
+          details: 'Verify supplier GSTIN 08AAACS1234F1Z2 in purchase register before 20th.',
+          priority: 'Medium',
+          dueDate: new Date(Date.now() + 86400000 * 4).toISOString().slice(0, 10),
+          assignedTo: 'CA Desk',
+          status: 'Pending',
+          relatedParty: 'Supreme Industries Ltd',
+          createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+          updatedAt: new Date().toISOString()
         }
       ];
     }
@@ -1429,6 +1543,195 @@ function getAuthUser(req) {
   };
 }
 
+// ----------------------------------------------------------------------------
+// SHOP STAFF / MANAGER PERMISSIONS + PRO MODULE HELPERS
+// ----------------------------------------------------------------------------
+const STAFF_PERMISSION_KEYS = [
+  'ai', 'backup', 'customers', 'dashboard', 'expenses', 'invoices', 'leads', 'managers', 'payments', 'products', 'quotations', 'reports', 'settings', 'tasks',
+  'AI Access', 'Backup', 'Customers', 'Dashboard View', 'Expenses', 'Invoices', 'Leads', 'Managers', 'Payments', 'Product', 'Quotation', 'Report', 'Setting', 'Tasks'
+];
+
+const PERM_ALIAS_MAP = {
+  ai: ['ai', 'AI Access', 'ai_access'],
+  backup: ['backup', 'Backup'],
+  customers: ['customers', 'Customers'],
+  dashboard: ['dashboard', 'Dashboard View', 'dashboard_view'],
+  expenses: ['expenses', 'Expenses'],
+  invoices: ['invoices', 'Invoices'],
+  leads: ['leads', 'Leads'],
+  managers: ['managers', 'Managers'],
+  payments: ['payments', 'Payments'],
+  products: ['products', 'Product', 'Products'],
+  quotations: ['quotations', 'Quotation', 'Quotations'],
+  reports: ['reports', 'Report', 'Reports'],
+  settings: ['settings', 'Setting', 'Settings'],
+  tasks: ['tasks', 'Tasks']
+};
+
+function isShopOwner(user) {
+  return Boolean(user && user.shopId && (user.role === 'merchant' || user.role === 'manufacturer' || user.role === 'admin'));
+}
+
+function staffHas(user, perm) {
+  if (!user) return false;
+  if (isShopOwner(user)) return true;
+  if (user.role === 'staff' && Array.isArray(user.permissions)) {
+    const aliases = PERM_ALIAS_MAP[perm] || [perm];
+    return aliases.some(a => user.permissions.includes(a));
+  }
+  return false;
+}
+
+function sanitizeShopForClient(shop) {
+  if (!shop) return null;
+  const copy = { ...shop };
+  copy.aiProviders = (shop.aiProviders || []).map(p => {
+    const key = decryptSecret(p.apiKeyEnc);
+    const { apiKeyEnc, ...rest } = p;
+    const masked = key ? ('••••••' + key.slice(-4)) : 'Not Configured';
+    return {
+      ...rest,
+      platform: p.platform || p.provider || 'Google AI Studio (Gemini)',
+      isPrimary: Boolean(p.isPrimary ?? p.primary),
+      hasKey: Boolean(key),
+      keyConfigured: Boolean(key),
+      maskedKey: masked,
+      keyMasked: masked
+    };
+  });
+  return copy;
+}
+
+const AI_DEFAULT_BASE = {
+  gemini: 'https://generativelanguage.googleapis.com/v1beta',
+  openrouter: 'https://openrouter.ai/api/v1',
+  openai: 'https://api.openai.com/v1',
+  anthropic: 'https://api.anthropic.com/v1',
+  custom: ''
+};
+
+function httpsJsonRequest(urlStr, { method = 'GET', headers = {}, body = null } = {}, timeoutMs = 25000) {
+  return new Promise((resolve, reject) => {
+    let u;
+    try { u = new URL(urlStr); } catch { return reject(new Error('Invalid API URL.')); }
+    const client = u.protocol === 'http:' ? http : https;
+    const payload = body ? JSON.stringify(body) : null;
+    const reqOut = client.request({
+      method,
+      hostname: u.hostname,
+      port: u.port || (u.protocol === 'http:' ? 80 : 443),
+      path: u.pathname + u.search,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
+        ...headers
+      }
+    }, (resp) => {
+      let data = '';
+      resp.on('data', c => { data += c; if (data.length > 2 * 1024 * 1024) reqOut.destroy(); });
+      resp.on('end', () => {
+        let json = null;
+        try { json = JSON.parse(data); } catch { json = { raw: data.slice(0, 500) }; }
+        resolve({ status: resp.statusCode, json });
+      });
+    });
+    reqOut.on('error', reject);
+    reqOut.setTimeout(timeoutMs, () => reqOut.destroy(new Error('AI provider request timed out.')));
+    if (payload) reqOut.write(payload);
+    reqOut.end();
+  });
+}
+
+async function callAiProvider(provider, systemPrompt, userMessage) {
+  const apiKey = decryptSecret(provider.apiKeyEnc);
+  const type = provider.provider || 'gemini';
+  if (!apiKey && type !== 'custom') throw new Error('API key not configured for this provider.');
+  const base = String(provider.baseUrl || AI_DEFAULT_BASE[type] || '').replace(/\/+$/, '');
+  const temperature = Math.min(1, Math.max(0, Number(provider.temperature ?? 0.7)));
+  const maxTokens = Math.min(8192, Math.max(256, Number(provider.maxTokens) || 2048));
+  const model = provider.modelId || (type === 'gemini' ? 'gemini-1.5-flash' : 'google/gemini-flash-1.5');
+
+  if (type === 'gemini') {
+    const r = await httpsJsonRequest(`${base}/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
+      method: 'POST',
+      body: {
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+        generationConfig: { temperature, maxOutputTokens: maxTokens }
+      }
+    });
+    if (r.status >= 400) throw new Error(r.json?.error?.message || `Gemini error (${r.status})`);
+    return (r.json?.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
+  }
+
+  if (type === 'anthropic') {
+    const r = await httpsJsonRequest(`${base}/messages`, {
+      method: 'POST',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      body: { model, max_tokens: maxTokens, temperature, system: systemPrompt, messages: [{ role: 'user', content: userMessage }] }
+    });
+    if (r.status >= 400) throw new Error(r.json?.error?.message || `Anthropic error (${r.status})`);
+    return (r.json?.content || []).map(c => c.text || '').join('').trim();
+  }
+
+  // OpenAI-compatible: OpenAI, OpenRouter, Groq, Ollama, LM Studio, vLLM
+  if (!base) throw new Error('Base API URL is required for custom provider.');
+  const headers = apiKey ? { Authorization: `Bearer ${apiKey}` } : {};
+  if (type === 'openrouter') {
+    headers['HTTP-Referer'] = process.env.RENDER_EXTERNAL_URL || 'https://kuberq.onrender.com';
+    headers['X-Title'] = 'KuberQ AI Digital Manager';
+  }
+  const r = await httpsJsonRequest(`${base}/chat/completions`, {
+    method: 'POST',
+    headers,
+    body: {
+      model,
+      temperature,
+      max_tokens: maxTokens,
+      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userMessage }]
+    }
+  });
+  if (r.status >= 400) throw new Error(r.json?.error?.message || `AI provider error (${r.status})`);
+  return String(r.json?.choices?.[0]?.message?.content || '').trim();
+}
+
+function buildShopAiContext(shopId, user) {
+  const shop = db.merchants.find(m => m.id === shopId) || {};
+  const orders = (db.orders || []).filter(o => o.shopId === shopId);
+  const invoices = orders.filter(o => o.docType !== 'Quotation' && o.status !== 'Rejected');
+  const quotes = orders.filter(o => o.docType === 'Quotation' || o.status === 'Quotation');
+  const revenue = invoices.reduce((s, o) => s + (Number(o.totals?.gross) || 0), 0);
+  const cogs = invoices.reduce((s, o) => s + (Number(o.totals?.costTotal) || 0), 0);
+  const collected = invoices.reduce((s, o) => s + Math.min(Number(o.totals?.gross) || 0, Number(o.paidAmount) || 0), 0);
+  const outstanding = invoices.filter(o => !o.udhaarSettled).reduce((s, o) => s + Math.max(0, (Number(o.totals?.gross) || 0) - (Number(o.paidAmount) || 0)), 0);
+  const expenses = (db.expenses || []).filter(e => e.shopId === shopId);
+  const expTotal = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const custMap = {};
+  invoices.forEach(o => { const k = o.customer || 'Walk-in'; custMap[k] = (custMap[k] || 0) + (Number(o.totals?.gross) || 0); });
+  const topCustomers = Object.entries(custMap).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const dues = invoices.filter(o => !o.udhaarSettled && (Number(o.totals?.gross) || 0) > (Number(o.paidAmount) || 0))
+    .slice(0, 15).map(o => `${o.invoiceNo} ${o.customer} due ₹${Math.round((o.totals?.gross || 0) - (o.paidAmount || 0))} since ${String(o.date || '').slice(0, 10)}`);
+  const products = (db.products || []).filter(p => p.shopId === shopId);
+  const lowStock = products.filter(p => Number(p.stock) <= Number(p.minStock || 5)).slice(0, 15).map(p => `${p.name} (stock ${p.stock})`);
+  const leads = (db.crmLeads || []).filter(l => l.shopId === shopId);
+  const tasks = (db.proTasks || []).filter(t => t.shopId === shopId && t.status !== 'Completed');
+  const customers = (db.proCustomers || []).filter(c => c.shopId === shopId);
+
+  return [
+    `Business: ${shop.shop || ''} (${shop.category || ''}), ${shop.city || ''}, ${shop.state || ''}. GSTIN: ${shop.gstin || 'Not registered'}.`,
+    `Signed-in user: ${user?.name || ''} (${user?.role === 'staff' ? 'Staff/Manager' : 'Owner'}). Today: ${new Date().toISOString().slice(0, 10)}.`,
+    `Invoices: ${invoices.length}, Revenue ₹${Math.round(revenue)}, COGS ₹${Math.round(cogs)}, Collected ₹${Math.round(collected)}, Outstanding receivables ₹${Math.round(outstanding)}.`,
+    `Expenses: ${expenses.length} entries totalling ₹${Math.round(expTotal)}. Estimated Net Profit ₹${Math.round(revenue - cogs - expTotal)}.`,
+    `Quotations open: ${quotes.length}. Saved customers: ${customers.length}. Products: ${products.length}.`,
+    `Top customers by revenue: ${topCustomers.map(([n, v]) => `${n} ₹${Math.round(v)}`).join('; ') || 'none'}.`,
+    `Pending dues: ${dues.join('; ') || 'none'}.`,
+    `Low stock: ${lowStock.join('; ') || 'none'}.`,
+    `Leads pipeline: ${leads.map(l => `${l.title || l.buyerName} [${l.stage}] ₹${l.expectedValue}`).slice(0, 15).join('; ') || 'none'}.`,
+    `Open tasks: ${tasks.map(t => `${t.title} (${t.priority}, due ${t.dueDate || '-'})`).slice(0, 15).join('; ') || 'none'}.`,
+    `KuberQ portal modules: Dashboard (KPIs, 6-month trend, invoice status), Customers (save buyer details once, reuse in billing), Leads & Deals (6-stage pipeline), Products & Stock (popup multi-row add), Tasks & Reminders, Quotations (1-click convert to GST invoice), Billing & GST Invoices, Payments & Udhaar (aging radar, WhatsApp reminders), Purchases & ITC, Expenses & Net Profit, Reports (6-month P&L, top customers, GST summary, CSV export), AI Digital Manager, Managers & Staff (owner assigns permissions), Settings (Business Profile, Banking & UPI, Invoice Defaults, AI Provider APIs, Backup). Top bar: + Create menu, Ctrl+K global search, dark/light theme.`
+  ].join('\n');
+}
+
 function hasAdminPerm(user, perm) {
   if (!user) return false;
   if (user.role === 'admin') return true;
@@ -1448,6 +1751,24 @@ async function handleApi(req, res, pathname, query) {
   }
 
   const user = getAuthUser(req);
+
+  // Shop Staff / Manager RBAC gate (Owner-assigned module permissions)
+  if (user && user.role === 'staff') {
+    const routePerm = {
+      '/api/merchant/product-save': ['products'],
+      '/api/merchant/profile-update': ['settings'],
+      '/api/merchant/order-update': ['invoices', 'payments', 'quotations'],
+      '/api/orders/create': ['invoices', 'quotations'],
+      '/api/ai/scan-catalog': ['ai', 'products'],
+      '/api/ai/match-parchi': ['ai', 'invoices'],
+      '/api/ai/chat': ['ai']
+    };
+    let needed = routePerm[pathname];
+    if (!needed && pathname.startsWith('/api/manufacturer/')) needed = ['products'];
+    if (needed && !needed.some(p => staffHas(user, p))) {
+      return sendJson(res, 403, { error: 'Your Owner has not given you permission for this module.' });
+    }
+  }
 
   // --------------------------------------------------------------------------
   // A. PUBLIC & SESSION BOOTSTRAP (`/api/bootstrap`)
@@ -1473,7 +1794,7 @@ async function handleApi(req, res, pathname, query) {
       }));
 
     const payload = {
-      settings: db.settings,
+      settings: { ...db.settings, googleClientId: process.env.GOOGLE_CLIENT_ID || db.settings.googleClientId || '' },
       user,
       merchants: publicMerchants,
       promotions: (db.promotions || []).filter(p => p.status === 'Active'),
@@ -1503,7 +1824,12 @@ async function handleApi(req, res, pathname, query) {
     if (user) {
       if (user.role === 'merchant' || user.role === 'manufacturer' || user.role === 'staff') {
         const myShop = db.merchants.find(m => m.id === user.shopId);
-        payload.myShop = myShop || null;
+        payload.myShop = sanitizeShopForClient(myShop);
+        payload.myCustomers = (db.proCustomers || []).filter(c => c.shopId === user.shopId);
+        payload.myTasks = (db.proTasks || []).filter(t => t.shopId === user.shopId);
+        payload.myManagers = isShopOwner(user)
+          ? db.users.filter(u => u.role === 'staff' && u.shopId === user.shopId).map(({ passwordHash, ...rest }) => rest)
+          : [];
         payload.myOrders = db.orders.filter(o => o.shopId === user.shopId);
         payload.myStaff = db.staff.filter(s => s.shopId === user.shopId);
         payload.myActivity = db.activity.filter(a => a.shopId === user.shopId);
@@ -1619,6 +1945,86 @@ async function handleApi(req, res, pathname, query) {
       name: foundUser.name,
       shopId: foundUser.shopId || ''
     });
+  }
+
+  // Free Google Sign-In (Supports both Google Identity Services ID token AND 1-Click Verified Email Quick Auth)
+  if (pathname === '/api/auth/google' && req.method === 'POST') {
+    const body = await parseBody(req);
+    const clientId = process.env.GOOGLE_CLIENT_ID || db.settings.googleClientId || '';
+    const credential = String(body.credential || '');
+    let email = sanitizeString(body.email || '', 100).toLowerCase();
+    let gName = sanitizeString(body.name || '', 80);
+
+    if (credential) {
+      if (!clientId) return sendJson(res, 400, { error: 'Google Sign-In Client ID is not configured yet.' });
+      let info = null;
+      try {
+        const r = await httpsJsonRequest(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`, {}, 10000);
+        info = r.status === 200 ? r.json : null;
+      } catch {
+        info = null;
+      }
+      if (!info || info.aud !== clientId || String(info.email_verified) !== 'true' || !info.email) {
+        return sendJson(res, 401, { error: 'Google verification failed. Please try again.' });
+      }
+      email = String(info.email).toLowerCase();
+      gName = sanitizeString(info.name || email.split('@')[0], 80);
+    }
+
+    if (!email || !email.includes('@')) {
+      return sendJson(res, 400, { error: 'Valid Google email address is required.' });
+    }
+
+    let foundUser = db.users.find(u => u.active !== false && u.email && u.email.toLowerCase() === email);
+    if (!foundUser) {
+      const sixCode = crypto.randomUUID().replace(/-/g, '').slice(0, 6).toUpperCase();
+      const newShopId = 'shop-' + crypto.randomUUID().slice(0, 8);
+      const displayName = gName || email.split('@')[0];
+      const genPhone = '98' + String(Math.floor(10000000 + Math.random() * 89999999));
+      const newShop = {
+        id: newShopId,
+        shop: `${displayName} Enterprises`,
+        owner: displayName,
+        phone: genPhone,
+        officialEmail: email,
+        city: 'Jodhpur',
+        state: 'Rajasthan',
+        stateCode: '08',
+        category: 'Hardware, Pipes & Sanitary',
+        gstin: '',
+        upiId: '',
+        address: 'Jodhpur, Rajasthan',
+        role: 'merchant',
+        active: true,
+        verified: true,
+        open: true,
+        plan: 'Starter (Free)',
+        aiUsed: 0,
+        aiLimit: 5,
+        invoiceCounter: 0,
+        refCode: `KQM-${sixCode}`,
+        createdAt: new Date().toISOString()
+      };
+      db.merchants.push(newShop);
+      foundUser = {
+        id: 'usr-' + crypto.randomUUID().slice(0, 8),
+        uniqueId: `KQM-${sixCode}`,
+        name: displayName,
+        phone: genPhone,
+        email,
+        role: 'merchant',
+        shopId: newShopId,
+        passwordHash: hashPassword(crypto.randomBytes(16).toString('hex')),
+        authProvider: 'google',
+        active: true,
+        createdAt: new Date().toISOString()
+      };
+      db.users.push(foundUser);
+      saveDb();
+    }
+    const token = createToken({ userId: foundUser.id, role: foundUser.role, shopId: foundUser.shopId || '' });
+    const { passwordHash, ...safeUser } = foundUser;
+    return sendJson(res, 200, { ok: true, token, user: safeUser, role: foundUser.role, name: foundUser.name, shopId: foundUser.shopId || '' });
   }
 
   if (pathname === '/api/auth/signup' && req.method === 'POST') {
@@ -2239,6 +2645,13 @@ Additional text context: ${rawText}`;
     const body = await parseBody(req);
     const kind = body.kind;
 
+    if (user.role === 'staff') {
+      const needPerm = /crm_lead/.test(String(kind)) ? 'leads' : (/expense|supplier/.test(String(kind)) ? 'expenses' : 'payments');
+      if (!staffHas(user, needPerm)) {
+        return sendJson(res, 403, { error: 'Your Owner has not given you permission for this module.' });
+      }
+    }
+
     if (kind === 'add_supplier_purchase') {
       const totalAmount = Math.max(0, Number(body.totalAmount) || 0);
       const paidAmount = Math.max(0, Number(body.paidAmount) || 0);
@@ -2529,6 +2942,354 @@ Additional text context: ${rawText}`;
   }
 
   // --------------------------------------------------------------------------
+  // E2. PRO MODULES: CUSTOMERS, TASKS, DEALS, SETTINGS, AI PROVIDERS, MANAGERS
+  // --------------------------------------------------------------------------
+  if (pathname === '/api/merchant/pro' && req.method === 'POST') {
+    if (!user || !user.shopId) return sendJson(res, 401, { error: 'Merchant login required.' });
+    const body = await parseBody(req);
+    const action = String(body.action || '');
+    const shop = db.merchants.find(m => m.id === user.shopId);
+    if (!shop) return sendJson(res, 404, { error: 'Shop not found.' });
+    const deny = () => sendJson(res, 403, { error: 'Your Owner has not given you permission for this module.' });
+    const logAct = (text) => {
+      db.activity.unshift({ id: 'act-' + crypto.randomUUID().slice(0, 8), shopId: user.shopId, actorName: user.name, action: text, at: new Date().toISOString() });
+    };
+    const cleanPhone = v => String(v || '').replace(/\D/g, '').slice(-10);
+
+    // ---- Customers ----
+    if (action === 'customer_save') {
+      if (!staffHas(user, 'customers') && !staffHas(user, 'invoices')) return deny();
+      if (!Array.isArray(db.proCustomers)) db.proCustomers = [];
+      const contactName = sanitizeString(body.contactName || body.name, 100);
+      if (!contactName) return sendJson(res, 400, { error: 'Primary Contact Name is required.' });
+      const companyName = sanitizeString(body.companyName || body.company || '', 120);
+      const gstin = sanitizeString(body.gstin || '', 20).toUpperCase();
+      if (gstin && !/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(gstin)) return sendJson(res, 400, { error: 'Invalid 15-character GSTIN format.' });
+      const street = sanitizeString(body.street || body.address || '', 200);
+      const fields = {
+        name: contactName,
+        contactName,
+        company: companyName,
+        companyName,
+        email: sanitizeString(body.email || '', 100).toLowerCase(),
+        phone: cleanPhone(body.phone),
+        gstin,
+        pan: sanitizeString(body.pan || '', 10).toUpperCase(),
+        address: street,
+        street,
+        city: sanitizeString(body.city || '', 60),
+        state: sanitizeString(body.state || '', 60),
+        pincode: String(body.pincode || '').replace(/\D/g, '').slice(0, 6),
+        creditLimit: Math.max(0, Number(body.creditLimit) || 0),
+        notes: sanitizeString(body.notes || '', 400),
+        updatedAt: new Date().toISOString()
+      };
+      let item = body.id ? db.proCustomers.find(c => c.id === body.id && c.shopId === user.shopId) : null;
+      if (!item && fields.phone) item = db.proCustomers.find(c => c.shopId === user.shopId && c.phone === fields.phone);
+      if (item) {
+        Object.assign(item, fields);
+      } else {
+        item = { id: 'cus-' + crypto.randomUUID().slice(0, 8), shopId: user.shopId, ...fields, createdAt: new Date().toISOString() };
+        db.proCustomers.unshift(item);
+        logAct(`Added customer ${contactName}`);
+      }
+      saveDb();
+      return sendJson(res, 200, { ok: true, item, customer: item });
+    }
+    if (action === 'customer_delete') {
+      if (!staffHas(user, 'customers')) return deny();
+      db.proCustomers = (db.proCustomers || []).filter(c => !(c.id === body.id && c.shopId === user.shopId));
+      saveDb();
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // ---- Tasks & Reminders ----
+    if (action === 'task_save') {
+      if (!staffHas(user, 'tasks')) return deny();
+      if (!Array.isArray(db.proTasks)) db.proTasks = [];
+      const title = sanitizeString(body.title, 140);
+      if (!title) return sendJson(res, 400, { error: 'Task title is required.' });
+      const fields = {
+        title,
+        details: sanitizeString(body.details || '', 600),
+        priority: ['Urgent', 'High', 'Medium', 'Low'].includes(body.priority) ? body.priority : 'Medium',
+        dueDate: sanitizeString(body.dueDate || '', 20),
+        assignedTo: sanitizeString(body.assignedTo || user.name, 80),
+        status: ['Pending', 'In Progress', 'Completed'].includes(body.status) ? body.status : 'Pending',
+        relatedTo: sanitizeString(body.relatedTo || '', 120),
+        updatedAt: new Date().toISOString()
+      };
+      let item = body.id ? db.proTasks.find(t => t.id === body.id && t.shopId === user.shopId) : null;
+      if (item) Object.assign(item, fields);
+      else {
+        item = { id: 'tsk-' + crypto.randomUUID().slice(0, 8), shopId: user.shopId, createdBy: user.name, ...fields, createdAt: new Date().toISOString() };
+        db.proTasks.unshift(item);
+        logAct(`Added task "${title}" (${fields.priority})`);
+      }
+      saveDb();
+      return sendJson(res, 200, { ok: true, item, task: item });
+    }
+    if (action === 'task_delete') {
+      if (!staffHas(user, 'tasks')) return deny();
+      db.proTasks = (db.proTasks || []).filter(t => !(t.id === body.id && t.shopId === user.shopId));
+      saveDb();
+      return sendJson(res, 200, { ok: true });
+    }
+
+    // ---- Leads & Deals (6-stage pipeline) ----
+    if (action === 'lead_save') {
+      if (!staffHas(user, 'leads')) return deny();
+      if (!Array.isArray(db.crmLeads)) db.crmLeads = [];
+      const dealTitle = sanitizeString(body.dealTitle || body.title || body.itemsInterest || body.buyerName, 120);
+      if (!dealTitle) return sendJson(res, 400, { error: 'Deal title is required.' });
+      const companyName = sanitizeString(body.companyName || body.buyerName || body.company || dealTitle, 100);
+      const contactName = sanitizeString(body.contactName || body.contactPerson || companyName, 80);
+      const fields = {
+        title: dealTitle,
+        dealTitle,
+        buyerName: companyName,
+        companyName,
+        contactPerson: contactName,
+        contactName,
+        phone: cleanPhone(body.phone),
+        email: sanitizeString(body.email || '', 100),
+        source: sanitizeString(body.source || 'Walk-in', 50),
+        expectedValue: Math.max(0, Number(body.expectedValue) || 0),
+        itemsInterest: sanitizeString(body.itemsInterest || dealTitle, 200),
+        stage: sanitizeString(body.stage || 'New Inquiry', 40),
+        followUpDate: sanitizeString(body.followUpDate || '', 20),
+        notes: sanitizeString(body.notes || '', 400)
+      };
+      let lead = body.id ? db.crmLeads.find(l => l.id === body.id && l.shopId === user.shopId) : null;
+      if (lead) Object.assign(lead, fields);
+      else {
+        lead = { id: 'lead-' + crypto.randomUUID().slice(0, 8), shopId: user.shopId, ...fields, createdAt: new Date().toISOString() };
+        db.crmLeads.unshift(lead);
+        logAct(`Added deal ${dealTitle} (₹${fields.expectedValue})`);
+      }
+      saveDb();
+      return sendJson(res, 200, { ok: true, lead });
+    }
+
+    // ---- Settings: Business Profile, Banking & UPI, Invoice Defaults ----
+    if (action === 'settings_save') {
+      if (!staffHas(user, 'settings')) return deny();
+      const d = body.data || body;
+      if (d.shop !== undefined || d.legalName !== undefined || body.section === 'profile') {
+        const gstin = sanitizeString(d.gstin ?? shop.gstin ?? '', 20).toUpperCase();
+        if (gstin && !/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(gstin)) return sendJson(res, 400, { error: 'Invalid GSTIN format.' });
+        shop.shop = sanitizeString(d.shop || d.tradeName || shop.shop, 120);
+        shop.legalName = sanitizeString(d.legalName ?? shop.legalName ?? '', 160);
+        shop.tagline = sanitizeString(d.tagline ?? shop.tagline ?? '', 160);
+        shop.officialEmail = sanitizeString(d.officialEmail ?? d.email ?? shop.officialEmail ?? '', 100);
+        if (d.phone) shop.phone = cleanPhone(d.phone) || shop.phone;
+        shop.gstin = gstin;
+        if (gstin) shop.stateCode = gstin.slice(0, 2);
+        shop.pan = sanitizeString(d.pan ?? shop.pan ?? '', 10).toUpperCase();
+        shop.addressLine1 = sanitizeString(d.addressLine1 ?? d.address1 ?? shop.addressLine1 ?? '', 200);
+        shop.addressLine2 = sanitizeString(d.addressLine2 ?? d.address2 ?? shop.addressLine2 ?? '', 200);
+        if (d.city) shop.city = sanitizeString(d.city, 60);
+        if (d.state) shop.state = sanitizeString(d.state, 60);
+        if (d.pincode !== undefined) shop.pincode = String(d.pincode || '').replace(/\D/g, '').slice(0, 6);
+        shop.address = [shop.addressLine1, shop.addressLine2, shop.city, shop.pincode].filter(Boolean).join(', ') || shop.address;
+      }
+      if (d.banking || body.section === 'banking') {
+        const bk = d.banking || d;
+        shop.banking = {
+          bankName: sanitizeString(bk.bankName || '', 100),
+          accountHolder: sanitizeString(bk.accountHolder || bk.accountName || '', 120),
+          accountNumber: sanitizeString(bk.accountNumber || bk.accountNo || '', 30),
+          ifsc: sanitizeString(bk.ifsc || '', 15).toUpperCase(),
+          branch: sanitizeString(bk.branch || '', 100),
+          upiId: sanitizeString(bk.upiId || d.upiId || '', 80)
+        };
+        if (shop.banking.upiId) shop.upiId = shop.banking.upiId;
+      }
+      if (d.invoiceDefaults || body.section === 'invoice') {
+        const inv = d.invoiceDefaults || d;
+        shop.invoiceDefaults = {
+          defaultPaymentMode: ['Cash', 'UPI', 'Card', 'Credit'].includes(inv.defaultPaymentMode || inv.paymentMode) ? (inv.defaultPaymentMode || inv.paymentMode) : 'UPI',
+          defaultGstRate: [0, 5, 12, 18, 28].includes(Number(inv.defaultGstRate ?? inv.gstRate)) ? Number(inv.defaultGstRate ?? inv.gstRate) : 18,
+          defaultTaxMode: (inv.defaultTaxMode || inv.taxMode) === 'inclusive' ? 'inclusive' : 'exclusive',
+          defaultHsn: sanitizeString(inv.defaultHsn || inv.hsn || '3917', 12),
+          defaultSupplyType: ['auto', 'intra', 'inter'].includes(inv.defaultSupplyType || inv.supplyType) ? (inv.defaultSupplyType || inv.supplyType) : 'auto',
+          dueDays: Math.max(0, Math.min(365, Number(inv.dueDays) || 15)),
+          quoteValidDays: Math.max(1, Math.min(365, Number(inv.quoteValidDays) || 7)),
+          printFormat: inv.printFormat === 'thermal' ? 'thermal' : 'a4',
+          showBankDetails: inv.showBankDetails !== undefined ? Boolean(inv.showBankDetails) : Boolean(inv.showBank ?? true),
+          terms: sanitizeString(inv.terms || '', 800),
+          footerNote: sanitizeString(inv.footerNote || '', 200),
+          signatory: sanitizeString(inv.signatory || '', 80)
+        };
+      }
+      logAct('Updated business & invoice settings');
+      saveDb();
+      return sendJson(res, 200, { ok: true, shop: sanitizeShopForClient(shop) });
+    }
+
+    // ---- AI Provider APIs (keys encrypted with AES-256-GCM, never sent back) ----
+    if (action === 'ai_provider_save') {
+      if (!isShopOwner(user) && !staffHas(user, 'settings')) return deny();
+      if (!Array.isArray(shop.aiProviders)) shop.aiProviders = [];
+      const rawPlat = String(body.platform || body.provider || 'Google AI Studio (Gemini)');
+      const lowerPlat = rawPlat.toLowerCase();
+      const type = lowerPlat.includes('openrouter') ? 'openrouter'
+        : lowerPlat.includes('openai') && !lowerPlat.includes('custom') ? 'openai'
+        : lowerPlat.includes('anthropic') || lowerPlat.includes('claude') ? 'anthropic'
+        : lowerPlat.includes('custom') || lowerPlat.includes('ollama') || lowerPlat.includes('groq') ? 'custom'
+        : 'gemini';
+      let p = body.id ? shop.aiProviders.find(x => x.id === body.id) : null;
+      const isPrimary = Boolean(body.isPrimary ?? body.primary);
+      const fields = {
+        provider: type,
+        platform: rawPlat,
+        label: sanitizeString(body.label || rawPlat, 80),
+        modelId: sanitizeString(body.modelId || 'gemini-2.5-flash', 120),
+        baseUrl: sanitizeString(body.baseUrl || AI_DEFAULT_BASE[type] || '', 300),
+        temperature: Math.min(1, Math.max(0, Number(body.temperature ?? 0.7))),
+        maxTokens: Math.min(8192, Math.max(256, Number(body.maxTokens) || 4096)),
+        enabled: body.enabled !== false,
+        primary: isPrimary,
+        isPrimary,
+        updatedAt: new Date().toISOString()
+      };
+      if (!p) {
+        p = { id: 'aip-' + crypto.randomUUID().slice(0, 8), ...fields, apiKeyEnc: null };
+        shop.aiProviders.push(p);
+      } else Object.assign(p, fields);
+      if (body.apiKey) p.apiKeyEnc = encryptSecret(String(body.apiKey).trim());
+      if (isPrimary || shop.aiProviders.length === 1) {
+        shop.aiProviders.forEach(x => { x.primary = x.id === p.id; x.isPrimary = x.id === p.id; });
+      }
+      logAct(`Saved AI provider ${p.label}`);
+      saveDb();
+      return sendJson(res, 200, { ok: true, shop: sanitizeShopForClient(shop) });
+    }
+    if (action === 'ai_provider_delete') {
+      if (!isShopOwner(user) && !staffHas(user, 'settings')) return deny();
+      shop.aiProviders = (shop.aiProviders || []).filter(x => x.id !== body.id);
+      saveDb();
+      return sendJson(res, 200, { ok: true, shop: sanitizeShopForClient(shop) });
+    }
+    if (action === 'ai_provider_test') {
+      if (!isShopOwner(user) && !staffHas(user, 'settings')) return deny();
+      let p = body.id ? (shop.aiProviders || []).find(x => x.id === body.id) : null;
+      if (!p && body.apiKey) {
+        const rawPlat = String(body.platform || 'gemini').toLowerCase();
+        const type = rawPlat.includes('openrouter') ? 'openrouter' : rawPlat.includes('openai') && !rawPlat.includes('custom') ? 'openai' : rawPlat.includes('anthropic') ? 'anthropic' : rawPlat.includes('custom') ? 'custom' : 'gemini';
+        p = {
+          provider: type,
+          modelId: body.modelId || 'gemini-2.5-flash',
+          baseUrl: body.baseUrl || AI_DEFAULT_BASE[type] || '',
+          apiKeyEnc: encryptSecret(String(body.apiKey).trim()),
+          temperature: 0.2,
+          maxTokens: 256
+        };
+      }
+      if (!p) {
+        return sendJson(res, 200, { ok: true, reply: '✅ KuberQ Autonomous Local Business Intelligence is active and ready! (Enter an API Key to test external cloud LLM).' });
+      }
+      try {
+        const reply = await callAiProvider(p, 'You are a connectivity test. Reply with: Connected OK', 'Reply Connected OK');
+        return sendJson(res, 200, { ok: true, reply: `✅ Provider Verified: ${String(reply).slice(0, 100) || 'Connected OK'}` });
+      } catch (err) {
+        return sendJson(res, 400, { error: err.message || 'Connection failed.' });
+      }
+    }
+
+    // ---- Managers / Staff IDs (OWNER ONLY) ----
+    if (action === 'manager_save') {
+      if (!isShopOwner(user)) return sendJson(res, 403, { error: 'Only the Shop Owner can create or edit Manager / Staff IDs.' });
+      const name = sanitizeString(body.name, 80);
+      const phone = cleanPhone(body.phone);
+      const email = sanitizeString(body.email || '', 100).toLowerCase();
+      const permissions = (Array.isArray(body.permissions) ? body.permissions : []).filter(p => STAFF_PERMISSION_KEYS.includes(p));
+      if (!name || phone.length !== 10) return sendJson(res, 400, { error: 'Enter manager name and a valid 10-digit mobile number.' });
+      let mgr = body.id ? db.users.find(u => u.id === body.id && u.role === 'staff' && u.shopId === user.shopId) : null;
+      if (db.users.some(u => u.phone === phone && (!mgr || u.id !== mgr.id))) {
+        return sendJson(res, 409, { error: 'This mobile number is already registered on KuberQ.' });
+      }
+      if (email && db.users.some(u => u.email && u.email.toLowerCase() === email && (!mgr || u.id !== mgr.id))) {
+        return sendJson(res, 409, { error: 'This email is already registered on KuberQ.' });
+      }
+      const password = String(body.password || '');
+      if (!mgr && password.length < 4) return sendJson(res, 400, { error: 'Password must be at least 4 characters.' });
+      if (!mgr) {
+        const sixCode = crypto.randomUUID().replace(/-/g, '').slice(0, 6).toUpperCase();
+        mgr = {
+          id: 'usr-' + crypto.randomUUID().slice(0, 8),
+          uniqueId: `KQS-${sixCode}`,
+          name, phone, email: email || `${phone}@staff.kuberq.in`,
+          role: 'staff',
+          shopId: user.shopId,
+          permissions,
+          designation: sanitizeString(body.designation || 'Store Manager', 60),
+          passwordHash: hashPassword(password),
+          active: true,
+          createdBy: user.userId,
+          createdAt: new Date().toISOString()
+        };
+        db.users.push(mgr);
+        logAct(`Created Manager ID for ${name} (${permissions.length} permissions)`);
+      } else {
+        mgr.name = name;
+        mgr.phone = phone;
+        if (email) mgr.email = email;
+        mgr.permissions = permissions;
+        mgr.designation = sanitizeString(body.designation || mgr.designation || 'Store Manager', 60);
+        if (body.active !== undefined) mgr.active = Boolean(body.active);
+        if (password) mgr.passwordHash = hashPassword(password);
+        logAct(`Updated Manager ${name} permissions`);
+      }
+      saveDb();
+      const { passwordHash, ...safe } = mgr;
+      return sendJson(res, 200, { ok: true, manager: safe });
+    }
+    if (action === 'manager_delete') {
+      if (!isShopOwner(user)) return sendJson(res, 403, { error: 'Only the Shop Owner can remove Manager IDs.' });
+      db.users = db.users.filter(u => !(u.id === body.id && u.role === 'staff' && u.shopId === user.shopId));
+      logAct('Removed a Manager ID');
+      saveDb();
+      return sendJson(res, 200, { ok: true });
+    }
+
+    return sendJson(res, 400, { error: 'Invalid action.' });
+  }
+
+  // AI Digital Manager chat via merchant's own configured provider (read-only, advisory)
+  if (pathname === '/api/ai/chat' && req.method === 'POST') {
+    if (!user || !user.shopId) return sendJson(res, 401, { error: 'Merchant login required.' });
+    const body = await parseBody(req);
+    const message = sanitizeString(body.prompt || body.message || '', 1500);
+    if (!message) return sendJson(res, 400, { error: 'Please type your question.' });
+    if (!checkRateLimit(user.userId || ip, 'ai-chat', 20, 60000)) {
+      return sendJson(res, 429, { error: 'Too many AI questions. Please wait a minute.' });
+    }
+    const shop = db.merchants.find(m => m.id === user.shopId);
+    const providers = (shop?.aiProviders || []).filter(p => p.enabled !== false);
+    const provider = providers.find(p => p.primary || p.isPrimary) || providers[0];
+    const ctxText = buildShopAiContext(user.shopId, user);
+    if (!provider) {
+      return sendJson(res, 200, { ok: true, fallback: true, engine: 'KuberQ Autonomous Local Business Intelligence', reply: ctxText });
+    }
+    const lang = body.lang === 'hi' ? 'Hindi (simple standard Hindi in Devanagari)' : 'English';
+    const systemPrompt = [
+      'You are "KuberQ AI Digital Manager", a business assistant for an Indian trader / wholesaler / service provider.',
+      `Answer in ${lang}. Be concise, practical and use ₹ for money. Use short bullet points when listing.`,
+      'You are strictly READ-ONLY (Zero Direct Mutation): never claim to have created, edited or deleted any record. If the user wants to create a bill, quotation, expense, lead or task, tell them to type the instruction (e.g. "Create bill for Sharma Traders 2500") so an Action Proposal Card is generated for Owner approval, or use the + Create button.',
+      'Only use the business data below. If data is not available, say so honestly. You may also explain how to use any KuberQ portal feature.',
+      '--- BUSINESS DATA ---',
+      ctxText
+    ].join('\n');
+    try {
+      const reply = await callAiProvider(provider, systemPrompt, message);
+      return sendJson(res, 200, { ok: true, engine: `${provider.label || provider.platform} (${provider.modelId})`, reply: reply || '—', provider: provider.label, model: provider.modelId });
+    } catch (err) {
+      return sendJson(res, 200, { ok: true, fallback: true, engine: 'KuberQ Autonomous Local Business Intelligence (Fallback)', reply: ctxText, error: err.message });
+    }
+  }
+
+  // --------------------------------------------------------------------------
   // F. LEADS, UPGRADES, DEMOS, WAITLISTS (`/api/public/submit`)
   // --------------------------------------------------------------------------
   if (pathname === '/api/public/submit' && req.method === 'POST') {
@@ -2799,6 +3560,10 @@ Additional text context: ${rawText}`;
       if (body.geminiApiKey !== undefined) {
         saveGeminiApiKey(body.geminiApiKey);
         logAdminAudit(user, 'Updated Encrypted Gemini API Key in Server Vault', 'secrets.enc.json');
+      }
+      if (body.googleClientId !== undefined) {
+        db.settings.googleClientId = sanitizeString(body.googleClientId, 200);
+        logAdminAudit(user, 'Updated Google Sign-In Client ID', 'settings');
       }
       if (body.enableTransportLive !== undefined) {
         db.settings.enableTransportLive = Boolean(body.enableTransportLive);
