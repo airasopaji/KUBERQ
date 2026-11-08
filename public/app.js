@@ -1452,6 +1452,7 @@ function renderHome() {
           const stateDisp = trDyn(m.state);
           const catDisp = trDyn(m.category);
           const isDemoStore = Boolean(m.isDemo || m.id === 'shop-marwar-hw-01' || m.id === 'MQM-31CD16');
+          const vouchCount = Number(m.communityVerifications || 18);
           return `
             <div class="store-card" style="display:flex;flex-direction:column;justify-content:space-between;gap:18px">
               <div>
@@ -1480,9 +1481,6 @@ function renderHome() {
                 <p style="font-size:1.02rem;color:#334155;margin-top:6px;font-weight:500">
                   ${esc(catDisp)} · ${esc(cityDisp)}, ${esc(stateDisp)} · 📞 ${esc(m.phone || CENTRAL_SUPPORT_PHONE)}
                   ${isDemoStore ? `<span class="text-muted" style="font-size:0.82rem;display:block;margin-top:3px">💡 ${tr('Sample Demo Storefront with preloaded test catalog & fictional GSTIN.', 'सैंपल डेमो स्टोर: परीक्षण हेतु डेमो कैटलॉग व टेस्ट GSTIN।')}</span>` : ''}
-                </p>
-              </div>
-                  ${esc(catDisp)} · ${esc(cityDisp)}, ${esc(stateDisp)} · 📞 ${esc(m.phone)}
                 </p>
               </div>
 
