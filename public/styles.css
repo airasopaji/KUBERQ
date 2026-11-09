@@ -883,10 +883,15 @@ a {
 
 .table-wrap {
   width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  display: block;
   border-radius: 14px;
   border: 1.5px solid var(--border);
   background: #fff;
+  position: relative;
 }
 
 table {
@@ -1469,17 +1474,129 @@ tr:hover td {
     z-index: 95;
     backdrop-filter: blur(3px);
   }
-  .enterprise-main {
-    padding: 14px;
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-    overflow-x: hidden;
+  /* Single-line sleek header on mobile without overlap */
+  .enterprise-topbar {
+    height: 52px !important;
+    min-height: 52px !important;
+    max-height: 52px !important;
+    padding: 0 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    flex-wrap: nowrap !important;
+    overflow: hidden !important;
+  }
+  .topbar-left {
+    gap: 8px !important;
+    flex-shrink: 0 !important;
   }
   .topbar-right-ribbon {
     font-size: 0.78rem;
-    gap: 6px;
+    gap: 4px !important;
+    flex-wrap: nowrap !important;
+    flex-shrink: 0 !important;
   }
+  .topbar-logout-btn {
+    padding: 6px 8px !important;
+    font-size: 0.82rem !important;
+    min-width: 32px !important;
+  }
+  .quick-create-btn {
+    padding: 5px 8px !important;
+    font-size: 0.8rem !important;
+  }
+  .theme-toggle-btn {
+    width: 32px !important;
+    height: 32px !important;
+    padding: 0 !important;
+    font-size: 0.95rem !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Main content spacing & bottom clearance for floating hub */
+  .enterprise-main {
+    padding: 10px 10px 85px 10px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow-x: hidden !important;
+  }
+
+  /* Compact Cards on mobile */
+  .card, .erp-card, .card-subtle {
+    padding: 14px 12px !important;
+    border-radius: 12px !important;
+    margin-bottom: 14px !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Sales Return 1-Column Responsive Grid on Mobile */
+  .sales-return-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+    width: 100% !important;
+  }
+
+  /* Universal Touch-Scrollable Tables on Mobile with Min-Width */
+  .table-wrap, .bulk-table-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-x pan-y !important;
+    display: block !important;
+    position: relative !important;
+    border-radius: 10px !important;
+    margin-bottom: 14px !important;
+    scrollbar-width: thin;
+  }
+  .table-wrap table, .bulk-table-wrap table {
+    width: 100% !important;
+    min-width: 620px !important;
+    border-collapse: collapse !important;
+  }
+  .table-wrap th, .table-wrap td {
+    padding: 9px 12px !important;
+    font-size: 0.82rem !important;
+    white-space: nowrap !important;
+  }
+
+  /* View Header Banner on mobile */
+  .view-header-banner {
+    padding: 12px 14px !important;
+    margin-bottom: 14px !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+  .view-header-title {
+    gap: 8px !important;
+  }
+  .view-header-icon {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 1.3rem !important;
+  }
+  .view-header-text h2 {
+    font-size: 1.1rem !important;
+  }
+
+  /* Floating Action Button (FAB) position */
+  .floating-action-hub {
+    bottom: 20px !important;
+    right: 14px !important;
+    z-index: 80 !important;
+  }
+}
+
+.sales-return-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 18px;
+  align-items: start;
 }
 
 

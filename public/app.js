@@ -650,7 +650,8 @@ function renderEnterpriseShell(opts) {
           <!-- + Create Quick Action Dropdown (Item #1) -->
           <div class="quick-create-wrap" onclick="event.stopPropagation()">
             <button type="button" class="quick-create-btn" onclick="state.quickCreateOpen=!state.quickCreateOpen;state.globalSearchOpen=false;render()">
-              <span>+ ${tr('Create', 'नया बनाएँ')}</span>
+              <span class="desktop-only">+ ${tr('Create', 'नया बनाएँ')}</span>
+              <span class="mobile-only">+ New</span>
               <span style="font-size:0.7rem">▾</span>
             </button>
             ${state.quickCreateOpen ? `
@@ -693,7 +694,8 @@ function renderEnterpriseShell(opts) {
           </button>
 
           <button class="topbar-logout-btn" onclick="logout()" title="${tr('Secure Logout', 'सुरक्षित लॉगआउट')}">
-            🚪 ${tr('LOGOUT', 'लॉगआउट')}
+            <span class="desktop-only">🚪 ${tr('LOGOUT', 'लॉगआउट')}</span>
+            <span class="mobile-only" style="font-size:1rem">🚪</span>
           </button>
         </div>
       </header>
@@ -10743,9 +10745,12 @@ function renderMerchantCustomersCrm(shop) {
       </div>
 
       <div class="erp-card">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-          <h3 style="margin:0;font-size:1rem">${tr('Customer List', 'पंजीकृत ग्राहक सूची')} (${customers.length})</h3>
-          <span class="badge badge-primary">${tr('1-Click Auto-Fill in GST Billing Enabled', 'बिलिंग में 1-क्लिक ऑटो-फिल चालू')}</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <h3 style="margin:0;font-size:1.05rem;font-weight:800">${tr('Customer List', 'पंजीकृत ग्राहक सूची')} (${customers.length})</h3>
+            <span class="badge badge-primary desktop-only">${tr('1-Click Auto-Fill in GST Billing Enabled', 'बिलिंग में 1-क्लिक ऑटो-फिल चालू')}</span>
+          </div>
+          <span class="mobile-only" style="font-size:0.75rem;color:#0284c7;font-weight:700">↔️ ${tr('Swipe table to view balance & actions →', 'बकाया व कार्रवाई देखने हेतु दाएँ स्वाइप करें →')}</span>
         </div>
 
         <div class="table-wrap">
@@ -12259,7 +12264,7 @@ function renderMerchantSalesReturn(shop) {
           <button type="button" class="btn btn-ghost btn-sm" onclick="state.merchantTab='POS Counter';render()">← ${tr('Back to POS Counter', 'पीओएस काउंटर पर लौटें')}</button>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start">
+        <div class="sales-return-grid">
           <!-- LEFT: Search Sale & Items List (Matching Image 2) -->
           <div>
             <div style="margin-bottom:16px">
@@ -12403,7 +12408,10 @@ function renderMerchantSalesReturn(shop) {
         <!-- Recent Returns History Table -->
         ${returnHistory.length > 0 ? `
           <div style="margin-top:24px;border-top:1.5px solid #f1f5f9;padding-top:16px">
-            <h3 style="font-size:1.05rem;font-weight:800;color:#0f172a;margin-bottom:10px">📜 ${tr('Recent Sales Returns History', 'हालिया सामान वापसी इतिहास')}</h3>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
+              <h3 style="font-size:1.05rem;font-weight:800;color:#0f172a;margin:0">📜 ${tr('Recent Sales Returns History', 'हालिया सामान वापसी इतिहास')}</h3>
+              <span class="mobile-only" style="font-size:0.75rem;color:#0284c7;font-weight:700">↔️ ${tr('Swipe table to view all columns →', 'पूरी टेबल देखने हेतु दाएँ स्वाइप करें →')}</span>
+            </div>
             <div class="table-wrap">
               <table>
                 <thead>
