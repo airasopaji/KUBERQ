@@ -205,7 +205,14 @@
       "stock": 120,
       "minStock": 20,
       "taxMode": "exclusive",
-      "costPrice": 139
+      "costPrice": 139,
+      "sku": "SKU-00001",
+      "barcode": "2000000100",
+      "category": "Hardware & Fittings",
+      "unit": "meter",
+      "batchNumber": "BAT-2026-A1",
+      "expiryDate": "2027-08-30",
+      "reorderLevel": 20
     },
     {
       "id": "prd-2",
@@ -219,7 +226,14 @@
       "stock": 85,
       "minStock": 15,
       "taxMode": "exclusive",
-      "costPrice": 260
+      "costPrice": 260,
+      "sku": "SKU-00002",
+      "barcode": "2000000101",
+      "category": "Pipes & Sanitary",
+      "unit": "meter",
+      "batchNumber": "BAT-2026-B2",
+      "expiryDate": "2027-08-30",
+      "reorderLevel": 15
     },
     {
       "id": "prd-3",
@@ -233,7 +247,14 @@
       "stock": 12,
       "minStock": 30,
       "taxMode": "exclusive",
-      "costPrice": 13
+      "costPrice": 13,
+      "sku": "SKU-00003",
+      "barcode": "2000000102",
+      "category": "Electricals & Wires",
+      "unit": "pc",
+      "batchNumber": "BAT-2026-C3",
+      "expiryDate": "2026-11-25",
+      "reorderLevel": 30
     },
     {
       "id": "prd-4",
@@ -247,7 +268,14 @@
       "stock": 8,
       "minStock": 3,
       "taxMode": "exclusive",
-      "costPrice": 5334
+      "costPrice": 5334,
+      "sku": "SKU-00004",
+      "barcode": "2000000103",
+      "category": "Paints & Chemicals",
+      "unit": "pc",
+      "batchNumber": "BAT-2026-D4",
+      "expiryDate": "2027-08-30",
+      "reorderLevel": 3
     },
     {
       "id": "prd-5",
@@ -261,7 +289,14 @@
       "stock": 65,
       "minStock": 15,
       "taxMode": "inclusive",
-      "costPrice": 689
+      "costPrice": 689,
+      "sku": "SKU-00005",
+      "barcode": "2000000104",
+      "category": "Tools & Fasteners",
+      "unit": "kg",
+      "batchNumber": "BAT-2026-E5",
+      "expiryDate": "2026-12-10",
+      "reorderLevel": 15
     },
     {
       "id": "prd-6",
@@ -275,7 +310,14 @@
       "stock": 50,
       "minStock": 10,
       "taxMode": "exclusive",
-      "costPrice": 1159
+      "costPrice": 1159,
+      "sku": "SKU-00006",
+      "barcode": "2000000105",
+      "category": "Hardware & Fittings",
+      "unit": "meter",
+      "batchNumber": "BAT-2026-F6",
+      "expiryDate": "2027-08-30",
+      "reorderLevel": 10
     },
     {
       "id": "prd-7",
@@ -289,7 +331,109 @@
       "stock": 40,
       "minStock": 10,
       "taxMode": "exclusive",
-      "costPrice": 1856
+      "costPrice": 1856,
+      "sku": "SKU-00007",
+      "barcode": "2000000106",
+      "category": "Pipes & Sanitary",
+      "unit": "meter",
+      "batchNumber": "BAT-2026-G7",
+      "expiryDate": "2027-08-30",
+      "reorderLevel": 10
+    },
+    {
+      "id": "prd-extra-1",
+      "shopId": "shop-marwar-hw-01",
+      "name": "Basmati Rice 5 kg Premium",
+      "sku": "SKU-00010",
+      "barcode": "200000000046",
+      "category": "Grains & Grocery",
+      "price": 495,
+      "wholesalePrice": 440,
+      "costPrice": 380,
+      "hsn": "1006",
+      "gstRate": 5,
+      "taxMode": "exclusive",
+      "stock": 45,
+      "unit": "pack",
+      "reorderLevel": 10,
+      "batchNumber": "BAT-2026-R1",
+      "expiryDate": "2027-05-15"
+    },
+    {
+      "id": "prd-extra-2",
+      "shopId": "shop-marwar-hw-01",
+      "name": "Fresh Dairy Butter 200g",
+      "sku": "SKU-00011",
+      "barcode": "200000000152",
+      "category": "Dairy Products",
+      "price": 115,
+      "wholesalePrice": 102,
+      "costPrice": 88,
+      "hsn": "0405",
+      "gstRate": 12,
+      "taxMode": "exclusive",
+      "stock": 22,
+      "unit": "pack",
+      "reorderLevel": 8,
+      "batchNumber": "BAT-2026-B9",
+      "expiryDate": "2026-11-20"
+    },
+    {
+      "id": "prd-extra-3",
+      "shopId": "shop-marwar-hw-01",
+      "name": "Cheddar Cheese Block 200g",
+      "sku": "SKU-00012",
+      "barcode": "200000000145",
+      "category": "Dairy Products",
+      "price": 160,
+      "wholesalePrice": 140,
+      "costPrice": 120,
+      "hsn": "0406",
+      "gstRate": 12,
+      "taxMode": "exclusive",
+      "stock": 14,
+      "unit": "pack",
+      "reorderLevel": 6,
+      "batchNumber": "BAT-2026-C4",
+      "expiryDate": "2027-01-10"
+    },
+    {
+      "id": "prd-extra-4",
+      "shopId": "shop-marwar-hw-01",
+      "name": "Fresh Croissants 4 Pack",
+      "sku": "SKU-00013",
+      "barcode": "200000000169",
+      "category": "Bakery & Snacks",
+      "price": 145,
+      "wholesalePrice": 125,
+      "costPrice": 95,
+      "hsn": "1905",
+      "gstRate": 5,
+      "taxMode": "exclusive",
+      "stock": 18,
+      "unit": "pack",
+      "reorderLevel": 5,
+      "batchNumber": "BAT-2026-CR1",
+      "expiryDate": "2026-11-15"
+    },
+    {
+      "id": "prd-extra-5",
+      "shopId": "shop-marwar-hw-01",
+      "name": "Havells Copper Wire 1.5 sq mm (90m)",
+      "sku": "SKU-00014",
+      "barcode": "200000000210",
+      "category": "Electricals & Wires",
+      "price": 1750,
+      "wholesalePrice": 1550,
+      "costPrice": 1320,
+      "hsn": "8544",
+      "gstRate": 18,
+      "taxMode": "exclusive",
+      "stock": 35,
+      "unit": "roll",
+      "reorderLevel": 10,
+      "batchNumber": "BAT-2026-HW8",
+      "expiryDate": "2029-12-31"
     }
   ],
   "orders": [
@@ -1147,5 +1291,359 @@
       "createdAt": "2026-11-05T04:19:02.281Z",
       "updatedAt": "2026-11-08T04:19:02.281Z"
     }
-  ]
+  ],
+  "suppliers": [
+    {
+      "id": "sup-01",
+      "shopId": "shop-marwar-hw-01",
+      "company": "Supreme Plastics & Pipes Depot",
+      "contactName": "Rameshwar Ji Agarwal",
+      "phone": "9829033445",
+      "email": "supreme.jodhpur@example.com",
+      "gstin": "08AAECS4567M1Z2",
+      "address": "Industrial Area Phase 2, Basni, Jodhpur",
+      "balancePayable": 42500,
+      "paymentTerms": "15 Days Credit"
+    },
+    {
+      "id": "sup-02",
+      "shopId": "shop-marwar-hw-01",
+      "company": "Havells Electrical Wholesalers",
+      "contactName": "Dinesh Sharma",
+      "phone": "9414055667",
+      "email": "dinesh.havells@example.com",
+      "gstin": "08AABCH7890N1Z4",
+      "address": "Station Road, Jodhpur",
+      "balancePayable": 18400,
+      "paymentTerms": "Immediate / 7 Days"
+    },
+    {
+      "id": "sup-03",
+      "shopId": "shop-marwar-hw-01",
+      "company": "Marwar Agro & Dairy Suppliers",
+      "contactName": "Kailash Choudhary",
+      "phone": "9828066778",
+      "email": "agro.marwar@example.com",
+      "gstin": "08AACMA3456P1Z8",
+      "address": "Mandi Yard, Bhagat Ki Kothi, Jodhpur",
+      "balancePayable": 8200,
+      "paymentTerms": "Weekly Cash"
+    }
+  ],
+  "shifts": [
+    {
+      "id": "sh-2026-001",
+      "shopId": "shop-marwar-hw-01",
+      "cashierName": "Vikram Malhotra (Owner)",
+      "cashierPhone": "9829011223",
+      "openedAt": "2026-11-09T03:45:11.052Z",
+      "openingFloat": 2000,
+      "status": "Open",
+      "cashSales": 14250,
+      "upiSales": 28400,
+      "cardSales": 4500,
+      "cashExpenses": 450,
+      "expectedCash": 15800,
+      "salesCount": 18
+    }
+  ],
+  "heldSales": [],
+  "salesReturns": [
+    {
+      "id": "ret-2026-001",
+      "shopId": "shop-marwar-hw-01",
+      "originalInvoiceId": "INV-2026-001",
+      "customerName": "Walk-in Customer",
+      "customerPhone": "",
+      "date": "2026-11-08T09:45:11.060Z",
+      "reason": "Damaged packaging during transit",
+      "refundMode": "Cash",
+      "refundAmount": 370,
+      "taxReversed": 56.44,
+      "items": [
+        {
+          "name": "Supreme PVC Pipe 1 inch (3m)",
+          "qty": 2,
+          "price": 185,
+          "backOnShelf": true
+        }
+      ]
+    }
+  ],
+  "rolesPermissions": {
+    "roles": [
+      "Admin",
+      "Manager",
+      "Cashier",
+      "Storekeeper",
+      "Staff",
+      "Rider"
+    ],
+    "sections": [
+      {
+        "name": "GENERAL",
+        "modules": [
+          {
+            "key": "dashboard",
+            "label": "Dashboard"
+          }
+        ]
+      },
+      {
+        "name": "SELL",
+        "modules": [
+          {
+            "key": "pos_counter",
+            "label": "POS Counter"
+          },
+          {
+            "key": "online_orders",
+            "label": "Online Orders"
+          },
+          {
+            "key": "deliveries",
+            "label": "Deliveries"
+          },
+          {
+            "key": "deals_coupons",
+            "label": "Deals & Coupons"
+          },
+          {
+            "key": "sales",
+            "label": "Sales & Invoices"
+          },
+          {
+            "key": "returns",
+            "label": "Returns & Credit Notes"
+          },
+          {
+            "key": "shifts_close",
+            "label": "Shifts & Day Close"
+          }
+        ]
+      },
+      {
+        "name": "STOCK",
+        "modules": [
+          {
+            "key": "products",
+            "label": "Products"
+          },
+          {
+            "key": "categories",
+            "label": "Categories"
+          },
+          {
+            "key": "expiry_batches",
+            "label": "Expiry & Batches"
+          },
+          {
+            "key": "stock_adjustments",
+            "label": "Stock Adjustments"
+          },
+          {
+            "key": "stock_count",
+            "label": "Stock Count"
+          },
+          {
+            "key": "reorder",
+            "label": "Reorder"
+          }
+        ]
+      },
+      {
+        "name": "BUY",
+        "modules": [
+          {
+            "key": "purchase_orders",
+            "label": "Purchase Orders"
+          },
+          {
+            "key": "receive_stock",
+            "label": "Receive Stock"
+          },
+          {
+            "key": "supplier_returns",
+            "label": "Supplier Returns"
+          },
+          {
+            "key": "suppliers",
+            "label": "Suppliers"
+          }
+        ]
+      },
+      {
+        "name": "CUSTOMERS",
+        "modules": [
+          {
+            "key": "customers",
+            "label": "Customers"
+          }
+        ]
+      },
+      {
+        "name": "MONEY",
+        "modules": [
+          {
+            "key": "expenses",
+            "label": "Expenses"
+          }
+        ]
+      },
+      {
+        "name": "REPORTS",
+        "modules": [
+          {
+            "key": "reports",
+            "label": "Reports"
+          }
+        ]
+      },
+      {
+        "name": "SYSTEM",
+        "modules": [
+          {
+            "key": "ai_assistant",
+            "label": "AI Store Assistant"
+          },
+          {
+            "key": "notifications",
+            "label": "Notifications"
+          },
+          {
+            "key": "users",
+            "label": "Users"
+          },
+          {
+            "key": "roles_permissions",
+            "label": "Roles & Permissions"
+          },
+          {
+            "key": "settings",
+            "label": "Settings"
+          },
+          {
+            "key": "activity_logs",
+            "label": "Activity Logs"
+          }
+        ]
+      }
+    ],
+    "matrix": {
+      "Cashier_dashboard": {
+        "v": true,
+        "a": false,
+        "e": false,
+        "d": false
+      },
+      "Cashier_pos_counter": {
+        "v": true,
+        "a": true,
+        "e": true,
+        "d": false
+      },
+      "Cashier_online_orders": {
+        "v": true,
+        "a": false,
+        "e": true,
+        "d": false
+      },
+      "Cashier_deliveries": {
+        "v": true,
+        "a": false,
+        "e": false,
+        "d": false
+      },
+      "Cashier_deals_coupons": {
+        "v": true,
+        "a": false,
+        "e": false,
+        "d": false
+      },
+      "Cashier_sales": {
+        "v": true,
+        "a": true,
+        "e": false,
+        "d": false
+      },
+      "Cashier_returns": {
+        "v": true,
+        "a": true,
+        "e": false,
+        "d": false
+      },
+      "Cashier_shifts_close": {
+        "v": true,
+        "a": true,
+        "e": true,
+        "d": false
+      },
+      "Cashier_products": {
+        "v": true,
+        "a": false,
+        "e": false,
+        "d": false
+      },
+      "Storekeeper_products": {
+        "v": true,
+        "a": true,
+        "e": true,
+        "d": false
+      },
+      "Storekeeper_categories": {
+        "v": true,
+        "a": true,
+        "e": true,
+        "d": false
+      },
+      "Storekeeper_expiry_batches": {
+        "v": true,
+        "a": true,
+        "e": true,
+        "d": false
+      },
+      "Storekeeper_stock_adjustments": {
+        "v": true,
+        "a": true,
+        "e": false,
+        "d": false
+      },
+      "Storekeeper_stock_count": {
+        "v": true,
+        "a": true,
+        "e": true,
+        "d": false
+      },
+      "Storekeeper_reorder": {
+        "v": true,
+        "a": true,
+        "e": false,
+        "d": false
+      },
+      "Storekeeper_receive_stock": {
+        "v": true,
+        "a": true,
+        "e": true,
+        "d": false
+      },
+      "Storekeeper_supplier_returns": {
+        "v": true,
+        "a": true,
+        "e": false,
+        "d": false
+      },
+      "Rider_online_orders": {
+        "v": true,
+        "a": false,
+        "e": true,
+        "d": false
+      },
+      "Rider_deliveries": {
+        "v": true,
+        "a": false,
+        "e": true,
+        "d": false
+      }
+    }
+  }
 }
