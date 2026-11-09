@@ -650,9 +650,8 @@ function renderEnterpriseShell(opts) {
           <!-- + Create Quick Action Dropdown (Item #1) -->
           <div class="quick-create-wrap" onclick="event.stopPropagation()">
             <button type="button" class="quick-create-btn" onclick="state.quickCreateOpen=!state.quickCreateOpen;state.globalSearchOpen=false;render()">
-              <span class="desktop-only">+ ${tr('Create', 'नया बनाएँ')}</span>
-              <span class="mobile-only">+ New</span>
-              <span style="font-size:0.7rem">▾</span>
+              <span class="desktop-only">+ ${tr('Create', 'नया बनाएँ')} ▾</span>
+              <span class="mobile-only" style="display:inline">+ New ▾</span>
             </button>
             ${state.quickCreateOpen ? `
               <div class="quick-create-menu">
@@ -695,7 +694,7 @@ function renderEnterpriseShell(opts) {
 
           <button class="topbar-logout-btn" onclick="logout()" title="${tr('Secure Logout', 'सुरक्षित लॉगआउट')}">
             <span class="desktop-only">🚪 ${tr('LOGOUT', 'लॉगआउट')}</span>
-            <span class="mobile-only" style="font-size:1rem">🚪</span>
+            <span class="mobile-only" style="display:inline">🚪</span>
           </button>
         </div>
       </header>
@@ -770,6 +769,30 @@ function renderEnterpriseShell(opts) {
           </div>
         </main>
       </div>
+
+      <!-- Enterprise Mobile Bottom Navigation Bar -->
+      <nav class="mobile-bottom-nav mobile-only no-print" aria-label="Enterprise App Navigation">
+        <button type="button" class="mobile-nav-btn ${activeTab === 'Dashboard' ? 'active' : ''}" onclick="setEnterpriseNavTab('Dashboard')">
+          <span class="mobile-nav-icon">📊</span>
+          <span class="mobile-nav-label">${tr('Dashboard', 'डैशबोर्ड')}</span>
+        </button>
+        <button type="button" class="mobile-nav-btn ${activeTab === 'POS Counter' ? 'active' : ''}" onclick="setEnterpriseNavTab('POS Counter')">
+          <span class="mobile-nav-icon">🛒</span>
+          <span class="mobile-nav-label">${tr('Billing', 'बिलिंग')}</span>
+        </button>
+        <button type="button" class="mobile-nav-btn ${activeTab === 'Customers' ? 'active' : ''}" onclick="setEnterpriseNavTab('Customers')">
+          <span class="mobile-nav-icon">👥</span>
+          <span class="mobile-nav-label">${tr('Customers', 'ग्राहक')}</span>
+        </button>
+        <button type="button" class="mobile-nav-btn ${activeTab === 'Reports' ? 'active' : ''}" onclick="setEnterpriseNavTab('Reports')">
+          <span class="mobile-nav-icon">📈</span>
+          <span class="mobile-nav-label">${tr('Reports', 'रिपोर्ट्स')}</span>
+        </button>
+        <button type="button" class="mobile-nav-btn" onclick="toggleEnterpriseSidebar()">
+          <span class="mobile-nav-icon">☰</span>
+          <span class="mobile-nav-label">${tr('Menu', 'मेनू')}</span>
+        </button>
+      </nav>
     </div>
   `;
 }
@@ -3188,26 +3211,25 @@ function renderMerchantReportsOnly(shop) {
 
   return `
     <div style="display:grid;gap:18px">
-      <!-- Subtabs Navigation -->
-      <div class="card-subtle no-print" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 16px;border-radius:14px;border:1.5px solid var(--border, #cbd5e1)">
-        <span class="report-menu-title" style="font-weight:900;font-size:0.86rem;margin-right:4px">📊 ${tr('Reports Menu:', 'रिपोर्ट चुनें:')}</span>
-        <button type="button" class="btn btn-sm ${subTab === 'pnl' ? 'btn-primary' : 'btn-ghost'}" style="${subTab === 'pnl' ? 'background:#0f172a;color:#fff' : ''}" onclick="state.reportSubTab='pnl';render()">
-          📊 ${tr('6-Month P&L Statement', '6-माह लाभ-हानि (P&L)')}
+      <!-- Top-Middle Subtabs Navigation (Fixes Point 2) -->
+      <div class="page-subtab-strip no-print">
+        <button type="button" class="subtab-chip ${subTab === 'pnl' ? 'active' : ''}" onclick="state.reportSubTab='pnl';render()">
+          📊 ${tr('6-Month P&L', '6-माह लाभ-हानि (P&L)')}
         </button>
-        <button type="button" class="btn btn-sm ${subTab === 'valuation' ? 'btn-primary' : 'btn-ghost'}" style="${subTab === 'valuation' ? 'background:#0f172a;color:#fff' : ''}" onclick="state.reportSubTab='valuation';render()">
-          📦 ${tr('Stock Valuation Report', 'स्टॉक वैल्यूएशन रिपोर्ट')}
+        <button type="button" class="subtab-chip ${subTab === 'valuation' ? 'active' : ''}" onclick="state.reportSubTab='valuation';render()">
+          📦 ${tr('Stock Valuation', 'स्टॉक वैल्यूएशन')}
         </button>
-        <button type="button" class="btn btn-sm ${subTab === 'expiry_risk' ? 'btn-primary' : 'btn-ghost'}" style="${subTab === 'expiry_risk' ? 'background:#0f172a;color:#fff' : ''}" onclick="state.reportSubTab='expiry_risk';render()">
-          ⏳ ${tr('Expiry Risk Analysis', 'एक्सपायरी जोखिम विश्लेषण')}
+        <button type="button" class="subtab-chip ${subTab === 'expiry_risk' ? 'active' : ''}" onclick="state.reportSubTab='expiry_risk';render()">
+          ⏳ ${tr('Expiry Risk', 'एक्सपायरी रिस्क')}
         </button>
-        <button type="button" class="btn btn-sm ${subTab === 'sales_breakdown' ? 'btn-primary' : 'btn-ghost'}" style="${subTab === 'sales_breakdown' ? 'background:#0f172a;color:#fff' : ''}" onclick="state.reportSubTab='sales_breakdown';render()">
-          📈 ${tr('Sales by Product & Category', 'बिक्री अनुसार प्रोडक्ट व श्रेणी')}
+        <button type="button" class="subtab-chip ${subTab === 'sales_breakdown' ? 'active' : ''}" onclick="state.reportSubTab='sales_breakdown';render()">
+          📈 ${tr('Sales by Product', 'प्रोडक्ट अनुसार बिक्री')}
         </button>
-        <button type="button" class="btn btn-sm ${subTab === 'expenses_breakdown' ? 'btn-primary' : 'btn-ghost'}" style="${subTab === 'expenses_breakdown' ? 'background:#0f172a;color:#fff' : ''}" onclick="state.reportSubTab='expenses_breakdown';render()">
-          💸 ${tr('Expenses by Category', 'खर्च श्रेणी अनुसार')}
+        <button type="button" class="subtab-chip ${subTab === 'expenses_breakdown' ? 'active' : ''}" onclick="state.reportSubTab='expenses_breakdown';render()">
+          💸 ${tr('Expenses', 'खर्च विवरण')}
         </button>
-        <button type="button" class="btn btn-sm ${subTab === 'margins' ? 'btn-primary' : 'btn-ghost'}" style="${subTab === 'margins' ? 'background:#0f172a;color:#fff' : ''}" onclick="state.reportSubTab='margins';render()">
-          🏷️ ${tr('Price & Margin Analysis', 'दाम व मार्जिन रिपोर्ट')}
+        <button type="button" class="subtab-chip ${subTab === 'margins' ? 'active' : ''}" onclick="state.reportSubTab='margins';render()">
+          🏷️ ${tr('Price & Margin', 'दाम व मार्जिन')}
         </button>
       </div>
 
@@ -3223,38 +3245,45 @@ function renderMerchantReportsOnly(shop) {
           </div>
 
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));gap:12px;margin-bottom:20px">
-            <div class="pnl-kpi-rev" style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:14px">
-              <span style="font-size:0.75rem;color:#166534;font-weight:700">6M Revenue:</span>
-              <strong style="font-size:1.35rem;color:#15803d;display:block">₹${total6mRev.toLocaleString('en-IN')}</strong>
+            <div class="report-kpi-card rev">
+              <span class="kpi-label">6M Revenue:</span>
+              <strong class="kpi-val">₹${total6mRev.toLocaleString('en-IN')}</strong>
             </div>
-            <div class="pnl-kpi-cogs" style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:12px;padding:14px">
-              <span style="font-size:0.75rem;color:#991b1b;font-weight:700">Cost of Goods (COGS):</span>
-              <strong style="font-size:1.35rem;color:#b91c1c;display:block">₹${total6mCogs.toLocaleString('en-IN')}</strong>
+            <div class="report-kpi-card cogs">
+              <span class="kpi-label">Cost of Goods (COGS):</span>
+              <strong class="kpi-val">₹${total6mCogs.toLocaleString('en-IN')}</strong>
             </div>
-            <div class="pnl-kpi-exp" style="background:#fefce8;border:1.5px solid #fde047;border-radius:12px;padding:14px">
-              <span style="font-size:0.75rem;color:#854d0e;font-weight:700">Operating Expenses:</span>
-              <strong style="font-size:1.35rem;color:#a16207;display:block">₹${total6mExp.toLocaleString('en-IN')}</strong>
+            <div class="report-kpi-card exp">
+              <span class="kpi-label">Operating Expenses:</span>
+              <strong class="kpi-val">₹${total6mExp.toLocaleString('en-IN')}</strong>
             </div>
-            <div class="pnl-kpi-net" style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:12px;padding:14px">
-              <span style="font-size:0.75rem;color:#1e40af;font-weight:700">Net Operating Profit:</span>
-              <strong style="font-size:1.35rem;color:#1d4ed8;display:block">₹${total6mNet.toLocaleString('en-IN')}</strong>
+            <div class="report-kpi-card profit">
+              <span class="kpi-label">Net Operating Profit:</span>
+              <strong class="kpi-val">₹${total6mNet.toLocaleString('en-IN')}</strong>
             </div>
           </div>
 
           <div class="table-wrap">
             <table>
               <thead>
-                <tr><th>Month</th><th>Billed Revenue</th><th>COGS</th><th>Gross Margin</th><th>Operating Expenses</th><th>Net Profit</th></tr>
+                <tr>
+                  <th>${tr('Month', 'माह')}</th>
+                  <th>${tr('Billed Revenue', 'बिलिंग आय')}</th>
+                  <th>${tr('COGS', 'लागत (COGS)')}</th>
+                  <th>${tr('Gross Margin', 'सकल लाभ')}</th>
+                  <th>${tr('Operating Expenses', 'खर्चे')}</th>
+                  <th>${tr('Net Profit', 'शुद्ध लाभ')}</th>
+                </tr>
               </thead>
               <tbody>
                 ${sixMonths.map(m => `
                   <tr>
-                    <td><strong class="table-cell-title">${m.label || m.ym}</strong></td>
-                    <td style="color:#16a34a;font-weight:700">₹${Number(m.revenue || 0).toLocaleString('en-IN')}</td>
-                    <td class="table-cell-dim">₹${Number(m.cogs || 0).toLocaleString('en-IN')}</td>
-                    <td><strong class="table-cell-title">₹${Math.max(0, Number(m.revenue || 0) - Number(m.cogs || 0)).toLocaleString('en-IN')}</strong></td>
-                    <td style="color:#ef4444;font-weight:600">₹${Number(m.expenses || 0).toLocaleString('en-IN')}</td>
-                    <td><strong style="color:${(m.netProfit || 0) >= 0 ? '#16a34a' : '#ef4444'}">₹${Number(m.netProfit || 0).toLocaleString('en-IN')}</strong></td>
+                    <td><strong class="table-month-text">${m.label || m.ym}</strong></td>
+                    <td class="table-rev-text">₹${Number(m.revenue || 0).toLocaleString('en-IN')}</td>
+                    <td class="table-cogs-text">₹${Number(m.cogs || 0).toLocaleString('en-IN')}</td>
+                    <td class="table-margin-text">₹${Math.max(0, Number(m.revenue || 0) - Number(m.cogs || 0)).toLocaleString('en-IN')}</td>
+                    <td class="table-exp-text">₹${Number(m.expenses || 0).toLocaleString('en-IN')}</td>
+                    <td><strong class="${(m.netProfit || 0) >= 0 ? 'table-profit-pos' : 'table-profit-neg'}">₹${Number(m.netProfit || 0).toLocaleString('en-IN')}</strong></td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -3265,30 +3294,30 @@ function renderMerchantReportsOnly(shop) {
 
       <!-- 2. STOCK VALUATION REPORT -->
       ${subTab === 'valuation' ? `
-        <div class="card" style="border-radius:16px;padding:24px;background:#ffffff;box-shadow:var(--shadow-md)">
+        <div class="card" style="border-radius:16px;padding:24px;box-shadow:var(--shadow-md)">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
             <div>
               <span class="badge badge-primary">📦 ${tr('INVENTORY VALUATION AUDIT', 'इन्वेंट्री वैल्यूएशन ऑडिट')}</span>
-              <h3 style="font-size:1.3rem;font-weight:900;color:#0f172a;margin:4px 0 0">${tr('Stock Valuation at Cost Price vs Retail Value', 'लागत मूल्य (Cost) एवं बिक्री मूल्य (Retail) पर स्टॉक मूल्यांकन')}</h3>
+              <h3 style="font-size:1.3rem;font-weight:900;margin:4px 0 0">${tr('Stock Valuation at Cost Price vs Retail Value', 'लागत मूल्य (Cost) एवं बिक्री मूल्य (Retail) पर स्टॉक मूल्यांकन')}</h3>
             </div>
           </div>
 
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:14px;margin-bottom:20px">
-            <div style="background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:12px;padding:14px">
-              <span style="font-size:0.75rem;color:#64748b">Total Inventory Items:</span>
-              <strong style="font-size:1.3rem;color:#0f172a;display:block">${products.length} Products (${totalStockUnits} Units)</strong>
+            <div class="report-kpi-card exp">
+              <span class="kpi-label">Total Inventory Items:</span>
+              <strong class="kpi-val" style="font-size:1.2rem">${products.length} Products (${totalStockUnits} Units)</strong>
             </div>
-            <div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:12px;padding:14px">
-              <span style="font-size:0.75rem;color:#1e40af">Total Valuation @ Cost:</span>
-              <strong style="font-size:1.3rem;color:#1d4ed8;display:block">₹${totalStockCostValuation.toLocaleString('en-IN')}</strong>
+            <div class="report-kpi-card profit">
+              <span class="kpi-label">Total Valuation @ Cost:</span>
+              <strong class="kpi-val">₹${totalStockCostValuation.toLocaleString('en-IN')}</strong>
             </div>
-            <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:14px">
-              <span style="font-size:0.75rem;color:#166534">Total Valuation @ Selling Price:</span>
-              <strong style="font-size:1.3rem;color:#15803d;display:block">₹${totalStockSalesValuation.toLocaleString('en-IN')}</strong>
+            <div class="report-kpi-card rev">
+              <span class="kpi-label">Total Valuation @ Selling Price:</span>
+              <strong class="kpi-val">₹${totalStockSalesValuation.toLocaleString('en-IN')}</strong>
             </div>
-            <div style="background:#fefce8;border:1.5px solid #fde047;border-radius:12px;padding:14px">
-              <span style="font-size:0.75rem;color:#854d0e">Potential Gross Profit:</span>
-              <strong style="font-size:1.3rem;color:#a16207;display:block">₹${potentialGrossMargin.toLocaleString('en-IN')} (${marginPercent}%)</strong>
+            <div class="report-kpi-card exp">
+              <span class="kpi-label">Potential Gross Profit:</span>
+              <strong class="kpi-val">₹${potentialGrossMargin.toLocaleString('en-IN')} (${marginPercent}%)</strong>
             </div>
           </div>
 
@@ -3304,13 +3333,13 @@ function renderMerchantReportsOnly(shop) {
                   const sp = Number(p.price || 0);
                   return `
                     <tr>
-                      <td><strong>${esc(p.name)}</strong></td>
+                      <td><strong class="table-month-text">${esc(p.name)}</strong></td>
                       <td>${esc(p.category || 'General')}</td>
                       <td><strong>${q} ${esc(p.unit || 'pc')}</strong></td>
                       <td>₹${cp.toLocaleString('en-IN')}</td>
                       <td>₹${sp.toLocaleString('en-IN')}</td>
                       <td>₹${(q * cp).toLocaleString('en-IN')}</td>
-                      <td><strong style="color:#16a34a">₹${(q * sp).toLocaleString('en-IN')}</strong></td>
+                      <td><strong class="table-rev-text">₹${(q * sp).toLocaleString('en-IN')}</strong></td>
                     </tr>
                   `;
                 }).join('')}
@@ -3322,22 +3351,22 @@ function renderMerchantReportsOnly(shop) {
 
       <!-- 3. EXPIRY RISK REPORT -->
       ${subTab === 'expiry_risk' ? `
-        <div class="card" style="border-radius:16px;padding:24px;background:#ffffff;box-shadow:var(--shadow-md)">
+        <div class="card" style="border-radius:16px;padding:24px;box-shadow:var(--shadow-md)">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
             <div>
               <span class="badge badge-danger">⏳ ${tr('EXPIRY RISK INTELLIGENCE', 'एक्सपायरी जोखिम रिपोर्ट')}</span>
-              <h3 style="font-size:1.3rem;font-weight:900;color:#0f172a;margin:4px 0 0">${tr('Capital at Risk from Near-Expiry Inventory (< 60 Days)', '60 दिनों में समाप्त होने वाला माल एवं जोखिम पूँजी')}</h3>
+              <h3 style="font-size:1.3rem;font-weight:900;margin:4px 0 0">${tr('Capital at Risk from Near-Expiry Inventory (< 60 Days)', '60 दिनों में समाप्त होने वाला माल एवं जोखिम पूँजी')}</h3>
             </div>
           </div>
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">
-            <div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:12px;padding:16px">
-              <span style="font-size:0.75rem;color:#991b1b;font-weight:700">Total Stock at Expiry Risk:</span>
-              <strong style="font-size:1.5rem;color:#b91c1c;display:block">${expiryRiskItems} Units</strong>
+            <div class="report-kpi-card cogs">
+              <span class="kpi-label">Total Stock at Expiry Risk:</span>
+              <strong class="kpi-val">${expiryRiskItems} Units</strong>
             </div>
-            <div style="background:#fff1f2;border:1.5px solid #fda4af;border-radius:12px;padding:16px">
-              <span style="font-size:0.75rem;color:#9f1239;font-weight:700">Total Capital Value at Risk:</span>
-              <strong style="font-size:1.5rem;color:#be123c;display:block">₹${expiryRiskValue.toLocaleString('en-IN')}</strong>
+            <div class="report-kpi-card cogs">
+              <span class="kpi-label">Total Capital Value at Risk:</span>
+              <strong class="kpi-val">₹${expiryRiskValue.toLocaleString('en-IN')}</strong>
             </div>
           </div>
 
@@ -3351,14 +3380,14 @@ function renderMerchantReportsOnly(shop) {
                   <tr><td colspan="7" style="text-align:center;padding:24px" class="text-muted">✓ No products are expiring within the next 60 days. All stock is safe.</td></tr>
                 ` : expiringList.map(e => `
                   <tr>
-                    <td><strong>${esc(e.product.name)}</strong></td>
+                    <td><strong class="table-month-text">${esc(e.product.name)}</strong></td>
                     <td>${esc(e.product.batchNumber || 'BAT-01')}</td>
                     <td>${esc(e.product.expiryDate)}</td>
                     <td>
                       ${e.daysLeft < 0 ? `<span style="color:#ef4444;font-weight:800">Expired (${Math.abs(e.daysLeft)}d ago)</span>` : `<span style="color:#f59e0b;font-weight:800">${e.daysLeft} days left</span>`}
                     </td>
                     <td><strong>${e.stock}</strong></td>
-                    <td><strong style="color:#ef4444">₹${Number(e.val).toLocaleString('en-IN')}</strong></td>
+                    <td><strong class="table-exp-text">₹${Number(e.val).toLocaleString('en-IN')}</strong></td>
                     <td>
                       <button type="button" class="btn btn-ghost btn-sm" onclick="state.merchantTab='Suppliers';render()">🚚 Return to Supplier</button>
                     </td>
@@ -3372,18 +3401,18 @@ function renderMerchantReportsOnly(shop) {
 
       <!-- 4. SALES BY PRODUCT & CATEGORY -->
       ${subTab === 'sales_breakdown' ? `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px">
-          <div class="card" style="border-radius:16px;padding:20px;background:#ffffff;box-shadow:var(--shadow-md)">
-            <h3 style="font-size:1.15rem;font-weight:900;color:#0f172a;margin-bottom:12px">🏆 ${tr('Sales by Product (Top Selling)', 'प्रोडक्ट अनुसार कुल बिक्री')}</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:18px">
+          <div class="card" style="border-radius:16px;padding:20px;box-shadow:var(--shadow-md)">
+            <h3 style="font-size:1.15rem;font-weight:900;margin-bottom:12px">🏆 ${tr('Sales by Product (Top Selling)', 'प्रोडक्ट अनुसार कुल बिक्री')}</h3>
             <div class="table-wrap">
               <table>
                 <thead><tr><th>Product Name</th><th>Units Sold</th><th>Total Revenue</th></tr></thead>
                 <tbody>
                   ${topProducts.length === 0 ? '<tr><td colspan="3" class="text-muted" style="text-align:center">No sales data recorded yet.</td></tr>' : topProducts.map(p => `
                     <tr>
-                      <td><strong>${esc(p.name)}</strong></td>
+                      <td><strong class="table-month-text">${esc(p.name)}</strong></td>
                       <td>${p.qty}</td>
-                      <td><strong style="color:#16a34a">₹${Number(p.revenue).toLocaleString('en-IN')}</strong></td>
+                      <td><strong class="table-rev-text">₹${Number(p.revenue).toLocaleString('en-IN')}</strong></td>
                     </tr>
                   `).join('')}
                 </tbody>
@@ -3391,16 +3420,16 @@ function renderMerchantReportsOnly(shop) {
             </div>
           </div>
 
-          <div class="card" style="border-radius:16px;padding:20px;background:#ffffff;box-shadow:var(--shadow-md)">
-            <h3 style="font-size:1.15rem;font-weight:900;color:#0f172a;margin-bottom:12px">📁 ${tr('Sales by Category', 'श्रेणी (Category) अनुसार बिक्री')}</h3>
+          <div class="card" style="border-radius:16px;padding:20px;box-shadow:var(--shadow-md)">
+            <h3 style="font-size:1.15rem;font-weight:900;margin-bottom:12px">📁 ${tr('Sales by Category', 'श्रेणी (Category) अनुसार बिक्री')}</h3>
             <div class="table-wrap">
               <table>
                 <thead><tr><th>Category</th><th>Revenue</th></tr></thead>
                 <tbody>
                   ${catSales.length === 0 ? '<tr><td colspan="2" class="text-muted" style="text-align:center">No category sales data yet.</td></tr>' : catSales.map(([cat, rev]) => `
                     <tr>
-                      <td><strong>${esc(cat)}</strong></td>
-                      <td><strong style="color:#0284c7">₹${Number(rev).toLocaleString('en-IN')}</strong></td>
+                      <td><strong class="table-month-text">${esc(cat)}</strong></td>
+                      <td><strong class="table-margin-text">₹${Number(rev).toLocaleString('en-IN')}</strong></td>
                     </tr>
                   `).join('')}
                 </tbody>
@@ -3412,8 +3441,8 @@ function renderMerchantReportsOnly(shop) {
 
       <!-- 5. EXPENSES BY CATEGORY -->
       ${subTab === 'expenses_breakdown' ? `
-        <div class="card" style="border-radius:16px;padding:24px;background:#ffffff;box-shadow:var(--shadow-md)">
-          <h3 style="font-size:1.3rem;font-weight:900;color:#0f172a;margin-bottom:14px">💸 ${tr('Operating Expenses by Category', 'खर्च श्रेणी अनुसार विवरण (Rent, Tea, Freight, Salary)')}</h3>
+        <div class="card" style="border-radius:16px;padding:24px;box-shadow:var(--shadow-md)">
+          <h3 style="font-size:1.3rem;font-weight:900;margin-bottom:14px">💸 ${tr('Operating Expenses by Category', 'खर्च श्रेणी अनुसार विवरण (Rent, Tea, Freight, Salary)')}</h3>
           <div class="table-wrap">
             <table>
               <thead><tr><th>Expense Category</th><th>Amount (₹)</th><th>Share of Expenses</th></tr></thead>
@@ -3423,8 +3452,8 @@ function renderMerchantReportsOnly(shop) {
                   const share = totalExp > 0 ? Math.round((amt / totalExp) * 100) : 0;
                   return `
                     <tr>
-                      <td><strong>${esc(cat)}</strong></td>
-                      <td><strong style="color:#ef4444">₹${Number(amt).toLocaleString('en-IN')}</strong></td>
+                      <td><strong class="table-month-text">${esc(cat)}</strong></td>
+                      <td><strong class="table-exp-text">₹${Number(amt).toLocaleString('en-IN')}</strong></td>
                       <td>
                         <div style="display:flex;align-items:center;gap:8px">
                           <div style="background:#e2e8f0;border-radius:6px;width:100px;height:8px;overflow:hidden">
@@ -3444,8 +3473,8 @@ function renderMerchantReportsOnly(shop) {
 
       <!-- 6. PRICE & MARGIN ANALYSIS -->
       ${subTab === 'margins' ? `
-        <div class="card" style="border-radius:16px;padding:24px;background:#ffffff;box-shadow:var(--shadow-md)">
-          <h3 style="font-size:1.3rem;font-weight:900;color:#0f172a;margin-bottom:14px">🏷️ ${tr('Product Pricing, Cost & Gross Margin % Analysis', 'दाम, लागत एवं सकल मुनाफ़ा मार्जिन (Margin %) विश्लेषण')}</h3>
+        <div class="card" style="border-radius:16px;padding:24px;box-shadow:var(--shadow-md)">
+          <h3 style="font-size:1.3rem;font-weight:900;margin-bottom:14px">🏷️ ${tr('Product Pricing, Cost & Gross Margin % Analysis', 'दाम, लागत एवं सकल मुनाफ़ा मार्जिन (Margin %) विश्लेषण')}</h3>
           <div class="table-wrap">
             <table>
               <thead>
@@ -10753,7 +10782,7 @@ function renderMerchantCustomersCrm(shop) {
           <span class="mobile-only" style="font-size:0.75rem;color:#0284c7;font-weight:700">↔️ ${tr('Swipe table to view balance & actions →', 'बकाया व कार्रवाई देखने हेतु दाएँ स्वाइप करें →')}</span>
         </div>
 
-        <div class="table-wrap">
+        <div class="table-wrap desktop-only">
           <table>
             <thead>
               <tr>
@@ -10810,6 +10839,50 @@ function renderMerchantCustomersCrm(shop) {
               }).join('')}
             </tbody>
           </table>
+        </div>
+
+        <!-- Mobile-Native App Cards View -->
+        <div class="mobile-card-list mobile-only">
+          ${customers.length === 0 ? `
+            <div style="text-align:center;padding:24px" class="text-muted">
+              ${tr('No customers saved yet.', 'अभी कोई ग्राहक सेव नहीं है।')}
+            </div>
+          ` : customers.map(c => {
+            const custOrders = orders.filter(o => (c.phone && o.phone === c.phone) || (o.customer && (o.customer.toLowerCase() === (c.companyName || '').toLowerCase() || o.customer.toLowerCase() === (c.contactName || '').toLowerCase())));
+            const totalInvoiced = custOrders.reduce((s, o) => s + (Number(o.totals?.gross) || 0), 0);
+            const totalDue = custOrders.reduce((s, o) => {
+              const g = Number(o.totals?.gross) || 0;
+              const pd = o.paymentMode === 'Credit' && !o.udhaarSettled ? Math.min(g, Number(o.paidAmount) || 0) : g;
+              return s + Math.max(0, g - pd);
+            }, 0);
+            const initials = (c.contactName || c.companyName || 'C').split(' ').filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || 'C';
+            const cleanPhone = (c.phone || '').replace(/[^0-9]/g, '');
+            return `
+              <div class="mobile-app-card">
+                <div class="mobile-app-card-top">
+                  <div class="mobile-app-card-avatar">${esc(initials)}</div>
+                  <div class="mobile-app-card-info">
+                    <div class="mobile-app-card-title" onclick="openCustomerModal('${c.id}')">${esc(c.contactName)}</div>
+                    ${c.companyName && c.companyName !== c.contactName ? `<div class="mobile-app-card-sub">🏢 ${esc(c.companyName)}</div>` : ''}
+                    <div class="mobile-app-card-sub">📍 ${esc(c.city || '—')}${c.state ? `, ${esc(c.state)}` : ''}</div>
+                  </div>
+                  <div style="text-align:right">
+                    <div style="font-size:0.7rem;color:var(--text-muted,#64748b);font-weight:600">${tr('Due', 'बकाया')}</div>
+                    <div style="font-size:0.95rem;font-weight:800;color:${totalDue > 0 ? '#ef4444' : '#10b981'}">
+                      ${totalDue > 0 ? fmtINR(totalDue) : '₹0 (Clear)'}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mobile-app-card-actions">
+                  ${c.phone ? `<a href="tel:${esc(c.phone)}" class="mobile-action-pill">📞 ${tr('Call', 'कॉल')}</a>` : ''}
+                  ${c.phone ? `<a href="https://wa.me/91${cleanPhone}?text=${encodeURIComponent(state.lang === 'hi' ? 'नमस्ते ' + c.contactName + ', KuberQ पर आपका बकाया: ' + fmtINR(totalDue) : 'Hello ' + c.contactName + ', Outstanding Balance on KuberQ: ' + fmtINR(totalDue))}" target="_blank" class="mobile-action-pill whatsapp">💬 WhatsApp</a>` : ''}
+                  <button type="button" class="mobile-action-pill primary" onclick="prefillInvoiceFromCustomer('${c.id}')">🧾 ${tr('Bill', 'बिल')}</button>
+                  <button type="button" class="mobile-action-pill" onclick="openCustomerModal('${c.id}')">✏️ ${tr('Edit', 'एडिट')}</button>
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>
     </div>
@@ -11038,7 +11111,7 @@ function renderMerchantTasks(shop) {
       </div>
 
       <div class="erp-card">
-        <div class="table-wrap">
+        <div class="table-wrap desktop-only">
           <table>
             <thead>
               <tr>
@@ -11091,6 +11164,43 @@ function renderMerchantTasks(shop) {
               }).join('')}
             </tbody>
           </table>
+        </div>
+
+        <!-- Mobile App Cards for Tasks -->
+        <div class="mobile-card-list mobile-only">
+          ${tasks.length === 0 ? `
+            <div style="text-align:center;padding:24px" class="text-muted">
+              ${tr('No tasks or reminders yet.', 'अभी कोई रिमाइंडर नहीं है।')}
+            </div>
+          ` : tasks.map(t => {
+            const prColors = {
+              Urgent: { bg: '#fee2e2', color: '#dc2626' },
+              High: { bg: '#ffedd5', color: '#ea580c' },
+              Medium: { bg: '#fef3c7', color: '#d97706' },
+              Low: { bg: '#e0f2fe', color: '#0284c7' }
+            };
+            const pr = prColors[t.priority] || prColors.Medium;
+            return `
+              <div class="mobile-app-card" style="${t.status === 'Completed' ? 'opacity:0.65' : ''}">
+                <div class="mobile-app-card-top">
+                  <div style="flex:1">
+                    <span style="background:${pr.bg};color:${pr.color};font-weight:800;font-size:0.7rem;padding:2px 8px;border-radius:999px">${esc(t.priority || 'Medium')}</span>
+                    <div class="mobile-app-card-title" style="margin-top:4px;${t.status === 'Completed' ? 'text-decoration:line-through' : ''}">${esc(t.title)}</div>
+                    ${t.details ? `<div class="mobile-app-card-sub">${esc(t.details)}</div>` : ''}
+                    <div class="mobile-app-card-sub" style="margin-top:4px">📅 <b>${esc(t.dueDate || 'Today')}</b> • 👤 ${esc(t.assignedTo || 'Owner')}</div>
+                  </div>
+                  <div style="text-align:right">
+                    <span class="badge ${t.status === 'Completed' ? 'badge-primary' : 'badge-gold'}" style="font-size:0.7rem">${esc(t.status || 'Pending')}</span>
+                  </div>
+                </div>
+                <div class="mobile-app-card-actions">
+                  ${t.status !== 'Completed' ? `<button type="button" class="mobile-action-pill primary" onclick="quickCompleteTask('${t.id}')">✓ ${tr('Done', 'पूर्ण')}</button>` : ''}
+                  <button type="button" class="mobile-action-pill" onclick="openTaskModal('${t.id}')">✏️ ${tr('Edit', 'एडिट')}</button>
+                  <button type="button" class="mobile-action-pill" style="color:#ef4444" onclick="deleteTaskRecord('${t.id}')">🗑️</button>
+                </div>
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>
     </div>
@@ -11971,6 +12081,7 @@ function renderMerchantPosCounter(shop) {
   if (!state.posPaymentMode) state.posPaymentMode = 'Cash';
   if (state.posDiscount === undefined) state.posDiscount = 0;
   if (state.posTendered === undefined) state.posTendered = 0;
+  const posMobileView = state.posMobileView || 'products';
 
   const allProducts = (state.data.products || []).filter(p => p.shopId === shop.id);
   const categories = ['All', ...new Set(allProducts.map(p => p.category || 'General'))];
@@ -11992,65 +12103,73 @@ function renderMerchantPosCounter(shop) {
 
   return `
     <div style="display:grid;gap:14px">
-      <!-- Top Action Bar: Walk-in / Customer Selector, Hold Sales, Customer Screen, Barcode Scan Input -->
-      <div class="card-subtle pos-header-bar" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding:12px 16px;border-radius:14px;border:1.5px solid var(--border, #cbd5e1)">
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1">
-          <!-- Walk-in Customer Dropdown (User Feature 4) -->
-          <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-weight:800;font-size:0.88rem">👤 ${tr('Customer:', 'ग्राहक:')}</span>
-            <select id="pos-customer-select" class="form-input" style="padding:6px 10px;border-radius:8px;font-weight:700;font-size:0.86rem;min-width:180px" onchange="handlePosCustomerChange(this.value)">
+      <!-- Top-Middle Module Tabs (Counter vs Cart vs Shift vs Held vs Barcodes) -->
+      <div class="pos-top-nav-strip no-print">
+        <button type="button" class="pos-nav-chip ${posMobileView === 'products' ? 'active' : ''}" onclick="state.posMobileView='products';render()">
+          🛒 ${tr('Products Catalog', 'प्रोडक्ट कैटलॉग')} (${filteredProducts.length})
+        </button>
+        <button type="button" class="pos-nav-chip ${posMobileView === 'cart' ? 'active' : ''}" onclick="state.posMobileView='cart';render()">
+          🛍️ ${tr('Billing Cart & Pay', 'बिलिंग कार्ट व पेमेंट')} <span class="badge ${cart.length > 0 ? 'badge-primary' : 'badge-ghost'}" style="margin-left:4px">${cart.length}</span>
+        </button>
+        <button type="button" class="pos-nav-chip" onclick="state.merchantTab='Shifts & Drawer';render()">
+          💼 ${tr('Shift & Drawer', 'गल्ला व शिफ्ट')}
+        </button>
+        <button type="button" class="pos-nav-chip" onclick="openHeldSalesModal()">
+          ⏸️ ${tr('Held Bills', 'होल्ड बिल')} ${heldSalesCount > 0 ? `(${heldSalesCount})` : ''}
+        </button>
+        <button type="button" class="pos-nav-chip" onclick="window.open('/customer-display', '_blank', 'width=900,height=600')">
+          🖥️ ${tr('Customer Screen', 'ग्राहक स्क्रीन')}
+        </button>
+        <button type="button" class="pos-nav-chip" onclick="openStorefrontBarcodeSheet()">
+          🏷️ ${tr('Print Barcodes', 'बारकोड शीट')}
+        </button>
+      </div>
+
+      <!-- Top Action Bar: Walk-in / Customer Selector & Barcode Scan Input -->
+      <div class="card-subtle pos-header-bar" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding:10px 14px;border-radius:14px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1 1 240px">
+          <!-- Walk-in Customer Dropdown -->
+          <div style="display:flex;align-items:center;gap:6px;flex:1 1 160px">
+            <span style="font-weight:800;font-size:0.86rem;white-space:nowrap">👤 ${tr('Customer:', 'ग्राहक:')}</span>
+            <select id="pos-customer-select" class="form-input" style="padding:6px 10px;border-radius:8px;font-weight:700;font-size:0.86rem;width:100%" onchange="handlePosCustomerChange(this.value)">
               <option value="walk_in" ${state.posCustomer.name === 'Walk-in Customer' ? 'selected' : ''}>👤 ${tr('Walk-in Customer (No details)', 'वॉक-इन ग्राहक (काउंटर सेल)')}</option>
               ${customers.map(c => `
                 <option value="${c.id}" ${state.posCustomer.id === c.id ? 'selected' : ''}>${esc(c.contactName || c.name)} (${esc(c.phone || 'No Phone')})</option>
               `).join('')}
             </select>
-            <button type="button" class="btn btn-ghost btn-sm" style="padding:4px 8px;font-size:0.8rem" onclick="openCustomerModal()" title="${tr('Add New Customer', 'नया ग्राहक जोड़ें')}">+ New</button>
+            <button type="button" class="btn btn-ghost btn-sm" style="padding:4px 8px;font-size:0.8rem;white-space:nowrap" onclick="openCustomerModal()" title="${tr('Add New Customer', 'नया ग्राहक जोड़ें')}">+ New</button>
           </div>
 
-          <!-- Barcode & SKU Fast Search Input (USB Scanner & Mobile Camera Ready) -->
-          <div style="display:flex;gap:6px;align-items:center;flex:1;min-width:240px">
-            <input type="text" id="pos-barcode-search" class="form-input" placeholder="${tr('🔍 Scan barcode with gun / type SKU or name...', '🔍 बारकोड गन से स्कैन करें या नाम/SKU लिखें...')}" style="padding:8px 12px;border-radius:8px;border:1.5px solid #0284c7;font-size:0.92rem;font-weight:600" onkeydown="handlePosBarcodeScan(event)" />
-            <button type="button" class="btn btn-gold btn-sm" style="white-space:nowrap;padding:7px 12px" onclick="triggerBarcodeCameraScan()">📷 ${tr('Scan Camera', 'कैमरा स्कैनर')}</button>
+          <!-- Barcode & SKU Fast Search Input -->
+          <div style="display:flex;gap:6px;align-items:center;flex:1 1 200px">
+            <input type="text" id="pos-barcode-search" class="form-input" placeholder="${tr('🔍 Scan barcode with gun / type SKU or name...', '🔍 बारकोड गन से स्कैन करें या नाम/SKU लिखें...')}" style="padding:7px 12px;border-radius:8px;border:1.5px solid #0284c7;font-size:0.88rem;font-weight:600;width:100%" onkeydown="handlePosBarcodeScan(event)" />
+            <button type="button" class="btn btn-gold btn-sm" style="white-space:nowrap;padding:7px 10px" onclick="triggerBarcodeCameraScan()">📷 ${tr('Scan', 'स्कैन')}</button>
           </div>
-        </div>
-
-        <!-- Top Right Actions: Held Sales, Dual Screen, Shifts -->
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <button type="button" class="btn btn-ghost btn-sm" style="font-weight:700;position:relative" onclick="openHeldSalesModal()">
-            ⏸️ ${tr('Held Sales', 'होल्ड बिल')}
-            ${heldSalesCount > 0 ? `<span style="background:#ef4444;color:#fff;border-radius:50%;padding:2px 6px;font-size:0.7rem;margin-left:4px;font-weight:900">${heldSalesCount}</span>` : ''}
-          </button>
-          <button type="button" class="btn btn-ghost btn-sm" style="font-weight:700" onclick="window.open('/customer-display', '_blank', 'width=900,height=600')">
-            🖥️ ${tr('Customer Screen', 'ग्राहक स्क्रीन (Dual Display)')}
-          </button>
-          <button type="button" class="btn btn-ghost btn-sm" style="font-weight:700" onclick="state.merchantTab='Shifts & Drawer';render()">
-            💼 ${tr('Shift / Cash Drawer', 'गल्ला / शिफ्ट')}
-          </button>
         </div>
       </div>
 
-      <!-- Main 2-Panel POS Layout: Left Products Catalogue, Right Live Cart -->
+      <!-- Main POS Layout: Responsive 2-Panel on Desktop, Tabbed on Mobile -->
       <div class="pos-container">
-        <!-- LEFT PANEL: Category Tabs + Products Grid -->
-        <div>
+        <!-- LEFT PANEL: Products Catalogue -->
+        <div class="pos-products-panel ${posMobileView === 'cart' ? 'mobile-hidden' : ''}">
           <!-- Category Filter Pills -->
           <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:8px;margin-bottom:12px;scrollbar-width:thin">
             ${categories.map(cat => {
               const count = cat === 'All' ? allProducts.length : allProducts.filter(p => p.category === cat).length;
               const isActive = activeCat === cat;
               return `
-                <button type="button" class="btn btn-sm ${isActive ? 'btn-primary' : 'btn-ghost'}" style="border-radius:20px;padding:5px 14px;font-size:0.84rem;font-weight:700;white-space:nowrap;${isActive ? 'background:#0f172a;border-color:#0f172a;color:#ffffff' : 'background:#ffffff;border:1px solid #cbd5e1'}" onclick="state.posCategory='${cat}';render()">
+                <button type="button" class="btn btn-sm ${isActive ? 'btn-primary' : 'btn-ghost'}" style="border-radius:20px;padding:5px 14px;font-size:0.84rem;font-weight:700;white-space:nowrap;${isActive ? 'background:#0f172a;border-color:#0f172a;color:#ffffff' : 'background:var(--surface,#ffffff);border:1px solid var(--border,#cbd5e1)'}" onclick="state.posCategory='${cat}';render()">
                   ${esc(cat)} (${count})
                 </button>
               `;
             }).join('')}
           </div>
 
-          <!-- Product Cards Grid (Matching Image 1) -->
+          <!-- Product Cards Grid -->
           <div class="pos-products-grid">
             ${filteredProducts.length === 0 ? `
-              <div style="grid-column:1/-1;text-align:center;padding:40px;background:#ffffff;border-radius:14px;border:1.5px dashed #cbd5e1">
-                <p style="font-size:1.1rem;color:#64748b">📦 ${tr('No products found in this category.', 'इस श्रेणी में कोई प्रोडक्ट नहीं मिला।')}</p>
+              <div style="grid-column:1/-1;text-align:center;padding:40px;border-radius:14px;border:1.5px dashed var(--border,#cbd5e1)">
+                <p style="font-size:1.1rem;color:var(--muted,#64748b)">📦 ${tr('No products found in this category.', 'इस श्रेणी में कोई प्रोडक्ट नहीं मिला।')}</p>
                 <button type="button" class="btn btn-primary btn-sm" onclick="openProductModal()">+ ${tr('Add Product', 'नया प्रोडक्ट जोड़ें')}</button>
               </div>
             ` : filteredProducts.map(p => {
@@ -12061,24 +12180,23 @@ function renderMerchantPosCounter(shop) {
               return `
                 <div class="pos-product-card" onclick="addPosItemToCart('${p.id}')">
                   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px">
-                    <span style="font-size:0.75rem;font-weight:800;color:#64748b;font-family:monospace">${esc(p.sku || 'SKU')}</span>
+                    <span style="font-size:0.75rem;font-weight:800;color:var(--muted,#64748b);font-family:monospace">${esc(p.sku || 'SKU')}</span>
                     ${isLowStock ? `<span style="background:#fee2e2;color:#991b1b;border-radius:4px;padding:1px 5px;font-size:0.68rem;font-weight:800">Low: ${stock}</span>` : `<span style="background:#f0fdf4;color:#166534;border-radius:4px;padding:1px 5px;font-size:0.68rem;font-weight:700">Qty: ${stock}</span>`}
                   </div>
 
                   <div style="margin:6px 0;min-height:36px">
-                    <strong style="font-size:0.9rem;color:#0f172a;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(p.name)}</strong>
-                    <span style="font-size:0.75rem;color:#64748b;display:block">${esc(p.category || 'General')}</span>
+                    <strong style="font-size:0.9rem;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(p.name)}</strong>
+                    <span style="font-size:0.75rem;color:var(--muted,#64748b);display:block">${esc(p.category || 'General')}</span>
                   </div>
 
-                  <!-- SVG Barcode Render (Image 1 style) -->
                   <div style="background:#ffffff;padding:2px;border-radius:4px;margin:2px 0 6px;text-align:center">
                     ${renderCode128Svg(barcode, 26, true)}
                   </div>
 
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:6px;border-top:1px dashed #e2e8f0">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;padding-top:6px;border-top:1px dashed var(--border,#e2e8f0)">
                     <div>
-                      <span style="font-size:1.05rem;font-weight:900;color:#0f172a">₹${Number(p.price || 0).toLocaleString('en-IN')}</span>
-                      <span style="font-size:0.72rem;color:#64748b">/${unit}</span>
+                      <span style="font-size:1.05rem;font-weight:900">₹${Number(p.price || 0).toLocaleString('en-IN')}</span>
+                      <span style="font-size:0.72rem;color:var(--muted,#64748b)">/${unit}</span>
                     </div>
                     <button type="button" class="btn btn-primary" style="width:28px;height:28px;border-radius:50%;padding:0;display:grid;place-items:center;font-size:1.1rem;font-weight:900;background:#0284c7;border:none" onclick="event.stopPropagation();addPosItemToCart('${p.id}')">+</button>
                   </div>
@@ -12088,13 +12206,16 @@ function renderMerchantPosCounter(shop) {
           </div>
         </div>
 
-        <!-- RIGHT PANEL: Current Sale (Cart, Totals, Numpad, Payment, Hold) -->
-        <div class="pos-cart-panel">
+        <!-- RIGHT PANEL: Current Sale (Cart, Totals, Payment) -->
+        <div class="pos-cart-panel ${posMobileView === 'products' ? 'mobile-hidden' : ''}">
           <!-- Cart Header -->
-          <div style="padding:12px 14px;border-bottom:1.5px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border-top-left-radius:16px;border-top-right-radius:16px">
-            <div>
-              <strong style="font-size:0.96rem;color:#0f172a;display:block">🛒 ${tr('Current Sale', 'चालू बिल (Current Sale)')}</strong>
-              <span style="font-size:0.78rem;color:#64748b">${esc(state.posCustomer.name || 'Walk-in Customer')} · Counter 1</span>
+          <div style="padding:12px 14px;border-bottom:1.5px solid var(--border,#e2e8f0);display:flex;justify-content:space-between;align-items:center;background:var(--card-header-bg,#f8fafc);border-top-left-radius:16px;border-top-right-radius:16px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <button type="button" class="btn btn-ghost btn-sm mobile-only" style="padding:3px 7px;font-size:0.78rem" onclick="state.posMobileView='products';render()">← ${tr('Catalog', 'कैटलॉग')}</button>
+              <div>
+                <strong style="font-size:0.96rem;display:block">🛒 ${tr('Current Sale', 'चालू बिल (Current Sale)')}</strong>
+                <span style="font-size:0.76rem;color:var(--muted,#64748b)">${esc(state.posCustomer.name || 'Walk-in Customer')}</span>
+              </div>
             </div>
             <button type="button" class="btn btn-ghost btn-sm" style="color:#ef4444;padding:4px 8px;font-size:0.8rem" onclick="clearPosCart()" title="${tr('Clear Cart', 'कार्ट खाली करें')}">🗑️ Clear</button>
           </div>
@@ -12102,29 +12223,30 @@ function renderMerchantPosCounter(shop) {
           <!-- Cart Items Scrollable List -->
           <div class="pos-cart-items">
             ${cart.length === 0 ? `
-              <div style="text-align:center;padding:36px 12px;color:#94a3b8">
+              <div style="text-align:center;padding:36px 12px;color:var(--muted,#94a3b8)">
                 <span style="font-size:2.2rem;display:block;margin-bottom:8px">🛍️</span>
                 <p style="font-size:0.92rem;margin:0;font-weight:600">${tr('Cart is empty', 'बिलिंग कार्ट खाली है')}</p>
-                <p style="font-size:0.78rem;margin:4px 0 0">${tr('Scan barcode or tap products on the left to add items.', 'बाईं ओर से सामान चुनें या बारकोड स्कैन करें।')}</p>
+                <p style="font-size:0.78rem;margin:4px 0 0">${tr('Scan barcode or tap products to add items.', 'सामान चुनें या बारकोड स्कैन करें।')}</p>
+                <button type="button" class="btn btn-primary btn-sm mobile-only" style="margin-top:12px" onclick="state.posMobileView='products';render()">← ${tr('Browse Products', 'कैटलॉग देखें')}</button>
               </div>
             ` : cart.map((it, idx) => {
               const lineTotal = Number(it.price || 0) * Number(it.qty || 1);
               return `
                 <div class="pos-cart-item">
                   <div style="flex:1;min-width:0">
-                    <strong style="font-size:0.86rem;color:#0f172a;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(it.name)}</strong>
-                    <span style="font-size:0.75rem;color:#64748b">₹${Number(it.price || 0).toLocaleString('en-IN')} × ${it.qty}</span>
+                    <strong style="font-size:0.86rem;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(it.name)}</strong>
+                    <span style="font-size:0.75rem;color:var(--muted,#64748b)">₹${Number(it.price || 0).toLocaleString('en-IN')} × ${it.qty}</span>
                   </div>
 
                   <!-- Qty Controls -->
                   <div style="display:flex;align-items:center;gap:3px">
-                    <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-weight:900;border:1px solid #cbd5e1;background:#fff" onclick="updatePosItemQty(${idx}, -1)">-</button>
-                    <input type="number" min="1" value="${it.qty}" style="width:38px;padding:3px;text-align:center;border-radius:4px;border:1px solid #cbd5e1;font-weight:700;font-size:0.84rem" onchange="setPosItemQty(${idx}, this.value)" />
-                    <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-weight:900;border:1px solid #cbd5e1;background:#fff" onclick="updatePosItemQty(${idx}, 1)">+</button>
+                    <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-weight:900;border:1px solid var(--border,#cbd5e1)" onclick="updatePosItemQty(${idx}, -1)">-</button>
+                    <input type="number" min="1" value="${it.qty}" style="width:38px;padding:3px;text-align:center;border-radius:4px;border:1px solid var(--border,#cbd5e1);font-weight:700;font-size:0.84rem" onchange="setPosItemQty(${idx}, this.value)" />
+                    <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-weight:900;border:1px solid var(--border,#cbd5e1)" onclick="updatePosItemQty(${idx}, 1)">+</button>
                   </div>
 
                   <div style="text-align:right;min-width:60px">
-                    <strong style="font-size:0.92rem;color:#0f172a;display:block">₹${lineTotal.toLocaleString('en-IN')}</strong>
+                    <strong style="font-size:0.92rem;display:block">₹${lineTotal.toLocaleString('en-IN')}</strong>
                     <button type="button" style="background:none;border:none;color:#ef4444;font-size:0.76rem;cursor:pointer;padding:0" onclick="removePosItem(${idx})">✕</button>
                   </div>
                 </div>
@@ -12133,68 +12255,68 @@ function renderMerchantPosCounter(shop) {
           </div>
 
           <!-- Totals, Discounts & Taxes -->
-          <div style="padding:10px 14px;background:#f8fafc;border-top:1.5px solid #e2e8f0;border-bottom:1.5px solid #e2e8f0">
-            <div style="display:flex;justify-content:space-between;font-size:0.84rem;color:#475569;margin-bottom:3px">
-              <span>${tr('Subtotal', 'योग (Subtotal)')}:</span>
+          <div style="padding:10px 14px;background:var(--subtle-bg,#f8fafc);border-top:1.5px solid var(--border,#e2e8f0);border-bottom:1.5px solid var(--border,#e2e8f0)">
+            <div style="display:flex;justify-content:space-between;font-size:0.84rem;margin-bottom:3px">
+              <span style="color:var(--muted,#64748b)">${tr('Subtotal', 'योग (Subtotal)')}:</span>
               <strong>₹${subtotal.toLocaleString('en-IN')}</strong>
             </div>
 
-            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.84rem;color:#475569;margin-bottom:3px">
-              <span>${tr('Discount', 'छूट (Discount)')}:</span>
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.84rem;margin-bottom:3px">
+              <span style="color:var(--muted,#64748b)">${tr('Discount', 'छूट (Discount)')}:</span>
               <div style="display:flex;align-items:center;gap:4px">
-                <input type="number" min="0" value="${discount}" style="width:60px;padding:2px 5px;text-align:right;border-radius:4px;border:1px solid #cbd5e1;font-weight:700;font-size:0.8rem" onchange="state.posDiscount=Number(this.value||0);syncCustomerScreenBroadcast();render()" />
+                <input type="number" min="0" value="${discount}" style="width:60px;padding:2px 5px;text-align:right;border-radius:4px;border:1px solid var(--border,#cbd5e1);font-weight:700;font-size:0.8rem" onchange="state.posDiscount=Number(this.value||0);syncCustomerScreenBroadcast();render()" />
               </div>
             </div>
 
-            <div style="display:flex;justify-content:space-between;font-size:0.84rem;color:#475569;margin-bottom:3px">
-              <span>${tr('GST (18% Incl/Auto)', 'लागू GST (18%)')}:</span>
+            <div style="display:flex;justify-content:space-between;font-size:0.84rem;margin-bottom:3px">
+              <span style="color:var(--muted,#64748b)">${tr('GST (18% Incl/Auto)', 'लागू GST (18%)')}:</span>
               <span>₹${tax.toLocaleString('en-IN')}</span>
             </div>
 
             ${rounding !== 0 ? `
-              <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:#64748b;margin-bottom:3px">
+              <div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--muted,#64748b);margin-bottom:3px">
                 <span>${tr('Rounding', 'राउंड-ऑफ')}:</span>
                 <span>${rounding > 0 ? '+' : ''}${rounding}</span>
               </div>
             ` : ''}
 
-            <div style="display:flex;justify-content:space-between;align-items:center;font-size:1.25rem;font-weight:900;color:#0f172a;padding-top:4px;border-top:1px dashed #cbd5e1;margin-top:4px">
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:1.25rem;font-weight:900;padding-top:4px;border-top:1px dashed var(--border,#cbd5e1);margin-top:4px">
               <span>${tr('Total Amount', 'कुल देय राशि')}:</span>
               <span style="color:#0284c7">₹${grandTotal.toLocaleString('en-IN')}</span>
             </div>
           </div>
 
-          <!-- Payment Mode Selection (Cash, Card, UPI / Wallet) -->
+          <!-- Payment Mode Selection -->
           <div style="padding:10px 14px">
             <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:6px;margin-bottom:8px">
-              <button type="button" class="btn btn-sm ${state.posPaymentMode === 'Cash' ? 'btn-primary' : 'btn-ghost'}" style="${state.posPaymentMode === 'Cash' ? 'background:#16a34a;border-color:#16a34a;color:#fff' : 'background:#fff;border:1px solid #cbd5e1'};padding:8px 0;font-weight:800;font-size:0.84rem" onclick="state.posPaymentMode='Cash';render()">
+              <button type="button" class="btn btn-sm ${state.posPaymentMode === 'Cash' ? 'btn-primary' : 'btn-ghost'}" style="${state.posPaymentMode === 'Cash' ? 'background:#16a34a;border-color:#16a34a;color:#fff' : ''};padding:8px 0;font-weight:800;font-size:0.84rem" onclick="state.posPaymentMode='Cash';render()">
                 💵 Cash
               </button>
-              <button type="button" class="btn btn-sm ${state.posPaymentMode === 'Card' ? 'btn-primary' : 'btn-ghost'}" style="${state.posPaymentMode === 'Card' ? 'background:#2563eb;border-color:#2563eb;color:#fff' : 'background:#fff;border:1px solid #cbd5e1'};padding:8px 0;font-weight:800;font-size:0.84rem" onclick="state.posPaymentMode='Card';render()">
+              <button type="button" class="btn btn-sm ${state.posPaymentMode === 'Card' ? 'btn-primary' : 'btn-ghost'}" style="${state.posPaymentMode === 'Card' ? 'background:#2563eb;border-color:#2563eb;color:#fff' : ''};padding:8px 0;font-weight:800;font-size:0.84rem" onclick="state.posPaymentMode='Card';render()">
                 💳 Card
               </button>
-              <button type="button" class="btn btn-sm ${state.posPaymentMode === 'UPI' ? 'btn-primary' : 'btn-ghost'}" style="${state.posPaymentMode === 'UPI' ? 'background:#7c3aed;border-color:#7c3aed;color:#fff' : 'background:#fff;border:1px solid #cbd5e1'};padding:8px 0;font-weight:800;font-size:0.84rem" onclick="state.posPaymentMode='UPI';render()">
+              <button type="button" class="btn btn-sm ${state.posPaymentMode === 'UPI' ? 'btn-primary' : 'btn-ghost'}" style="${state.posPaymentMode === 'UPI' ? 'background:#7c3aed;border-color:#7c3aed;color:#fff' : ''};padding:8px 0;font-weight:800;font-size:0.84rem" onclick="state.posPaymentMode='UPI';render()">
                 📱 UPI
               </button>
             </div>
 
-            <!-- Customer Tendered & Change Return Calculation (Image 1 style) -->
+            <!-- Customer Tendered & Change Return Calculation -->
             ${state.posPaymentMode === 'Cash' ? `
-              <div style="background:#f1f5f9;border-radius:8px;padding:8px 10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;font-size:0.84rem">
+              <div style="background:var(--subtle-bg,#f1f5f9);border-radius:8px;padding:8px 10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;font-size:0.84rem">
                 <div>
-                  <span style="color:#475569;display:block;font-size:0.75rem">${tr('Customer Gave (नकद प्राप्त):', 'ग्राहक ने दिए:')}</span>
-                  <input type="number" id="pos-tendered-input" value="${tendered || grandTotal}" style="width:90px;padding:3px 6px;border-radius:6px;border:1.5px solid #0284c7;font-weight:800;font-size:0.95rem;color:#0f172a" oninput="state.posTendered=Number(this.value||0);render()" />
+                  <span style="color:var(--muted,#475569);display:block;font-size:0.75rem">${tr('Customer Gave (नकद प्राप्त):', 'ग्राहक ने दिए:')}</span>
+                  <input type="number" id="pos-tendered-input" value="${tendered || grandTotal}" style="width:90px;padding:3px 6px;border-radius:6px;border:1.5px solid #0284c7;font-weight:800;font-size:0.95rem" oninput="state.posTendered=Number(this.value||0);render()" />
                 </div>
                 <div style="text-align:right">
-                  <span style="color:#475569;display:block;font-size:0.75rem">${tr('Change Return (वापसी):', 'बकाया वापसी:')}</span>
+                  <span style="color:var(--muted,#475569);display:block;font-size:0.75rem">${tr('Change Return (वापसी):', 'बकाया वापसी:')}</span>
                   <strong style="font-size:1.05rem;color:${changeDue >= 0 ? '#16a34a' : '#dc2626'}">₹${changeDue.toLocaleString('en-IN')}</strong>
                 </div>
               </div>
             ` : ''}
 
-            <!-- Bottom Action Buttons: Hold Sale, Complete Sale & Thermal Print, Sales Return -->
+            <!-- Bottom Action Buttons: Hold Sale, Complete Sale & Thermal Print -->
             <div style="display:grid;grid-template-columns:1fr 2fr;gap:6px">
-              <button type="button" class="btn btn-ghost" style="padding:10px 6px;font-size:0.84rem;font-weight:800;background:#f8fafc;border:1.5px solid #cbd5e1" onclick="holdCurrentPosSale()">
+              <button type="button" class="btn btn-ghost" style="padding:10px 6px;font-size:0.84rem;font-weight:800;border:1.5px solid var(--border,#cbd5e1)" onclick="holdCurrentPosSale()">
                 ⏸️ ${tr('Hold Sale', 'बिल होल्ड')}
               </button>
               <button type="button" class="btn btn-primary" style="padding:10px 14px;font-size:0.98rem;font-weight:900;background:#0284c7;border-color:#0284c7;box-shadow:0 4px 14px rgba(2,132,199,0.3)" onclick="completePosSale()">
@@ -12202,13 +12324,29 @@ function renderMerchantPosCounter(shop) {
               </button>
             </div>
 
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:6px;border-top:1px dashed #cbd5e1;font-size:0.78rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:6px;border-top:1px dashed var(--border,#cbd5e1);font-size:0.78rem">
               <a href="javascript:void(0)" onclick="state.merchantTab='Sales Return';render()" style="color:#0284c7;font-weight:700">↩️ ${tr('Customer Sales Return / Refund', 'ग्राहक सामान वापसी (Return)')}</a>
               <span class="text-muted">Thermal 58/80mm Ready</span>
             </div>
           </div>
         </div>
       </div>
+
+      <!-- Floating Bottom Sticky Bar on Mobile to instantly jump to Cart (Fixes Point 1) -->
+      ${cart.length > 0 && posMobileView !== 'cart' ? `
+        <div class="mobile-pos-checkout-bar mobile-only" onclick="state.posMobileView='cart';render()">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="width:36px;height:36px;border-radius:10px;background:#2563eb;color:#ffffff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1rem;box-shadow:0 2px 6px rgba(0,0,0,0.3)">${cart.length}</div>
+            <div>
+              <div style="font-size:0.74rem;color:#cbd5e1">${tr('Current Bill Total', 'चालू बिल')}</div>
+              <div style="font-size:1.18rem;font-weight:900;color:#ffffff">₹${grandTotal.toLocaleString('en-IN')}</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-gold btn-sm" style="font-weight:900;padding:8px 16px;border-radius:8px">
+            ${tr('View Bill & Pay', 'बिल देखें व भुगतान')} ➔
+          </button>
+        </div>
+      ` : ''}
     </div>
   `;
 }
@@ -12412,7 +12550,7 @@ function renderMerchantSalesReturn(shop) {
               <h3 style="font-size:1.05rem;font-weight:800;color:#0f172a;margin:0">📜 ${tr('Recent Sales Returns History', 'हालिया सामान वापसी इतिहास')}</h3>
               <span class="mobile-only" style="font-size:0.75rem;color:#0284c7;font-weight:700">↔️ ${tr('Swipe table to view all columns →', 'पूरी टेबल देखने हेतु दाएँ स्वाइप करें →')}</span>
             </div>
-            <div class="table-wrap">
+            <div class="table-wrap desktop-only">
               <table>
                 <thead>
                   <tr>
@@ -12439,6 +12577,29 @@ function renderMerchantSalesReturn(shop) {
                   `).join('')}
                 </tbody>
               </table>
+            </div>
+
+            <!-- Mobile App Cards for Sales Returns -->
+            <div class="mobile-card-list mobile-only">
+              ${returnHistory.map(r => `
+                <div class="mobile-app-card">
+                  <div class="mobile-app-card-top">
+                    <div>
+                      <div class="mobile-app-card-title">${esc(r.id)}</div>
+                      <div class="mobile-app-card-sub">📄 ${tr('Orig Bill:', 'मूल बिल:')} <b>${esc(r.originalInvoiceId)}</b></div>
+                    </div>
+                    <div style="text-align:right">
+                      <span class="badge badge-gold" style="font-size:0.7rem">${esc(r.reason)}</span>
+                      <div style="font-size:1.05rem;font-weight:900;color:#ef4444;margin-top:4px">
+                        -₹${Number(r.refundAmount || 0).toLocaleString('en-IN')}
+                      </div>
+                    </div>
+                  </div>
+                  <div style="font-size:0.8rem;color:var(--text,#1e293b);background:var(--subtle-bg,#f8fafc);padding:6px 10px;border-radius:6px">
+                    👤 <b>${esc(r.customerName)}</b> • ${(r.items || []).map(i => `${esc(i.name)} (×${i.qty})`).join(', ')}
+                  </div>
+                </div>
+              `).join('')}
             </div>
           </div>
         ` : ''}
@@ -12489,12 +12650,12 @@ function renderMerchantExpiryBatches(shop) {
 
   return `
     <div style="display:grid;gap:18px">
-      <div class="card" style="border-radius:16px;padding:24px;background:#ffffff;box-shadow:var(--shadow-md)">
+      <div class="card" style="border-radius:16px;padding:24px;box-shadow:var(--shadow-md)">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:18px">
           <div>
             <span class="badge badge-primary">⏳ ${tr('BATCHES & EXPIRY (FEFO LOGIC)', 'बैच व एक्सपायरी प्रबंधन (First-Expired, First-Out)')}</span>
-            <h2 style="font-size:1.35rem;font-weight:900;color:#0f172a;margin:4px 0 0">${tr('Expiry & Batch Management Desk', 'सामान एक्सपायरी ट्रैकिंग एवं बैच इन्वेंट्री')}</h2>
-            <p style="font-size:0.82rem;color:#64748b;margin:2px 0 0">${tr('Track shelf life, identify capital at risk, and return near-expiry goods to suppliers in 1-click.', 'नजदीकी एक्सपायरी सामान पहले बेचें, नुकसान से बचें व सप्लायर को समय रहते माल वापसी भेजें।')}</p>
+            <h2 style="font-size:1.35rem;font-weight:900;margin:4px 0 0">${tr('Expiry & Batch Management Desk', 'सामान एक्सपायरी ट्रैकिंग एवं बैच इन्वेंट्री')}</h2>
+            <p style="font-size:0.82rem;color:var(--muted,#64748b);margin:2px 0 0">${tr('Track shelf life, identify capital at risk, and return near-expiry goods to suppliers in 1-click.', 'नजदीकी एक्सपायरी सामान पहले बेचें, नुकसान से बचें व सप्लायर को समय रहते माल वापसी भेजें।')}</p>
           </div>
           <div style="display:flex;gap:8px">
             <button type="button" class="btn btn-gold btn-sm" onclick="state.merchantTab='Suppliers';render()">🚚 ${tr('Supplier Return', 'सप्लायर को वापसी')}</button>
@@ -12502,16 +12663,24 @@ function renderMerchantExpiryBatches(shop) {
           </div>
         </div>
 
-        <!-- Ribbon Pipeline Filters (Matching Image 4) -->
-        <div style="display:flex;border-radius:10px;overflow:hidden;border:1.5px solid #cbd5e1;margin-bottom:18px;flex-wrap:wrap">
-          <button type="button" style="flex:1;padding:10px 14px;border:none;cursor:pointer;font-weight:800;font-size:0.86rem;background:${filter === 'ALL' ? '#0f172a' : '#ffffff'};color:${filter === 'ALL' ? '#ffffff' : '#0f172a'}" onclick="state.expiryBatchFilter='ALL';render()">
-            ALL (${totalAll})
+        <!-- Ribbon Pipeline Filters (Top Middle Subtabs - Point 2) -->
+        <div class="page-subtab-strip no-print">
+          <button type="button" class="subtab-chip ${filter === 'ALL' ? 'active' : ''}" onclick="state.expiryBatchFilter='ALL';render()">
+            📁 ALL (${totalAll})
           </button>
-          <button type="button" style="flex:1;padding:10px 14px;border:none;cursor:pointer;font-weight:800;font-size:0.86rem;background:${filter === 'EXPIRED' ? '#ef4444' : '#fee2e2'};color:${filter === 'EXPIRED' ? '#ffffff' : '#991b1b'}" onclick="state.expiryBatchFilter='EXPIRED';render()">
+          <button type="button" class="subtab-chip ${filter === 'EXPIRED' ? 'active' : ''}" style="${filter === 'EXPIRED' ? 'background:#ef4444;border-color:#ef4444;color:#fff' : 'color:#ef4444'}" onclick="state.expiryBatchFilter='EXPIRED';render()">
             ⚠️ EXPIRED (${totalExpired})
           </button>
-          <button type="button" style="flex:1;padding:10px 14px;border:none;cursor:pointer;font-weight:800;font-size:0.86rem;background:${filter === 'EXPIRING_SOON' ? '#f59e0b' : '#fef3c7'};color:${filter === 'EXPIRING_SOON' ? '#ffffff' : '#92400e'}" onclick="state.expiryBatchFilter='EXPIRING_SOON';render()">
+          <button type="button" class="subtab-chip ${filter === 'EXPIRING_SOON' ? 'active' : ''}" style="${filter === 'EXPIRING_SOON' ? 'background:#f59e0b;border-color:#f59e0b;color:#fff' : 'color:#d97706'}" onclick="state.expiryBatchFilter='EXPIRING_SOON';render()">
             ⏳ EXPIRING SOON (${totalExpiringSoon})
+          </button>
+          <button type="button" class="subtab-chip ${filter === 'GOOD' ? 'active' : ''}" style="${filter === 'GOOD' ? 'background:#16a34a;border-color:#16a34a;color:#fff' : 'color:#16a34a'}" onclick="state.expiryBatchFilter='GOOD';render()">
+            ✓ GOOD (${totalGood})
+          </button>
+          <button type="button" class="subtab-chip ${filter === 'FINISHED' ? 'active' : ''}" onclick="state.expiryBatchFilter='FINISHED';render()">
+            🏁 FINISHED (${totalFinished})
+          </button>
+        </div>
           </button>
           <button type="button" style="flex:1;padding:10px 14px;border:none;cursor:pointer;font-weight:800;font-size:0.86rem;background:${filter === 'GOOD' ? '#16a34a' : '#dcfce7'};color:${filter === 'GOOD' ? '#ffffff' : '#166534'}" onclick="state.expiryBatchFilter='GOOD';render()">
             ✓ GOOD (${totalGood})
@@ -12522,7 +12691,7 @@ function renderMerchantExpiryBatches(shop) {
         </div>
 
         <!-- Expiry Table (Matching Image 4) -->
-        <div class="table-wrap">
+        <div class="table-wrap desktop-only">
           <table>
             <thead>
               <tr>
@@ -12576,6 +12745,45 @@ function renderMerchantExpiryBatches(shop) {
               `).join('')}
             </tbody>
           </table>
+        </div>
+
+        <!-- Mobile App Cards for Batches & Expiry -->
+        <div class="mobile-card-list mobile-only">
+          ${filtered.length === 0 ? `
+            <div style="text-align:center;padding:24px" class="text-muted">
+              No batches match this filter.
+            </div>
+          ` : filtered.map(b => `
+            <div class="mobile-app-card">
+              <div class="mobile-app-card-top">
+                <div style="flex:1">
+                  <div class="mobile-app-card-title">${esc(b.product.name)}</div>
+                  <div class="mobile-app-card-sub">Batch: <b style="color:#0284c7">${esc(b.batch)}</b> • Expiry: <b>${esc(b.expiryDate)}</b></div>
+                </div>
+                <div style="text-align:right">
+                  ${b.status === 'Good' ? '<span class="badge badge-primary" style="background:#dcfce7;color:#166534">Good</span>' : (
+                    b.status === 'Expiring Soon' ? '<span class="badge badge-gold">Expiring Soon</span>' : (
+                      b.status === 'Expired' ? '<span class="badge badge-danger">Expired</span>' : '<span class="badge badge-ghost">Finished</span>'
+                    )
+                  )}
+                  <div style="font-size:0.95rem;font-weight:800;color:var(--text,#1e293b);margin-top:4px">
+                    ${b.stock} ${esc(b.product.unit || 'pc')}
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;background:var(--subtle-bg,#f8fafc);padding:6px 10px;border-radius:6px;font-size:0.8rem">
+                <div>
+                  ${b.daysLeft === null ? '' : (
+                    b.daysLeft < 0 ? `<span style="color:#ef4444;font-weight:800">⚠️ Expired ${Math.abs(b.daysLeft)}d ago</span>` : (
+                      b.daysLeft <= 30 ? `<span style="color:#f59e0b;font-weight:800">⚠️ ${b.daysLeft} days left</span>` : `<span style="color:#16a34a">✓ ${b.daysLeft} days left</span>`
+                    )
+                  )}
+                  <span style="margin-left:6px;color:var(--text-muted,#64748b)">Val: ₹${b.totalValue.toLocaleString('en-IN')}</span>
+                </div>
+                <button type="button" class="mobile-action-pill" onclick="openSupplierReturnModal('${b.product.id}')">🚚 Return</button>
+              </div>
+            </div>
+          `).join('')}
         </div>
       </div>
     </div>
