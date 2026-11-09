@@ -1850,6 +1850,11 @@ async function handleApi(req, res, pathname, query) {
         payload.myJobWorkOrders = (db.jobWorkOrders || []).filter(jw => jw.shopId === user.shopId);
         payload.myProductionBatches = (db.productionBatches || []).filter(pb => pb.shopId === user.shopId);
         payload.myCrmLeads = (db.crmLeads || []).filter(ld => ld.shopId === user.shopId);
+        payload.myShifts = (db.shifts || []).filter(sh => sh.shopId === user.shopId);
+        payload.myHeldSales = (db.heldSales || []).filter(hs => hs.shopId === user.shopId);
+        payload.mySuppliers = (db.suppliers || []).filter(sp => sp.shopId === user.shopId);
+        payload.mySalesReturns = (db.salesReturns || []).filter(sr => sr.shopId === user.shopId);
+        payload.rolesPermissions = db.rolesPermissions || null;
         payload.bids = db.bids;
       } else if (user.role === 'customer') {
         payload.myOrders = db.orders.filter(o => o.customerId === user.userId || o.phone === user.phone);
@@ -3363,6 +3368,327 @@ Additional text context: ${rawText}`;
       logAct('Removed a Manager ID');
       saveDb();
       return sendJson(res, 200, { ok: true });
+    }
+
+    // ---- POS Retail Counter Sale ----
+    if (action === 'pos_sale_complete') {
+      const items = Array.isArray(body.items) ? body.items : [];
+      if (items.length === 0) return sendJson(res, 400, { error: 'Cart is empty.' });
+      const invoiceNo = 'S-' + new Date().getFullYear() + '-' + String(Date.now()).slice(-6);
+      const buyerName = sanitizeString(body.buyerName || 'Walk-in Customer', 100);
+      const buyerPhone = cleanPhone(body.buyerPhone || '');
+      const paymentMode = sanitizeString(body.paymentMode || 'Cash', 20);
+      const subtotal = Number(body.subtotal || 0);
+      const discount = Number(body.discount || 0);
+      const tax = Number(body.tax || 0);
+      const total = Number(body.total || (subtotal - discount + tax));
+
+      // Update product inventory
+      items.forEach(it => {
+        const p = db.products.find(prod => (prod.id === it.id || prod.barcode === it.barcode) && prod.shopId === user.shopId);
+        if (p) {
+          p.stock = Math.max(0, Number(p.stock || 0) - Number(it.qty || 1));
+        }
+      });
+
+      // Update Active Shift (Cash Register)
+      if (!Array.isArray(db.shifts)) db.shifts = [];
+      const activeShift = db.shifts.find(s => s.shopId === user.shopId && s.status === 'Open');
+      if (activeShift) {
+        if (paymentMode === 'Cash') {
+          activeShift.cashSales = (activeShift.cashSales || 0) + total;
+          activeShift.expectedCash = (activeShift.expectedCash || (activeShift.openingFloat || 0)) + total;
+        } else if (paymentMode === 'UPI' || paymentMode === 'Wallet') {
+          activeShift.upiSales = (activeShift.upiSales || 0) + total;
+        } else if (paymentMode === 'Card') {
+          activeShift.cardSales = (activeShift.cardSales || 0) + total;
+        }
+        activeShift.salesCount = (activeShift.salesCount || 0) + 1;
+      }
+
+      // Record Order / Sale
+      const newOrder = {
+        id: invoiceNo,
+        shopId: user.shopId,
+        buyerName,
+        phone: buyerPhone || shop.phone,
+        items: items.map(it => ({ name: it.name, qty: Number(it.qty || 1), price: Number(it.price || 0), total: Number(it.price || 0) * Number(it.qty || 1), hsn: it.hsn || '3917', gstRate: Number(it.gstRate || 18) })),
+        subtotal,
+        discount,
+        tax,
+        total,
+        paymentMode,
+        status: 'Completed',
+        source: 'POS Counter',
+        createdAt: new Date().toISOString(),
+        cashier: user.name || 'Admin'
+      };
+      db.orders.unshift(newOrder);
+      logAct(`Completed POS Retail Sale #${invoiceNo} (₹${total})`);
+      saveDb();
+      return sendJson(res, 200, { ok: true, invoiceNo, order: newOrder, products: db.products.filter(p => p.shopId === user.shopId), shifts: db.shifts.filter(s => s.shopId === user.shopId) });
+    }
+
+    // ---- Hold Sale & Held Sales Management ----
+    if (action === 'hold_sale') {
+      if (!Array.isArray(db.heldSales)) db.heldSales = [];
+      const holdRecord = {
+        id: 'hold-' + Date.now(),
+        shopId: user.shopId,
+        buyerName: sanitizeString(body.buyerName || 'Walk-in Customer', 100),
+        items: Array.isArray(body.items) ? body.items : [],
+        total: Number(body.total || 0),
+        note: sanitizeString(body.note || '', 100),
+        savedAt: new Date().toISOString()
+      };
+      db.heldSales.unshift(holdRecord);
+      saveDb();
+      return sendJson(res, 200, { ok: true, heldSales: db.heldSales.filter(h => h.shopId === user.shopId) });
+    }
+
+    if (action === 'delete_held_sale') {
+      if (!Array.isArray(db.heldSales)) db.heldSales = [];
+      db.heldSales = db.heldSales.filter(h => !(h.id === body.id && h.shopId === user.shopId));
+      saveDb();
+      return sendJson(res, 200, { ok: true, heldSales: db.heldSales.filter(h => h.shopId === user.shopId) });
+    }
+
+    // ---- Sales Return (Refund / Credit Note) ----
+    if (action === 'sales_return') {
+      if (!Array.isArray(db.salesReturns)) db.salesReturns = [];
+      const origInv = sanitizeString(body.originalInvoiceId || '', 50);
+      const returnItems = Array.isArray(body.items) ? body.items : [];
+      if (returnItems.length === 0) return sendJson(res, 400, { error: 'Please select items to return.' });
+      const refundAmount = Number(body.refundAmount || 0);
+      const taxReversed = Number(body.taxReversed || 0);
+      const reason = sanitizeString(body.reason || 'Customer return', 100);
+      const refundMode = sanitizeString(body.refundMode || 'Cash', 20);
+
+      // Return items back on shelf (increment stock) if requested
+      returnItems.forEach(it => {
+        if (it.backOnShelf) {
+          const p = db.products.find(prod => (prod.name === it.name || prod.id === it.id) && prod.shopId === user.shopId);
+          if (p) {
+            p.stock = (Number(p.stock) || 0) + Number(it.qty || 1);
+          }
+        }
+      });
+
+      const retRecord = {
+        id: 'ret-' + Date.now().toString().slice(-6),
+        shopId: user.shopId,
+        originalInvoiceId: origInv,
+        customerName: sanitizeString(body.customerName || 'Walk-in Customer', 100),
+        customerPhone: cleanPhone(body.customerPhone || ''),
+        date: new Date().toISOString(),
+        reason,
+        refundMode,
+        refundAmount,
+        taxReversed,
+        items: returnItems,
+        processedBy: user.name
+      };
+      db.salesReturns.unshift(retRecord);
+
+      // Add to orders as Return
+      db.orders.unshift({
+        id: 'CN-' + Date.now().toString().slice(-6),
+        shopId: user.shopId,
+        buyerName: retRecord.customerName,
+        phone: retRecord.customerPhone || shop.phone,
+        items: returnItems.map(it => ({ name: it.name, qty: it.qty, price: -Math.abs(it.price), total: -Math.abs(it.price * it.qty) })),
+        subtotal: -refundAmount,
+        discount: 0,
+        tax: -taxReversed,
+        total: -refundAmount,
+        paymentMode: refundMode,
+        status: 'Sales Return',
+        source: 'POS Return',
+        createdAt: new Date().toISOString(),
+        cashier: user.name
+      });
+
+      logAct(`Processed Sales Return for Invoice ${origInv} (Refund ₹${refundAmount})`);
+      saveDb();
+      return sendJson(res, 200, { ok: true, returnRecord: retRecord, salesReturns: db.salesReturns.filter(sr => sr.shopId === user.shopId), products: db.products.filter(p => p.shopId === user.shopId) });
+    }
+
+    // ---- Shift / Cash Drawer Management & Z-Report ----
+    if (action === 'shift_open') {
+      if (!Array.isArray(db.shifts)) db.shifts = [];
+      const openShift = db.shifts.find(s => s.shopId === user.shopId && s.status === 'Open');
+      if (openShift) return sendJson(res, 400, { error: 'A shift is already open. Please close it first.' });
+      const openingFloat = Number(body.openingFloat || 0);
+      const newShift = {
+        id: 'sh-' + new Date().getFullYear() + '-' + String(Date.now()).slice(-5),
+        shopId: user.shopId,
+        cashierName: user.name,
+        cashierPhone: user.phone,
+        openedAt: new Date().toISOString(),
+        openingFloat,
+        status: 'Open',
+        cashSales: 0,
+        upiSales: 0,
+        cardSales: 0,
+        cashExpenses: 0,
+        expectedCash: openingFloat,
+        salesCount: 0
+      };
+      db.shifts.unshift(newShift);
+      logAct(`Opened new Shift #${newShift.id} with float ₹${openingFloat}`);
+      saveDb();
+      return sendJson(res, 200, { ok: true, shift: newShift, shifts: db.shifts.filter(s => s.shopId === user.shopId) });
+    }
+
+    if (action === 'shift_close') {
+      if (!Array.isArray(db.shifts)) db.shifts = [];
+      const shift = db.shifts.find(s => s.shopId === user.shopId && s.status === 'Open');
+      if (!shift) return sendJson(res, 400, { error: 'No active open shift found.' });
+      const countedCash = Number(body.countedCash || 0);
+      const expected = Number(shift.expectedCash || (shift.openingFloat + shift.cashSales - (shift.cashExpenses || 0)));
+      const difference = countedCash - expected;
+      shift.status = 'Closed';
+      shift.closedAt = new Date().toISOString();
+      shift.countedCash = countedCash;
+      shift.difference = difference;
+      shift.denominations = body.denominations || {};
+      shift.zReport = {
+        shiftId: shift.id,
+        shopName: shop.shop,
+        cashier: shift.cashierName,
+        openedAt: shift.openedAt,
+        closedAt: shift.closedAt,
+        openingFloat: shift.openingFloat,
+        totalSalesCount: shift.salesCount,
+        cashSales: shift.cashSales,
+        upiSales: shift.upiSales,
+        cardSales: shift.cardSales,
+        cashExpenses: shift.cashExpenses || 0,
+        expectedCash: expected,
+        countedCash: countedCash,
+        difference: difference,
+        varianceStatus: difference === 0 ? 'Exact Match' : (difference > 0 ? `Cash Over (+₹${difference})` : `Cash Short (-₹${Math.abs(difference)})`)
+      };
+      logAct(`Closed Shift #${shift.id} - Z-Report: Counted ₹${countedCash}, Diff ₹${difference}`);
+      saveDb();
+      return sendJson(res, 200, { ok: true, zReport: shift.zReport, shifts: db.shifts.filter(s => s.shopId === user.shopId) });
+    }
+
+    // ---- Suppliers Management ----
+    if (action === 'supplier_save') {
+      if (!Array.isArray(db.suppliers)) db.suppliers = [];
+      const company = sanitizeString(body.company || body.name || '', 120);
+      if (!company) return sendJson(res, 400, { error: 'Supplier company name is required.' });
+      const id = body.id || ('sup-' + Date.now().toString().slice(-6));
+      const existing = db.suppliers.find(s => s.id === id && s.shopId === user.shopId);
+      const record = {
+        id,
+        shopId: user.shopId,
+        company,
+        contactName: sanitizeString(body.contactName || '', 100),
+        phone: cleanPhone(body.phone || ''),
+        email: sanitizeString(body.email || '', 100),
+        gstin: sanitizeString(body.gstin || '', 20).toUpperCase(),
+        address: sanitizeString(body.address || '', 200),
+        balancePayable: Number(body.balancePayable || 0),
+        paymentTerms: sanitizeString(body.paymentTerms || 'Net 15', 50),
+        updatedAt: new Date().toISOString()
+      };
+      if (existing) {
+        Object.assign(existing, record);
+      } else {
+        db.suppliers.unshift(record);
+      }
+      logAct(`Saved Supplier ${company}`);
+      saveDb();
+      return sendJson(res, 200, { ok: true, suppliers: db.suppliers.filter(s => s.shopId === user.shopId) });
+    }
+
+    if (action === 'supplier_delete') {
+      if (!Array.isArray(db.suppliers)) db.suppliers = [];
+      db.suppliers = db.suppliers.filter(s => !(s.id === body.id && s.shopId === user.shopId));
+      logAct('Deleted a Supplier');
+      saveDb();
+      return sendJson(res, 200, { ok: true, suppliers: db.suppliers.filter(s => s.shopId === user.shopId) });
+    }
+
+    // ---- Receive Stock / Inward Purchase ----
+    if (action === 'stock_receive') {
+      const items = Array.isArray(body.items) ? body.items : [];
+      if (items.length === 0) return sendJson(res, 400, { error: 'Please add items to receive.' });
+      const supplierName = sanitizeString(body.supplierName || 'General Supplier', 120);
+      const supplierInv = sanitizeString(body.supplierInvoiceNo || '', 50);
+
+      items.forEach(it => {
+        let p = db.products.find(prod => (prod.id === it.id || prod.barcode === it.barcode) && prod.shopId === user.shopId);
+        if (p) {
+          p.stock = (Number(p.stock) || 0) + Number(it.qty || 0);
+          if (it.costPrice) p.costPrice = Number(it.costPrice);
+          if (it.batchNumber) p.batchNumber = sanitizeString(it.batchNumber, 50);
+          if (it.expiryDate) p.expiryDate = sanitizeString(it.expiryDate, 20);
+        } else {
+          // create new product
+          p = {
+            id: 'prd-' + Date.now().toString().slice(-6),
+            shopId: user.shopId,
+            name: sanitizeString(it.name || 'New Item', 120),
+            sku: sanitizeString(it.sku || `SKU-${Date.now().toString().slice(-5)}`, 30),
+            barcode: sanitizeString(it.barcode || `2000${Date.now().toString().slice(-8)}`, 30),
+            category: sanitizeString(it.category || 'General', 50),
+            price: Number(it.price || it.costPrice * 1.25),
+            costPrice: Number(it.costPrice || 0),
+            stock: Number(it.qty || 0),
+            unit: sanitizeString(it.unit || 'pc', 20),
+            reorderLevel: Number(it.reorderLevel || 10),
+            batchNumber: sanitizeString(it.batchNumber || `BAT-${Date.now().toString().slice(-4)}`, 50),
+            expiryDate: sanitizeString(it.expiryDate || '', 20),
+            hsn: sanitizeString(it.hsn || '3917', 10),
+            gstRate: Number(it.gstRate || 18),
+            taxMode: 'exclusive'
+          };
+          db.products.push(p);
+        }
+      });
+
+      if (!Array.isArray(db.supplierPurchases)) db.supplierPurchases = [];
+      db.supplierPurchases.unshift({
+        id: 'po-' + Date.now().toString().slice(-6),
+        shopId: user.shopId,
+        supplierName,
+        supplierInvoiceNo: supplierInv,
+        date: new Date().toISOString(),
+        items,
+        total: Number(body.total || items.reduce((acc, it) => acc + (it.qty * (it.costPrice || 0)), 0)),
+        receivedBy: user.name
+      });
+
+      logAct(`Received inward stock from ${supplierName} (Total items: ${items.length})`);
+      saveDb();
+      return sendJson(res, 200, { ok: true, products: db.products.filter(p => p.shopId === user.shopId), supplierPurchases: db.supplierPurchases.filter(sp => sp.shopId === user.shopId) });
+    }
+
+    // ---- Online Order Status Update (e.g. Ready for Pickup) ----
+    if (action === 'order_status_update') {
+      const orderId = sanitizeString(body.orderId || '', 50);
+      const newStatus = sanitizeString(body.status || 'Ready for Pickup', 50);
+      const ord = db.orders.find(o => o.id === orderId && o.shopId === user.shopId);
+      if (!ord) return sendJson(res, 404, { error: 'Order not found.' });
+      ord.status = newStatus;
+      ord.updatedAt = new Date().toISOString();
+      logAct(`Updated Order #${orderId} status to "${newStatus}"`);
+      saveDb();
+      return sendJson(res, 200, { ok: true, order: ord, orders: db.orders.filter(o => o.shopId === user.shopId) });
+    }
+
+    // ---- Roles & Permissions Matrix Save (Image 5) ----
+    if (action === 'roles_matrix_save') {
+      if (!isShopOwner(user)) return sendJson(res, 403, { error: 'Only the Shop Owner can modify Role Permissions.' });
+      if (body.rolesPermissions) {
+        db.rolesPermissions = body.rolesPermissions;
+        logAct('Updated Visual Roles & Permissions Matrix');
+        saveDb();
+      }
+      return sendJson(res, 200, { ok: true, rolesPermissions: db.rolesPermissions });
     }
 
     return sendJson(res, 400, { error: 'Invalid action.' });
