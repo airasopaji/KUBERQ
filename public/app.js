@@ -481,8 +481,12 @@ if (typeof window !== 'undefined' && !window._enterpriseClockTimer) {
 }
 
 function toggleEnterpriseSidebar() {
-  state.sidebarCollapsed = !state.sidebarCollapsed;
-  state.sidebarMobileOpen = !state.sidebarMobileOpen;
+  if (typeof window !== 'undefined' && window.innerWidth <= 900) {
+    state.sidebarMobileOpen = !state.sidebarMobileOpen;
+    state.sidebarCollapsed = false; // Never collapse labels to icons on mobile drawer!
+  } else {
+    state.sidebarCollapsed = !state.sidebarCollapsed;
+  }
   render();
 }
 
@@ -607,8 +611,8 @@ function renderEnterpriseShell(opts) {
     .slice(0, 2)
     .map(w => w[0].toUpperCase())
     .join('') || 'KQ';
-  const isCollapsed = !!state.sidebarCollapsed;
   const isMobileOpen = !!state.sidebarMobileOpen;
+  const isCollapsed = !isMobileOpen && !!state.sidebarCollapsed;
 
   return `
     <div class="enterprise-shell" onclick="if(state.quickCreateOpen||state.globalSearchOpen){state.quickCreateOpen=false;state.globalSearchOpen=false;render();}">
@@ -3183,53 +3187,53 @@ function renderMerchantReportsOnly(shop) {
   return `
     <div style="display:grid;gap:18px">
       <!-- Subtabs Navigation -->
-      <div class="card-subtle no-print" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 16px;background:#ffffff;border-radius:14px;border:1.5px solid #cbd5e1">
-        <span style="font-weight:900;font-size:0.86rem;color:#0f172a;margin-right:4px">📊 ${tr('Reports Menu:', 'रिपोर्ट चुनें:')}</span>
-        <button type="button" class="btn btn-sm ${subTab === 'pnl' ? 'btn-primary' : 'btn-ghost'}" style="${subTab === 'pnl' ? 'background:#0f172a;color:#fff' : 'background:#f8fafc'}" onclick="state.reportSubTab='pnl';render()">
+      <div class="card-subtle no-print" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 16px;border-radius:14px;border:1.5px solid var(--border, #cbd5e1)">
+        <span class="report-menu-title" style="font-weight:900;font-size:0.86rem;margin-right:4px">📊 ${tr('Reports Menu:', 'रिपोर्ट चुनें:')}</span>
+        <button type="button" class="btn btn-sm ${subTab === 'pnl' ? 'btn-primary' : 'btn-ghost'}" style="${subTab === 'pnl' ? 'background:#0f172a;color:#fff' : ''}" onclick="state.reportSubTab='pnl';render()">
           📊 ${tr('6-Month P&L Statement', '6-माह लाभ-हानि (P&L)')}
         </button>
-        <button type="button" class="btn btn-sm ${subTab === 'valuation' ? 'btn-primary' : 'btn-ghost'}" style="${subTab === 'valuation' ? 'background:#0f172a;color:#fff' : 'background:#f8fafc'}" onclick="state.reportSubTab='valuation';render()">
+        <button type="button" class="btn btn-sm ${subTab === 'valuation' ? 'btn-primary' : 'btn-ghost'}" style="${subTab === 'valuation' ? 'background:#0f172a;color:#fff' : ''}" onclick="state.reportSubTab='valuation';render()">
           📦 ${tr('Stock Valuation Report', 'स्टॉक वैल्यूएशन रिपोर्ट')}
         </button>
-        <button type="button" class="btn btn-sm ${subTab === 'expiry_risk' ? 'btn-primary' : 'btn-ghost'}" style="${subTab === 'expiry_risk' ? 'background:#0f172a;color:#fff' : 'background:#f8fafc'}" onclick="state.reportSubTab='expiry_risk';render()">
+        <button type="button" class="btn btn-sm ${subTab === 'expiry_risk' ? 'btn-primary' : 'btn-ghost'}" style="${subTab === 'expiry_risk' ? 'background:#0f172a;color:#fff' : ''}" onclick="state.reportSubTab='expiry_risk';render()">
           ⏳ ${tr('Expiry Risk Analysis', 'एक्सपायरी जोखिम विश्लेषण')}
         </button>
-        <button type="button" class="btn btn-sm ${subTab === 'sales_breakdown' ? 'btn-primary' : 'btn-ghost'}" style="${subTab === 'sales_breakdown' ? 'background:#0f172a;color:#fff' : 'background:#f8fafc'}" onclick="state.reportSubTab='sales_breakdown';render()">
+        <button type="button" class="btn btn-sm ${subTab === 'sales_breakdown' ? 'btn-primary' : 'btn-ghost'}" style="${subTab === 'sales_breakdown' ? 'background:#0f172a;color:#fff' : ''}" onclick="state.reportSubTab='sales_breakdown';render()">
           📈 ${tr('Sales by Product & Category', 'बिक्री अनुसार प्रोडक्ट व श्रेणी')}
         </button>
-        <button type="button" class="btn btn-sm ${subTab === 'expenses_breakdown' ? 'btn-primary' : 'btn-ghost'}" style="${subTab === 'expenses_breakdown' ? 'background:#0f172a;color:#fff' : 'background:#f8fafc'}" onclick="state.reportSubTab='expenses_breakdown';render()">
+        <button type="button" class="btn btn-sm ${subTab === 'expenses_breakdown' ? 'btn-primary' : 'btn-ghost'}" style="${subTab === 'expenses_breakdown' ? 'background:#0f172a;color:#fff' : ''}" onclick="state.reportSubTab='expenses_breakdown';render()">
           💸 ${tr('Expenses by Category', 'खर्च श्रेणी अनुसार')}
         </button>
-        <button type="button" class="btn btn-sm ${subTab === 'margins' ? 'btn-primary' : 'btn-ghost'}" style="${subTab === 'margins' ? 'background:#0f172a;color:#fff' : 'background:#f8fafc'}" onclick="state.reportSubTab='margins';render()">
+        <button type="button" class="btn btn-sm ${subTab === 'margins' ? 'btn-primary' : 'btn-ghost'}" style="${subTab === 'margins' ? 'background:#0f172a;color:#fff' : ''}" onclick="state.reportSubTab='margins';render()">
           🏷️ ${tr('Price & Margin Analysis', 'दाम व मार्जिन रिपोर्ट')}
         </button>
       </div>
 
       <!-- 1. 6-MONTH P&L -->
       ${subTab === 'pnl' ? `
-        <div class="card" style="border-radius:16px;padding:24px;background:#ffffff;box-shadow:var(--shadow-md)">
+        <div class="card" style="border-radius:16px;padding:22px;box-shadow:var(--shadow-md)">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
             <div>
               <span class="badge badge-primary">📊 ${tr('6-MONTH ROLLING FINANCIAL AUDIT', '6-माह रोलिंग वित्तीय रिपोर्ट')}</span>
-              <h3 style="font-size:1.3rem;font-weight:900;color:#0f172a;margin:4px 0 0">${tr('Executive Profit & Loss Statement (May 2026 – Oct 2026)', 'कार्यकारी लाभ एवं हानि विवरण (मई 2026 – अक्टूबर 2026)')}</h3>
+              <h3 style="font-size:1.3rem;font-weight:900;margin:6px 0 0">${tr('Executive Profit & Loss Statement (May 2026 – Oct 2026)', 'कार्यकारी लाभ एवं हानि विवरण (मई 2026 – अक्टूबर 2026)')}</h3>
             </div>
             <button type="button" class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ Print P&L</button>
           </div>
 
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));gap:12px;margin-bottom:20px">
-            <div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:14px">
+            <div class="pnl-kpi-rev" style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:14px">
               <span style="font-size:0.75rem;color:#166534;font-weight:700">6M Revenue:</span>
               <strong style="font-size:1.35rem;color:#15803d;display:block">₹${total6mRev.toLocaleString('en-IN')}</strong>
             </div>
-            <div style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:12px;padding:14px">
+            <div class="pnl-kpi-cogs" style="background:#fef2f2;border:1.5px solid #fca5a5;border-radius:12px;padding:14px">
               <span style="font-size:0.75rem;color:#991b1b;font-weight:700">Cost of Goods (COGS):</span>
               <strong style="font-size:1.35rem;color:#b91c1c;display:block">₹${total6mCogs.toLocaleString('en-IN')}</strong>
             </div>
-            <div style="background:#fefce8;border:1.5px solid #fde047;border-radius:12px;padding:14px">
+            <div class="pnl-kpi-exp" style="background:#fefce8;border:1.5px solid #fde047;border-radius:12px;padding:14px">
               <span style="font-size:0.75rem;color:#854d0e;font-weight:700">Operating Expenses:</span>
               <strong style="font-size:1.35rem;color:#a16207;display:block">₹${total6mExp.toLocaleString('en-IN')}</strong>
             </div>
-            <div style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:12px;padding:14px">
+            <div class="pnl-kpi-net" style="background:#eff6ff;border:1.5px solid #93c5fd;border-radius:12px;padding:14px">
               <span style="font-size:0.75rem;color:#1e40af;font-weight:700">Net Operating Profit:</span>
               <strong style="font-size:1.35rem;color:#1d4ed8;display:block">₹${total6mNet.toLocaleString('en-IN')}</strong>
             </div>
@@ -3243,11 +3247,11 @@ function renderMerchantReportsOnly(shop) {
               <tbody>
                 ${sixMonths.map(m => `
                   <tr>
-                    <td><strong>${m.label || m.ym}</strong></td>
+                    <td><strong class="table-cell-title">${m.label || m.ym}</strong></td>
                     <td style="color:#16a34a;font-weight:700">₹${Number(m.revenue || 0).toLocaleString('en-IN')}</td>
-                    <td style="color:#64748b">₹${Number(m.cogs || 0).toLocaleString('en-IN')}</td>
-                    <td><strong>₹${Math.max(0, Number(m.revenue || 0) - Number(m.cogs || 0)).toLocaleString('en-IN')}</strong></td>
-                    <td style="color:#ef4444">₹${Number(m.expenses || 0).toLocaleString('en-IN')}</td>
+                    <td class="table-cell-dim">₹${Number(m.cogs || 0).toLocaleString('en-IN')}</td>
+                    <td><strong class="table-cell-title">₹${Math.max(0, Number(m.revenue || 0) - Number(m.cogs || 0)).toLocaleString('en-IN')}</strong></td>
+                    <td style="color:#ef4444;font-weight:600">₹${Number(m.expenses || 0).toLocaleString('en-IN')}</td>
                     <td><strong style="color:${(m.netProfit || 0) >= 0 ? '#16a34a' : '#ef4444'}">₹${Number(m.netProfit || 0).toLocaleString('en-IN')}</strong></td>
                   </tr>
                 `).join('')}
@@ -11984,11 +11988,11 @@ function renderMerchantPosCounter(shop) {
   return `
     <div style="display:grid;gap:14px">
       <!-- Top Action Bar: Walk-in / Customer Selector, Hold Sales, Customer Screen, Barcode Scan Input -->
-      <div class="card-subtle" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding:12px 16px;border-radius:14px;background:#ffffff;border:1.5px solid #cbd5e1">
+      <div class="card-subtle pos-header-bar" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding:12px 16px;border-radius:14px;border:1.5px solid var(--border, #cbd5e1)">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1">
           <!-- Walk-in Customer Dropdown (User Feature 4) -->
           <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-weight:800;color:#0f172a;font-size:0.88rem">👤 ${tr('Customer:', 'ग्राहक:')}</span>
+            <span style="font-weight:800;font-size:0.88rem">👤 ${tr('Customer:', 'ग्राहक:')}</span>
             <select id="pos-customer-select" class="form-input" style="padding:6px 10px;border-radius:8px;font-weight:700;font-size:0.86rem;min-width:180px" onchange="handlePosCustomerChange(this.value)">
               <option value="walk_in" ${state.posCustomer.name === 'Walk-in Customer' ? 'selected' : ''}>👤 ${tr('Walk-in Customer (No details)', 'वॉक-इन ग्राहक (काउंटर सेल)')}</option>
               ${customers.map(c => `
@@ -11999,7 +12003,7 @@ function renderMerchantPosCounter(shop) {
           </div>
 
           <!-- Barcode & SKU Fast Search Input (USB Scanner & Mobile Camera Ready) -->
-          <div style="display:flex;gap:6px;align-items:center;flex:1;min-width:260px">
+          <div style="display:flex;gap:6px;align-items:center;flex:1;min-width:240px">
             <input type="text" id="pos-barcode-search" class="form-input" placeholder="${tr('🔍 Scan barcode with gun / type SKU or name...', '🔍 बारकोड गन से स्कैन करें या नाम/SKU लिखें...')}" style="padding:8px 12px;border-radius:8px;border:1.5px solid #0284c7;font-size:0.92rem;font-weight:600" onkeydown="handlePosBarcodeScan(event)" />
             <button type="button" class="btn btn-gold btn-sm" style="white-space:nowrap;padding:7px 12px" onclick="triggerBarcodeCameraScan()">📷 ${tr('Scan Camera', 'कैमरा स्कैनर')}</button>
           </div>
@@ -12007,14 +12011,14 @@ function renderMerchantPosCounter(shop) {
 
         <!-- Top Right Actions: Held Sales, Dual Screen, Shifts -->
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <button type="button" class="btn btn-ghost btn-sm" style="background:#f1f5f9;font-weight:700;position:relative" onclick="openHeldSalesModal()">
+          <button type="button" class="btn btn-ghost btn-sm" style="font-weight:700;position:relative" onclick="openHeldSalesModal()">
             ⏸️ ${tr('Held Sales', 'होल्ड बिल')}
             ${heldSalesCount > 0 ? `<span style="background:#ef4444;color:#fff;border-radius:50%;padding:2px 6px;font-size:0.7rem;margin-left:4px;font-weight:900">${heldSalesCount}</span>` : ''}
           </button>
-          <button type="button" class="btn btn-ghost btn-sm" style="background:#f1f5f9;font-weight:700" onclick="window.open('/customer-display', '_blank', 'width=900,height=600')">
+          <button type="button" class="btn btn-ghost btn-sm" style="font-weight:700" onclick="window.open('/customer-display', '_blank', 'width=900,height=600')">
             🖥️ ${tr('Customer Screen', 'ग्राहक स्क्रीन (Dual Display)')}
           </button>
-          <button type="button" class="btn btn-ghost btn-sm" style="background:#f1f5f9;font-weight:700" onclick="state.merchantTab='Shifts & Drawer';render()">
+          <button type="button" class="btn btn-ghost btn-sm" style="font-weight:700" onclick="state.merchantTab='Shifts & Drawer';render()">
             💼 ${tr('Shift / Cash Drawer', 'गल्ला / शिफ्ट')}
           </button>
         </div>
