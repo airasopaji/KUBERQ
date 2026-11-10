@@ -2380,7 +2380,6 @@ tr:hover td {
     box-sizing: border-box;
     overflow-x: hidden;
   }
-  }
   .erp-card {
     padding: 16px 18px;
     margin-bottom: 16px;
@@ -3568,4 +3567,394 @@ tr:hover td {
   padding: 8px 12px;
   background: #ffffff;
   text-align: center;
+}
+
+/* ============================================================================
+   GRAND CUSTOMER STOREFRONT & SOCIAL PRESENCE WEBSITE VIEW
+   ============================================================================ */
+.storefront-grand-shell {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 16px 20px 80px;
+  box-sizing: border-box;
+}
+
+.storefront-hero-banner {
+  background: linear-gradient(135deg, #0b1120 0%, #1e293b 50%, #0f172a 100%);
+  border-radius: 20px;
+  padding: 24px 28px;
+  color: #ffffff;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.storefront-hero-banner::after {
+  content: '';
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.15) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.storefront-brand-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.storefront-brand-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.storefront-logo-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #0284c7, #2563eb);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  font-weight: 900;
+  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.4);
+  flex-shrink: 0;
+}
+
+.storefront-title {
+  font-size: 1.75rem;
+  font-weight: 900;
+  color: #ffffff;
+  margin: 0 0 4px;
+  letter-spacing: -0.02em;
+}
+
+.storefront-tagline {
+  color: #94a3b8;
+  font-size: 0.9rem;
+  margin: 0 0 6px;
+}
+
+.storefront-meta-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: #cbd5e1;
+}
+
+.storefront-rating-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(250, 204, 21, 0.16);
+  border: 1px solid #facc15;
+  color: #fef08a;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+/* Social & Web Ribbon */
+.store-social-ribbon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.social-btn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+.social-btn-pill:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+
+.social-btn-website {
+  background: rgba(56, 189, 248, 0.18);
+  border: 1px solid #38bdf8;
+  color: #38bdf8;
+}
+
+.social-btn-instagram {
+  background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #ffffff;
+}
+
+.social-btn-facebook {
+  background: #1877f2;
+  border: 1px solid #1877f2;
+  color: #ffffff;
+}
+
+.social-btn-whatsapp {
+  background: #16a34a;
+  border: 1px solid #16a34a;
+  color: #ffffff;
+}
+
+.social-btn-maps {
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid #ef4444;
+  color: #fca5a5;
+}
+
+/* Storefront 2-Panel Layout */
+.storefront-2col-layout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 20px;
+  align-items: start;
+}
+
+/* Category Filter Pills */
+.storefront-category-ribbon {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 14px;
+  scrollbar-width: thin;
+}
+
+.storefront-cat-pill {
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  border: 1.5px solid var(--border, #cbd5e1);
+  background: var(--card-bg, #ffffff);
+  color: var(--text, #1e293b);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.storefront-cat-pill.active {
+  background: #0284c7;
+  border-color: #0284c7;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
+}
+
+/* Product Cards Grid */
+.storefront-prod-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 16px;
+}
+
+.storefront-prod-card {
+  background: var(--card-bg, #ffffff);
+  border: 1.5px solid var(--border, #e2e8f0);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.storefront-prod-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  border-color: #0284c7;
+}
+
+.storefront-img-wrap {
+  position: relative;
+  width: 100%;
+  height: 145px;
+  background: #f1f5f9;
+  overflow: hidden;
+}
+
+.storefront-prod-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.storefront-prod-card:hover .storefront-prod-img {
+  transform: scale(1.05);
+}
+
+.storefront-stock-chip {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(4px);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.storefront-card-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.storefront-card-title {
+  font-size: 0.94rem;
+  font-weight: 800;
+  color: var(--text, #0f172a);
+  margin: 0 0 6px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.storefront-pricing-block {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.storefront-retail-rate {
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: #0284c7;
+}
+
+.storefront-wholesale-rate {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #16a34a;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.storefront-moq-badge {
+  font-size: 0.7rem;
+  background: #dcfce7;
+  color: #15803d;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 800;
+}
+
+.storefront-card-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* Stepper inside Product Card */
+.storefront-stepper {
+  display: flex;
+  align-items: center;
+  background: var(--subtle-bg, #f1f5f9);
+  border: 1.5px solid var(--border, #cbd5e1);
+  border-radius: 8px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.storefront-stepper-btn {
+  background: transparent;
+  border: none;
+  width: 32px;
+  height: 32px;
+  font-size: 1.1rem;
+  font-weight: 900;
+  cursor: pointer;
+  color: var(--text, #0f172a);
+  display: grid;
+  place-items: center;
+}
+
+.storefront-stepper-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.storefront-stepper-qty {
+  flex: 1;
+  text-align: center;
+  font-weight: 800;
+  font-size: 0.92rem;
+  color: var(--text, #0f172a);
+}
+
+/* Customer Display Screen Upgrade (Image 1 fix) */
+.customer-display-hero {
+  background: linear-gradient(135deg, #0b1120 0%, #1e293b 100%);
+  border-radius: 18px;
+  padding: 18px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  margin-bottom: 20px;
+}
+
+.customer-display-item-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 8px;
+  transition: background 0.15s ease;
+}
+
+.customer-display-item-thumb {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #1e293b;
+  flex-shrink: 0;
+}
+
+@media (max-width: 900px) {
+  .storefront-2col-layout {
+    grid-template-columns: 1fr;
+  }
+  .storefront-grand-shell {
+    padding: 10px 10px 70px;
+  }
+  .storefront-hero-banner {
+    padding: 16px;
+  }
+  .storefront-title {
+    font-size: 1.4rem;
+  }
 }

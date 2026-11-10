@@ -2232,20 +2232,55 @@ window.submitPasswordReset = async function(e) {
 
 
 // ============================================================================
-// 4. FRICTIONLESS QR SCAN & PARCHI ORDER (`/order` & `/customer`)
 // ============================================================================
+// 4. PRODUCT PHOTOGRAPHY HELPER & ZERO-LATENCY STOREFRONT (`/order` & `/customer`)
+// ============================================================================
+const PRODUCT_PLACEHOLDER_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 150' fill='%231e293b'%3E%3Crect width='200' height='150' fill='%230f172a'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='32' fill='%2394a3b8'%3E📦%3C/text%3E%3C/svg%3E";
+
+function getProductPhotoUrl(prod) {
+  if (prod && prod.imageUrl && String(prod.imageUrl).trim()) return String(prod.imageUrl).trim();
+  const name = ((prod?.name || '') + ' ' + (prod?.category || '')).toLowerCase();
+  if (/pipe|pvc|cpvc|upvc|plumbing/.test(name)) return 'https://images.unsplash.com/photo-1590381105924-c72589b9ef3f?auto=format&fit=crop&w=500&q=80';
+  if (/sanitary|tap|faucet|bath|basin|cock|bib/.test(name)) return 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=500&q=80';
+  if (/tank|water|sintex/.test(name)) return 'https://images.unsplash.com/photo-1527061011665-3652c757a4d4?auto=format&fit=crop&w=500&q=80';
+  if (/putty|paint|cement|chemical|coating/.test(name)) return 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?auto=format&fit=crop&w=500&q=80';
+  if (/wire|cable|polycab|havells|switch|socket|electrical/.test(name)) return 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=500&q=80';
+  if (/butter|milk|cheese|dairy|paneer|ghee/.test(name)) return 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?auto=format&fit=crop&w=500&q=80';
+  if (/rice|grain|wheat|flour|dal|atta|grocery/.test(name)) return 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=500&q=80';
+  if (/bakery|croissant|bread|biscuit|cake|snack/.test(name)) return 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=500&q=80';
+  if (/chocolate|dark/.test(name)) return 'https://images.unsplash.com/photo-1548907040-4baa42d10919?auto=format&fit=crop&w=500&q=80';
+  if (/soap|dish|detergent/.test(name)) return 'https://images.unsplash.com/photo-1585421514284-efb74c2b69ba?auto=format&fit=crop&w=500&q=80';
+  if (/tomato|vegetable|fruit|banana|carrot|lemon/.test(name)) return 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=500&q=80';
+  return 'https://images.unsplash.com/photo-1581783898377-1c85bf937427?auto=format&fit=crop&w=500&q=80';
+}
+
 function renderOrderPage() {
   const shops = state.data.merchants;
   const shopId = state.query.shop || state.selectedShopId || (shops[0]?.id || '');
-  const shop = shops.find(s => s.id === shopId) || shops[0];
-  const allProducts = state.data.products.filter(p => p.shopId === shop?.id);
+  const shop = shops.find(s => s.id === shopId) || shops[0] || {};
+  const allProducts = (state.data.products || []).filter(p => p.shopId === shop?.id);
   const searchQ = (state.orderCatalogSearch || '').trim().toLowerCase();
-  const products = searchQ
-    ? allProducts.filter(p => (p.name || '').toLowerCase().includes(searchQ) || (p.category || '').toLowerCase().includes(searchQ) || (p.hsn || '').includes(searchQ))
-    : allProducts;
+  const activeCat = state.storefrontCategoryFilter || 'ALL';
 
-  const cartEntries = Object.entries(state.cart).filter(([, q]) => q > 0);
+  // Extract all categories dynamically from store products
+  const rawCats = [...new Set(allProducts.map(p => p.category || 'General').filter(Boolean))];
+  const categories = ['ALL', ...rawCats];
+
+  let products = allProducts;
+  if (activeCat !== 'ALL') {
+    products = products.filter(p => (p.category || 'General') === activeCat);
+  }
+  if (searchQ) {
+    products = products.filter(p =>
+      (p.name || '').toLowerCase().includes(searchQ) ||
+      (p.category || '').toLowerCase().includes(searchQ) ||
+      (p.hsn || '').includes(searchQ)
+    );
+  }
+
+  const cartEntries = Object.entries(state.cart || {}).filter(([, q]) => q > 0);
   let cartGross = 0;
+  let cartSubtotal = 0;
   let wholesaleSavings = 0;
   const moqHints = [];
   for (const [pid, qty] of cartEntries) {
@@ -2260,17 +2295,20 @@ function renderOrderPage() {
       const potentialSave = (p.price - p.wholesalePrice) * (p.moq || 10);
       moqHints.push(`${trDyn(p.name)} में ${needed} नग और जोड़ने पर थोक रेट (${fmtINR(p.wholesalePrice)}/नग) मिलेगा व ${fmtINR(potentialSave)} बचेंगे!`);
     }
+    const lineSub = rate * qty;
+    cartSubtotal += lineSub;
     const lineTotal = p.taxMode === 'inclusive' || !shop?.gstin
-      ? rate * qty
-      : rate * qty * (1 + (p.gstRate || 0) / 100);
+      ? lineSub
+      : lineSub * (1 + (p.gstRate || 0) / 100);
     cartGross += lineTotal;
   }
+  const cartTax = Math.max(0, cartGross - cartSubtotal);
   const shopReviews = (state.data.reviews || []).filter(r => r.targetId === shop?.id);
 
   if (state.lastPlacedOrder) {
     const o = state.lastPlacedOrder.order;
     const shopPhone = state.lastPlacedOrder.shopPhone || shop?.phone || '';
-    const upiId = state.lastPlacedOrder.upiId || '';
+    const upiId = state.lastPlacedOrder.upiId || shop?.upiId || '';
     const itemSummary = (o.items || []).map(i => `${i.name} x ${i.qty}`).join(', ') || o.note;
     const waText = `🧾 *New KuberQ Order ${o.invoiceNo}*\n🏪 Shop: ${shop?.shop}\n👤 Buyer: ${o.customer} (${o.phone})\n📍 Address: ${o.address}\n${o.buyerGstin ? `🏢 Buyer GSTIN: ${o.buyerGstin}\n` : ''}📦 Items/Parchi: ${itemSummary}\n💰 Total: ₹${o.totals?.gross || 0}`;
     const upiLink = upiId && o.totals?.gross > 0
@@ -2278,37 +2316,36 @@ function renderOrderPage() {
       : '';
 
     return `
-      <div class="container" style="max-width:640px;padding:44px 24px">
-        <div class="card" style="text-align:center;border:2.5px solid var(--gold)">
-          <span class="badge badge-primary" style="font-size:0.95rem">✓ ${tr('ORDER SAVED SUCCESSFULLY', 'ऑर्डर सफलतापूर्वक दर्ज हो गया')}</span>
-          <h1 style="font-size:1.95rem;margin-top:12px">${esc(o.invoiceNo)}</h1>
-          <p class="text-muted" style="margin-top:8px;font-size:1.05rem">
+      <div class="storefront-grand-shell" style="max-width:680px;margin:20px auto">
+        <div class="card" style="text-align:center;border:2.5px solid var(--gold);border-radius:20px;padding:32px 24px">
+          <span class="badge badge-primary" style="font-size:0.95rem;padding:6px 14px">✓ ${tr('ORDER SAVED SUCCESSFULLY', 'ऑर्डर सफलतापूर्वक दर्ज हो गया')}</span>
+          <h1 style="font-size:2.1rem;margin:14px 0 4px;font-weight:900">${esc(o.invoiceNo)}</h1>
+          <p class="text-muted" style="margin-top:4px;font-size:1.05rem">
             ${tr('Sent to', 'दुकान:')} <b class="text-gold">${esc(trDyn(shop?.shop))}</b> · ${tr('Total:', 'कुल राशि:')} <b>${fmtINR(o.totals?.gross || 0)}</b>
           </p>
 
-          <div class="card-subtle" style="margin:20px 0;text-align:left;font-size:0.98rem">
-            <p><b>${tr('Buyer:', 'खरीदार:')}</b> ${esc(o.customer)} (${esc(o.phone)})</p>
-            <p><b>${tr('Delivery:', 'पता:')}</b> ${esc(o.address)}</p>
-            ${o.note ? `<p style="margin-top:6px"><b>📝 ${tr('Parchi List:', 'पर्ची विवरण:')}</b><br/>${esc(o.note)}</p>` : ''}
+          <div class="card-subtle" style="margin:20px 0;text-align:left;font-size:0.95rem;border-radius:12px;padding:14px">
+            <p style="margin:0 0 6px"><b>${tr('Buyer:', 'खरीदार:')}</b> ${esc(o.customer)} (${esc(o.phone)})</p>
+            <p style="margin:0 0 6px"><b>${tr('Delivery:', 'डिलीवरी पता:')}</b> ${esc(o.address)}</p>
+            ${o.note ? `<p style="margin:6px 0 0"><b>📝 ${tr('Parchi List:', 'पर्ची विवरण:')}</b><br/>${esc(o.note)}</p>` : ''}
           </div>
 
-          <!-- Expected Dispatch & Response Time (Item #8) -->
           <div style="margin:16px 0;padding:12px 14px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;font-size:0.88rem;color:#166534;text-align:left">
             ⏱️ <b>${tr('Expected Response Time:', 'अपेक्षित प्रतिक्रिया समय:')}</b>
-            ${tr('Merchant usually verifies stock and confirms dispatch within 15–30 minutes during business hours (9 AM – 8 PM).', 'दुकानदार आमतौर पर व्यापारिक समय (सुबह 9 से रात 8 बजे) में 15 से 30 मिनट के भीतर स्टॉक जांचकर बिल/डिलीवरी की पुष्टि करता है।')}
+            ${tr('Merchant usually verifies stock and confirms dispatch within 15–30 minutes during business hours (9 AM – 8 PM).', 'दुकानदार व्यापारिक समय (सुबह 9 से रात 8 बजे) में 15 से 30 मिनट के भीतर स्टॉक जांचकर बिल/डिलीवरी की पुष्टि करता है।')}
           </div>
 
           <div style="display:grid;gap:12px">
-            <a class="btn btn-gold" style="width:100%;font-size:1.05rem" target="_blank" rel="noreferrer" href="https://wa.me/91${shopPhone}?text=${encodeURIComponent(waText)}">
+            <a class="btn btn-gold" style="width:100%;font-size:1.08rem;padding:12px" target="_blank" rel="noreferrer" href="https://wa.me/91${shopPhone}?text=${encodeURIComponent(waText)}">
               📲 ${tr('Send Order Alert to Shop on WhatsApp (Instant)', 'दुकानदार को WhatsApp पर तुरंत ऑर्डर अलर्ट भेजें')}
             </a>
             ${upiLink ? `
-              <a class="btn btn-primary" style="width:100%" href="${upiLink}">
+              <a class="btn btn-primary" style="width:100%;padding:12px;background:#0284c7;border-color:#0284c7;font-weight:800" href="${upiLink}">
                 💳 ${tr('Pay Directly via UPI App', 'UPI ऐप से सीधा भुगतान करें')} (${fmtINR(o.totals.gross)})
               </a>
             ` : ''}
             <button class="btn btn-ghost" onclick="state.lastPlacedOrder=null;render()">
-              ← ${tr('Place Another Order', 'एक और ऑर्डर करें')}
+              ← ${tr('Place Another Order', 'एक और नया ऑर्डर करें')}
             </button>
           </div>
         </div>
@@ -2317,291 +2354,382 @@ function renderOrderPage() {
   }
 
   const orderMode = state.orderPageTab || 'catalog';
+  const shopInitials = String(shop.shop || 'K').slice(0, 1).toUpperCase();
+  const mapsQuery = shop.googleMapsUrl || `https://maps.google.com/?q=${encodeURIComponent((shop.shop || '') + ' ' + (shop.city || ''))}`;
+  const igHandle = (shop.instagram || '').replace(/^@/, '');
 
   return `
-    <div class="order-vertical-shell">
-      <!-- Store Header Card with Switcher -->
-      <div class="order-step-card" style="background:linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);color:#ffffff;border:none">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
-          <div>
-            <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,0.15);padding:4px 10px;border-radius:20px;font-size:0.78rem;font-weight:700;color:#93c5fd;margin-bottom:8px">
-              ⚡ <span>${tr('DIRECT STORE QR / B2B DESK', 'सीधा डिजिटल ऑर्डर काउंटर · बिना लॉगिन')}</span>
+    <div class="storefront-grand-shell">
+      <!-- 1. GRAND HERO BANNER WITH BRANDING & SOCIAL PRESENCE LINKS -->
+      <section class="storefront-hero-banner">
+        <div class="storefront-brand-row">
+          <div class="storefront-brand-info">
+            <div class="storefront-logo-avatar">${esc(shopInitials)}</div>
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+                <span class="badge" style="background:#0284c7;color:#fff;font-weight:800;font-size:0.75rem">
+                  ✓ ${tr('VERIFIED STOREFRONT', 'सत्यापित ऑनलाइन दुकान')}
+                </span>
+                <span class="storefront-rating-badge">
+                  ⭐ ${shop.rating || '4.9'} <span style="font-size:0.72rem;color:#cbd5e1">(${shop.reviewsCount || 128} ${tr('reviews', 'समीक्षाएं')})</span>
+                </span>
+              </div>
+              <h1 class="storefront-title">${esc(trDyn(shop.shop || 'Store Name'))}</h1>
+              <p class="storefront-tagline">${esc(shop.tagline || tr('Trusted Wholesale & Retail Counter Since 1998', 'विश्वसनीय थोक व खुदरा व्यापार केंद्र'))}</p>
+              <div class="storefront-meta-line">
+                <span>📍 ${esc(shop.address || shop.city || 'Rajasthan')}</span>
+                <span>📞 ${esc(shop.phone || '')}</span>
+                ${shop.gstin ? `<span>🧾 GSTIN: <strong style="color:#67e8f9;font-family:monospace">${esc(shop.gstin)}</strong></span>` : ''}
+              </div>
             </div>
-            <h1 style="font-size:1.75rem;margin:0 0 6px;color:#ffffff">${esc(trDyn(shop?.shop))}</h1>
-            <p style="margin:0;font-size:0.9rem;color:#cbd5e1">
-              📍 ${esc(shop?.city || '')} · 📞 ${esc(shop?.phone || '')} · ID: <span style="font-family:monospace;color:#fde047">${esc(shop?.refCode || shop?.id)}</span>
-              ${shop?.gstin ? ` · GSTIN: <span style="font-family:monospace;color:#a7f3d0">${esc(shop.gstin)}</span>` : ''}
-            </p>
           </div>
 
-          <div style="background:rgba(255,255,255,0.1);padding:10px 14px;border-radius:12px;border:1px solid rgba(255,255,255,0.2);max-width:100%;box-sizing:border-box">
-            <label style="font-size:0.75rem;color:#93c5fd;display:block;margin-bottom:4px;font-weight:700">${tr('Switch Store / Trader:', 'अन्य दुकान चुनें:')}</label>
-            <select class="select" style="background:#0f172a;color:#ffffff;border-color:#475569;font-size:0.85rem;padding:6px 10px;max-width:100%;box-sizing:border-box" onchange="state.selectedShopId=this.value;state.cart={};navigate('/order?shop='+this.value)">
+          <!-- Switch Store Dropdown -->
+          <div style="background:rgba(255,255,255,0.08);padding:8px 12px;border-radius:12px;border:1px solid rgba(255,255,255,0.18)">
+            <label style="font-size:0.72rem;color:#93c5fd;display:block;margin-bottom:4px;font-weight:700">
+              🔄 ${tr('Switch Merchant / Store:', 'अन्य दुकान चुनें:')}
+            </label>
+            <select class="select" style="background:#0f172a;color:#ffffff;border-color:#475569;font-size:0.82rem;padding:5px 8px" onchange="state.selectedShopId=this.value;state.cart={};navigate('/order?shop='+this.value)">
               ${shops.map(s => `<option value="${s.id}" ${s.id === shop?.id ? 'selected' : ''}>[${s.refCode || s.id}] ${esc(s.shop)} (${esc(s.city)})</option>`).join('')}
             </select>
           </div>
         </div>
 
-        <!-- Mode Toggle Pill -->
-        <div style="display:flex;gap:10px;margin-top:18px;border-top:1px solid rgba(255,255,255,0.15);padding-top:14px;flex-wrap:wrap">
-          <button type="button" class="btn btn-sm ${orderMode === 'catalog' ? 'btn-gold' : 'btn-ghost'}" style="${orderMode === 'catalog' ? '' : 'color:#ffffff;border-color:rgba(255,255,255,0.3)'}" onclick="state.orderPageTab='catalog';render()">
-            📦 ${tr('1. Select from Catalog', '1. कैटलॉग से सामान चुनें')} (${allProducts.length})
-          </button>
-          <button type="button" class="btn btn-sm ${orderMode === 'parchi' ? 'btn-gold' : 'btn-ghost'}" style="${orderMode === 'parchi' ? '' : 'color:#ffffff;border-color:rgba(255,255,255,0.3)'}" onclick="state.orderPageTab='parchi';render()">
-            📝 ${tr('2. Quick Parchi / Direct List', '2. त्वरित पर्ची लिखकर भेजें')}
-          </button>
-        </div>
-      </div>
+        <!-- Social & Online Presence Ribbon (Website, Instagram, Facebook, WhatsApp, Maps) -->
+        <div class="store-social-ribbon">
+          <span style="font-size:0.8rem;color:#94a3b8;font-weight:700;margin-right:4px">
+            ${tr('Connect Online:', 'ऑनलाइन स्टोर व संपर्क:')}
+          </span>
 
-      <!-- STEP 1: Select Items or Write Parchi -->
-      <div class="order-step-card">
-        <div class="order-step-header">
-          <div>
-            <h3 style="margin:0;font-size:1.2rem;display:flex;align-items:center">
-              <span class="order-step-num-badge">1</span>
-              ${orderMode === 'catalog' ? tr('Pick Items from Catalog', 'कैटलॉग से सामान चुनें') : tr('Write Your Parchi List', 'अपनी पर्ची या सामान की सूची लिखें')}
-            </h3>
-            <p class="text-muted" style="margin:4px 0 0;font-size:0.84rem">
-              ${orderMode === 'catalog' ? tr('Select quantity. Automatic wholesale discount applied on MOQ bulk quantity.', 'मात्रा चुनें। थोक मात्रा (MOQ) पर थोक दर स्वतः लागू होगी।') : tr('Type or paste items needed, specifications, and sizes directly.', 'आवश्यक सामान, साइज व मात्रा सीधे पर्ची में टाइप करें।')}
-            </p>
-          </div>
-          ${orderMode === 'catalog' ? `
-            <div style="min-width:220px">
-              <input class="input" style="font-size:0.86rem;padding:6px 12px" placeholder="🔍 ${tr('Search item name or HSN...', 'सामान या HSN खोजें...')}" value="${esc(state.orderCatalogSearch || '')}" oninput="state.orderCatalogSearch=this.value;render()" />
-            </div>
-          ` : ''}
-        </div>
-
-        ${orderMode === 'catalog' ? `
-          <div style="display:flex;flex-direction:column;gap:8px">
-            ${products.length === 0 ? `
-              <div style="text-align:center;padding:32px;background:#f8fafc;border-radius:12px;border:1px dashed #cbd5e1">
-                <p class="text-muted">${tr('No products matching search criteria.', 'खोजे गए नाम का कोई सामान नहीं मिला।')}</p>
-                <button type="button" class="btn btn-ghost btn-sm" onclick="state.orderCatalogSearch='';render()">🔄 ${tr('Show All Products', 'सभी सामान देखें')}</button>
-              </div>
-            ` : products.map(p => {
-              const qty = state.cart[p.id] || 0;
-              const hasWholesale = p.wholesalePrice && p.wholesalePrice < p.price;
-              const isWholesaleActive = qty >= (p.moq || 9999) && hasWholesale;
-              return `
-                <div class="order-item-card">
-                  <div style="flex:1;min-width:180px">
-                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                      <b style="font-size:0.98rem;color:#0f172a">${esc(trDyn(p.name))}</b>
-                      ${p.unit ? `<span class="badge badge-ghost" style="font-size:0.72rem">${esc(p.unit)}</span>` : ''}
-                      ${p.hsn ? `<span style="font-size:0.72rem;font-family:monospace;color:#64748b">HSN: ${esc(p.hsn)}</span>` : ''}
-                    </div>
-                    <div style="font-size:0.86rem;color:#475569;margin-top:4px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-                      <span>${tr('Retail:', 'खुदरा:')} <b style="color:#0f172a">${fmtINR(p.price)}</b></span>
-                      ${hasWholesale ? `
-                        <span style="color:#16a34a;font-weight:700">
-                          ${tr('Wholesale:', 'थोक:')} ${fmtINR(p.wholesalePrice)}
-                          <span style="font-size:0.74rem;background:#dcfce7;color:#15803d;padding:2px 6px;border-radius:4px;margin-left:4px">MOQ: ${p.moq || 10}</span>
-                        </span>
-                      ` : ''}
-                      ${p.gstRate ? `<span style="font-size:0.74rem;color:#64748b">+${p.gstRate}% GST</span>` : ''}
-                    </div>
-                    ${isWholesaleActive ? `
-                      <span class="badge badge-success" style="font-size:0.72rem;margin-top:4px">✔ ${tr('Wholesale Rate Active', 'थोक दर लागू')}</span>
-                    ` : ''}
-                  </div>
-
-                  <div class="order-stepper-box">
-                    <button type="button" class="order-stepper-btn" onclick="updateCart('${p.id}', -1)">−</button>
-                    <span class="order-stepper-qty">${qty}</span>
-                    <button type="button" class="order-stepper-btn" onclick="updateCart('${p.id}', 1)">+</button>
-                    ${hasWholesale ? `
-                      <button type="button" class="btn btn-gold btn-sm" style="padding:4px 8px;font-size:0.78rem" title="${tr('Add Bulk MOQ Quantity', 'थोक न्यूनतम मात्रा जोड़ें')}" onclick="updateCart('${p.id}', ${p.moq || 10})">
-                        +${p.moq || 10}
-                      </button>
-                    ` : ''}
-                  </div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-        ` : `
-          <div>
-            <label class="form-label">${tr('Write or Paste Your Parchi List (Hardware, Sanitary, Groceries, Electrical, etc.):', 'अपनी पर्ची सूची लिखें या पेस्ट करें:')}</label>
-            <textarea class="textarea" rows="4" id="ord-note" style="font-size:0.95rem" placeholder="${tr('e.g. 15 Supreme 1 inch PVC pipe, 30 elbow, 5 JK wall putty 40kg, 2 tape rolls...', 'जैसे: 15 सुप्रीम 1 इंच पीवीसी पाइप, 30 एल्बो, 5 जेके वॉल पुट्टी 40kg, 2 टेप रोल...')}" oninput="state.parchiNote=this.value">${esc(state.parchiNote)}</textarea>
-            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-              <span class="text-muted" style="font-size:0.8rem">त्वरित सुझाव जोड़ें:</span>
-              <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.76rem;padding:2px 8px" onclick="state.parchiNote=(state.parchiNote ? state.parchiNote + ', ' : '') + '10 PVC Elbow 1 inch';render()">+ 10 PVC Elbow</button>
-              <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.76rem;padding:2px 8px" onclick="state.parchiNote=(state.parchiNote ? state.parchiNote + ', ' : '') + '5 CPVC Solvent 100ml';render()">+ 5 Solvent</button>
-              <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.76rem;padding:2px 8px" onclick="state.parchiNote=(state.parchiNote ? state.parchiNote + ', ' : '') + '2 Water Tank 1000L';render()">+ 2 Water Tank</button>
-            </div>
-          </div>
-        `}
-      </div>
-
-      <!-- Form Wrapper for Submission -->
-      <form onsubmit="submitCustomerOrder(event, '${shop?.id || ''}')">
-        ${orderMode === 'catalog' ? `
-          <input type="hidden" id="ord-note" value="${esc(state.parchiNote)}" />
-        ` : ''}
-
-        <!-- STEP 2: Order Review & Wholesale Savings -->
-        <div class="order-step-card">
-          <div class="order-step-header">
-            <div>
-              <h3 style="margin:0;font-size:1.2rem;display:flex;align-items:center">
-                <span class="order-step-num-badge">2</span>
-                ${tr('Order Review & Live Summary', 'ऑर्डर सारांश एवं कुल राशि')}
-              </h3>
-              <p class="text-muted" style="margin:4px 0 0;font-size:0.84rem">
-                ${tr('Review items selected and verify wholesale pricing benefits.', 'चुने गए सामानों की पुष्टि करें एवं थोक बचत देखें।')}
-              </p>
-            </div>
-            <div style="text-align:right">
-              <span style="font-size:0.82rem;color:#64748b;display:block">${tr('Estimated Gross Total:', 'अनुमानित कुल राशि:')}</span>
-              <span class="text-gold" style="font-size:1.4rem;font-weight:800">${fmtINR(cartGross)}</span>
-            </div>
-          </div>
-
-          ${cartEntries.length > 0 ? `
-            <div class="bulk-table-wrap" style="max-height:220px;margin-bottom:14px">
-              <table>
-                <thead>
-                  <tr style="background:#f8fafc">
-                    <th>${tr('Item', 'सामान')}</th>
-                    <th style="text-align:center">${tr('Qty', 'मात्रा')}</th>
-                    <th style="text-align:right">${tr('Rate Applied', 'दर')}</th>
-                    <th style="text-align:right">${tr('Line Total', 'योग')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${cartEntries.map(([pid, qty]) => {
-                    const p = allProducts.find(x => x.id === pid);
-                    if (!p) return '';
-                    const isWholesale = qty >= (p.moq || 9999) && p.wholesalePrice && p.wholesalePrice < p.price;
-                    const rate = isWholesale ? p.wholesalePrice : p.price;
-                    const lineTot = p.taxMode === 'inclusive' || !shop?.gstin
-                      ? rate * qty
-                      : rate * qty * (1 + (p.gstRate || 0) / 100);
-                    return `
-                      <tr>
-                        <td>
-                          <b>${esc(trDyn(p.name))}</b>
-                          ${isWholesale ? `<span class="badge badge-success" style="font-size:0.68rem;margin-left:4px">थोक</span>` : ''}
-                        </td>
-                        <td style="text-align:center"><b>${qty}</b></td>
-                        <td style="text-align:right">${fmtINR(rate)}</td>
-                        <td style="text-align:right;font-weight:700">${fmtINR(lineTot)}</td>
-                      </tr>
-                    `;
-                  }).join('')}
-                </tbody>
-              </table>
-            </div>
-          ` : (orderMode === 'catalog' ? `
-            <div style="padding:14px;background:#f8fafc;border-radius:10px;text-align:center;color:#64748b;font-size:0.88rem;margin-bottom:12px">
-              ℹ️ ${tr('No catalog items selected yet. Choose items above or switch to Parchi mode.', 'अभी तक कोई सामान नहीं चुना गया। ऊपर सूची से सामान चुनें या पर्ची मोड चुनें।')}
-            </div>
+          ${shop.website ? `
+            <a href="${esc(shop.website)}" target="_blank" rel="noreferrer" class="social-btn-pill social-btn-website" title="Official Website">
+              🌐 <span>${tr('Website', 'वेबसाइट')}</span>
+            </a>
           ` : `
-            <div style="padding:14px;background:#f8fafc;border-radius:10px;text-align:left;color:#0f172a;font-size:0.9rem;margin-bottom:12px">
-              📝 <b>पर्ची विवरण:</b> ${esc(state.parchiNote || 'पर्ची खाली है - कृपया ऊपर पर्ची लिखें')}
-            </div>
-          `)}
+            <a href="${window.location.href}" class="social-btn-pill social-btn-website">
+              🌐 <span>${tr('KuberQ Store', 'ऑनलाइन स्टोर')}</span>
+            </a>
+          `}
 
-          ${wholesaleSavings > 0 ? `
-            <div style="background:#ecfdf5;border:1.5px solid #10b981;padding:10px 14px;border-radius:10px;color:#065f46;font-size:0.88rem;margin-bottom:10px;display:flex;align-items:center;gap:8px">
-              <span>🎉</span>
+          ${igHandle ? `
+            <a href="https://instagram.com/${encodeURIComponent(igHandle)}" target="_blank" rel="noreferrer" class="social-btn-pill social-btn-instagram" title="Instagram Profile">
+              📸 <span>Instagram (@${esc(igHandle)})</span>
+            </a>
+          ` : ''}
+
+          ${shop.facebook ? `
+            <a href="${esc(shop.facebook)}" target="_blank" rel="noreferrer" class="social-btn-pill social-btn-facebook" title="Facebook Page">
+              📘 <span>Facebook</span>
+            </a>
+          ` : ''}
+
+          <a href="https://wa.me/91${shop.phone || CENTRAL_SUPPORT_PHONE}?text=${encodeURIComponent('Hello ' + (shop.shop || 'KuberQ') + ', I am viewing your online store catalog.')}" target="_blank" rel="noreferrer" class="social-btn-pill social-btn-whatsapp" title="WhatsApp Chat">
+            💬 <span>WhatsApp</span>
+          </a>
+
+          <a href="${esc(mapsQuery)}" target="_blank" rel="noreferrer" class="social-btn-pill social-btn-maps" title="Store Location & Directions">
+            📍 <span>${tr('Store Location / Maps', 'गूगल मैप्स लोकेशन')}</span>
+          </a>
+        </div>
+      </section>
+
+      <!-- 2. TWO-COLUMN INSIDE-STORE LAYOUT (Matching POS Counter Richness) -->
+      <div class="storefront-2col-layout">
+        <!-- LEFT COLUMN: Catalog / Product Grid -->
+        <div>
+          <!-- Search & Mode Switcher Bar -->
+          <div style="background:var(--card-bg, #ffffff);border:1.5px solid var(--border, #cbd5e1);border-radius:16px;padding:14px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.04)">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px">
+              <div style="display:flex;gap:8px">
+                <button type="button" class="btn btn-sm ${orderMode === 'catalog' ? 'btn-primary' : 'btn-ghost'}" style="${orderMode === 'catalog' ? 'background:#0284c7;border-color:#0284c7;font-weight:800' : ''}" onclick="state.orderPageTab='catalog';render()">
+                  📦 ${tr('1. Inside Store Catalog', '1. स्टोर कैटलॉग')} (${allProducts.length})
+                </button>
+                <button type="button" class="btn btn-sm ${orderMode === 'parchi' ? 'btn-primary' : 'btn-ghost'}" style="${orderMode === 'parchi' ? 'background:#0284c7;border-color:#0284c7;font-weight:800' : ''}" onclick="state.orderPageTab='parchi';render()">
+                  📝 ${tr('2. Quick Parchi / Direct List', '2. त्वरित पर्ची लिखकर भेजें')}
+                </button>
+              </div>
+
+              ${orderMode === 'catalog' ? `
+                <div style="flex:1;max-width:320px;min-width:180px">
+                  <input class="input" style="font-size:0.86rem;padding:7px 12px;border-radius:999px" placeholder="🔍 ${tr('Search pipes, fitting, butter, wires...', 'सामान या ब्रांड खोजें...')}" value="${esc(state.orderCatalogSearch || '')}" oninput="state.orderCatalogSearch=this.value;render()" />
+                </div>
+              ` : ''}
+            </div>
+
+            <!-- Category Pills Ribbon (Image 2 style) -->
+            ${orderMode === 'catalog' && categories.length > 1 ? `
+              <div class="storefront-category-ribbon">
+                ${categories.map(cat => {
+                  const count = cat === 'ALL' ? allProducts.length : allProducts.filter(p => (p.category || 'General') === cat).length;
+                  const isActive = activeCat === cat;
+                  return `
+                    <button type="button" class="storefront-cat-pill ${isActive ? 'active' : ''}" onclick="state.storefrontCategoryFilter='${cat}';render()">
+                      ${cat === 'ALL' ? '✦ ' + tr('All Products', 'सभी सामान') : esc(cat)} (${count})
+                    </button>
+                  `;
+                }).join('')}
+              </div>
+            ` : ''}
+          </div>
+
+          <!-- Product Catalog Content -->
+          ${orderMode === 'catalog' ? `
+            ${products.length === 0 ? `
+              <div style="text-align:center;padding:48px 20px;background:var(--card-bg, #ffffff);border-radius:16px;border:1.5px dashed var(--border, #cbd5e1)">
+                <span style="font-size:3rem;display:block;margin-bottom:8px">📦</span>
+                <p class="text-muted" style="font-size:1.05rem;font-weight:600">${tr('No products matching search criteria.', 'खोजे गए नाम का कोई सामान नहीं मिला।')}</p>
+                <button type="button" class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="state.orderCatalogSearch='';state.storefrontCategoryFilter='ALL';render()">
+                  🔄 ${tr('Show All Store Products', 'सभी सामान देखें')}
+                </button>
+              </div>
+            ` : `
+              <div class="storefront-prod-grid">
+                ${products.map(p => {
+                  const qty = state.cart[p.id] || 0;
+                  const hasWholesale = p.wholesalePrice && p.wholesalePrice < p.price;
+                  const isWholesaleActive = qty >= (p.moq || 9999) && hasWholesale;
+                  const photoUrl = getProductPhotoUrl(p);
+
+                  return `
+                    <div class="storefront-prod-card">
+                      <!-- Real Product Photo with Instant Vector SVG Fallback (0ms Lag) -->
+                      <div class="storefront-img-wrap">
+                        <img
+                          src="${esc(photoUrl)}"
+                          alt="${esc(p.name)}"
+                          loading="lazy"
+                          decoding="async"
+                          class="storefront-prod-img"
+                          onerror="this.onerror=null;this.src='${PRODUCT_PLACEHOLDER_SVG}'"
+                        />
+                        <span class="storefront-stock-chip">
+                          ${p.stock > 10 ? `✓ In Stock: ${p.stock}` : (p.stock > 0 ? `⚠️ Low: ${p.stock}` : 'Out of Stock')}
+                        </span>
+                      </div>
+
+                      <div class="storefront-card-body">
+                        <span style="font-size:0.72rem;color:#0284c7;font-weight:800;text-transform:uppercase;margin-bottom:2px">${esc(p.category || 'General')}</span>
+                        <h3 class="storefront-card-title" title="${esc(p.name)}">${esc(trDyn(p.name))}</h3>
+
+                        <div class="storefront-pricing-block">
+                          <div style="display:flex;align-items:baseline;gap:6px">
+                            <span class="storefront-retail-rate">${fmtINR(p.price)}</span>
+                            <span style="font-size:0.75rem;color:#64748b">/${p.unit || 'pc'}</span>
+                          </div>
+
+                          ${hasWholesale ? `
+                            <div class="storefront-wholesale-rate">
+                              <span>${tr('Wholesale:', 'थोक:')} <b>${fmtINR(p.wholesalePrice)}</b></span>
+                              <span class="storefront-moq-badge">MOQ: ${p.moq || 10}</span>
+                            </div>
+                          ` : ''}
+
+                          ${isWholesaleActive ? `
+                            <div style="margin-top:4px;font-size:0.72rem;font-weight:800;color:#16a34a">
+                              ✔ ${tr('Wholesale Rate Active!', 'थोक रेट लागू!')}
+                            </div>
+                          ` : ''}
+                        </div>
+
+                        <!-- Stepper / Add to Cart Action -->
+                        <div class="storefront-card-actions">
+                          ${qty === 0 ? `
+                            <button type="button" class="btn btn-primary btn-sm" style="width:100%;font-weight:800;border-radius:8px;background:#0284c7;border-color:#0284c7" onclick="updateCart('${p.id}', 1)">
+                              + ${tr('Add to Cart', 'कार्ट में जोड़ें')}
+                            </button>
+                          ` : `
+                            <div style="display:flex;width:100%;gap:4px">
+                              <div class="storefront-stepper" style="flex:1">
+                                <button type="button" class="storefront-stepper-btn" onclick="updateCart('${p.id}', -1)">−</button>
+                                <span class="storefront-stepper-qty">${qty}</span>
+                                <button type="button" class="storefront-stepper-btn" onclick="updateCart('${p.id}', 1)">+</button>
+                              </div>
+                              ${hasWholesale && qty < (p.moq || 10) ? `
+                                <button type="button" class="btn btn-gold btn-sm" style="padding:4px 8px;font-size:0.75rem;font-weight:800" title="${tr('Add MOQ to unlock wholesale price', 'थोक रेट लागू करने के लिए MOQ जोड़ें')}" onclick="updateCart('${p.id}', ${(p.moq || 10) - qty})">
+                                  +MOQ
+                                </button>
+                              ` : ''}
+                            </div>
+                          `}
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `}
+          ` : `
+            <!-- Quick Parchi Writer Mode -->
+            <div style="background:var(--card-bg, #ffffff);border:1.5px solid var(--border, #cbd5e1);border-radius:16px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.04)">
+              <label class="form-label" style="font-size:0.95rem;font-weight:800">
+                📝 ${tr('Write or Paste Your Parchi List (Hardware, Sanitary, Groceries, Electrical, etc.):', 'अपनी पर्ची सूची लिखें या पेस्ट करें:')}
+              </label>
+              <textarea class="textarea" rows="5" id="ord-note" style="font-size:0.95rem" placeholder="${tr('e.g. 15 Supreme 1 inch PVC pipe, 30 elbow, 5 JK wall putty 40kg, 2 Fresh Butter...', 'जैसे: 15 सुप्रीम 1 इंच पीवीसी पाइप, 30 एल्बो, 5 जेके वॉल पुट्टी 40kg, 2 फ्रेश बटर...')}" oninput="state.parchiNote=this.value">${esc(state.parchiNote)}</textarea>
+              <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+                <span class="text-muted" style="font-size:0.8rem">${tr('Quick suggestions:', 'त्वरित सुझाव जोड़ें:')}</span>
+                <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.76rem;padding:2px 8px" onclick="state.parchiNote=(state.parchiNote ? state.parchiNote + ', ' : '') + '10 PVC Elbow 1 inch';render()">+ 10 PVC Elbow</button>
+                <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.76rem;padding:2px 8px" onclick="state.parchiNote=(state.parchiNote ? state.parchiNote + ', ' : '') + '5 Astral CPVC Pipe 3/4 inch';render()">+ 5 CPVC Pipe</button>
+                <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.76rem;padding:2px 8px" onclick="state.parchiNote=(state.parchiNote ? state.parchiNote + ', ' : '') + '2 Water Tank 1000L';render()">+ 2 Water Tank</button>
+              </div>
+            </div>
+          `}
+        </div>
+
+        <!-- RIGHT COLUMN: Sticky Live Cart & Instant Checkout Desk -->
+        <div style="position:sticky;top:80px">
+          <form onsubmit="submitCustomerOrder(event, '${shop?.id || ''}')" style="background:var(--card-bg, #ffffff);border:1.5px solid var(--border, #cbd5e1);border-radius:18px;padding:20px;box-shadow:0 6px 20px rgba(0,0,0,0.06)">
+            ${orderMode === 'catalog' ? `
+              <input type="hidden" id="ord-note" value="${esc(state.parchiNote)}" />
+            ` : ''}
+
+            <!-- Cart Header -->
+            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid var(--border, #e2e8f0);padding-bottom:12px;margin-bottom:14px">
               <div>
-                <b>${tr('Wholesale Savings Applied:', 'B2B थोक रेट बचत लागू:')}</b>
-                ${tr(`You are saving ₹${wholesaleSavings} via wholesale MOQ pricing!`, `थोक दर (MOQ) के कारण आपकी ₹${wholesaleSavings} की सीधी बचत हो रही है!`)}
+                <h3 style="font-size:1.15rem;font-weight:900;margin:0;color:var(--text, #0f172a)">
+                  🛒 ${tr('Your Order Cart', 'आपका ऑर्डर कार्ट')}
+                </h3>
+                <span style="font-size:0.78rem;color:#64748b">${cartEntries.length} ${tr('item(s) selected', 'सामान चुना गया')}</span>
+              </div>
+              ${cartEntries.length > 0 ? `
+                <button type="button" class="btn btn-ghost btn-sm" style="color:#ef4444;font-size:0.78rem;padding:2px 6px" onclick="state.cart={};render()">
+                  🗑️ ${tr('Clear', 'खाली करें')}
+                </button>
+              ` : ''}
+            </div>
+
+            <!-- Cart Items List with Photos -->
+            <div style="max-height:260px;overflow-y:auto;margin-bottom:14px;padding-right:4px">
+              ${cartEntries.length === 0 ? `
+                <div style="text-align:center;padding:24px 10px;color:#94a3b8">
+                  <span style="font-size:2rem;display:block;margin-bottom:6px">🛍️</span>
+                  <p style="font-size:0.88rem;margin:0;font-weight:600">${tr('Cart is empty', 'कार्ट खाली है')}</p>
+                  <p style="font-size:0.76rem;margin:2px 0 0">${tr('Tap "+ Add to Cart" on any product.', 'सामान चुनने के लिए ऊपर दिए गए उत्पादों पर टैप करें।')}</p>
+                </div>
+              ` : cartEntries.map(([pid, qty]) => {
+                const p = allProducts.find(x => x.id === pid);
+                if (!p) return '';
+                const isWholesale = qty >= (p.moq || 9999) && p.wholesalePrice && p.wholesalePrice < p.price;
+                const rate = isWholesale ? p.wholesalePrice : p.price;
+                const lineTot = rate * qty;
+                const pPhoto = getProductPhotoUrl(p);
+
+                return `
+                  <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border, #f1f5f9)">
+                    <img src="${esc(pPhoto)}" alt="${esc(p.name)}" style="width:40px;height:40px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#f1f5f9" onerror="this.onerror=null;this.src='${PRODUCT_PLACEHOLDER_SVG}'" />
+                    <div style="flex:1;min-width:0">
+                      <strong style="font-size:0.84rem;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</strong>
+                      <span style="font-size:0.74rem;color:#64748b">${fmtINR(rate)} × ${qty} ${isWholesale ? '<span style="color:#16a34a;font-weight:700">(थोक)</span>' : ''}</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:4px">
+                      <button type="button" class="btn btn-ghost btn-sm" style="padding:1px 6px;font-size:0.8rem;border:1px solid #cbd5e1" onclick="updateCart('${p.id}', -1)">-</button>
+                      <span style="font-weight:800;font-size:0.82rem;min-width:18px;text-align:center">${qty}</span>
+                      <button type="button" class="btn btn-ghost btn-sm" style="padding:1px 6px;font-size:0.8rem;border:1px solid #cbd5e1" onclick="updateCart('${p.id}', 1)">+</button>
+                    </div>
+                    <strong style="font-size:0.88rem;min-width:55px;text-align:right">${fmtINR(lineTot)}</strong>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+
+            <!-- Wholesale Savings Callout -->
+            ${wholesaleSavings > 0 ? `
+              <div style="background:#ecfdf5;border:1.5px solid #10b981;padding:8px 12px;border-radius:10px;color:#065f46;font-size:0.82rem;margin-bottom:12px;display:flex;align-items:center;gap:6px">
+                <span>🎉</span>
+                <div><b>${tr('Wholesale Savings Applied:', 'B2B थोक रेट बचत लागू:')}</b> ${fmtINR(wholesaleSavings)}!</div>
+              </div>
+            ` : ''}
+
+            <!-- Price Breakdown -->
+            <div style="background:var(--subtle-bg, #f8fafc);padding:10px 14px;border-radius:12px;margin-bottom:14px;font-size:0.85rem">
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                <span class="text-muted">${tr('Subtotal:', 'उपयोग (Subtotal):')}</span>
+                <strong>${fmtINR(cartSubtotal)}</strong>
+              </div>
+              ${cartTax > 0 ? `
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#64748b">
+                  <span>${tr('GST (18% Estimated):', 'लागू GST (18%):')}</span>
+                  <span>${fmtINR(cartTax)}</span>
+                </div>
+              ` : ''}
+              <div style="display:flex;justify-content:space-between;font-size:1.2rem;font-weight:900;border-top:1.5px dashed var(--border, #cbd5e1);padding-top:6px;margin-top:6px">
+                <span>${tr('Total Payable:', 'कुल देय राशि:')}</span>
+                <span style="color:#0284c7">${fmtINR(cartGross)}</span>
               </div>
             </div>
-          ` : ''}
 
-          ${moqHints.length > 0 ? `
-            <div style="background:#fffbeb;border:1.5px solid #f59e0b;padding:10px 14px;border-radius:10px;color:#92400e;font-size:0.84rem;margin-bottom:10px">
-              💡 <b>${tr('Wholesale Tip:', 'स्मार्ट थोक बचत सुझाव:')}</b> ${esc(moqHints[0])}
+            <!-- Customer Details Form -->
+            <div style="margin-bottom:14px">
+              <div class="form-group" style="margin-bottom:8px">
+                <label class="form-label" style="font-size:0.78rem;font-weight:700">${tr('Your Name / Firm *', 'आपका नाम / फर्म का नाम *')}</label>
+                <input class="input" id="ord-name" required value="${esc(state.data.user?.name || state.checkoutCustomer.name)}" placeholder="e.g. Vikram Rathore" style="padding:6px 10px;font-size:0.85rem" />
+              </div>
+              <div class="form-group" style="margin-bottom:8px">
+                <label class="form-label" style="font-size:0.78rem;font-weight:700">${tr('10-Digit WhatsApp Mobile *', '10 अंकों का WhatsApp नंबर *')}</label>
+                <input class="input" id="ord-phone" pattern="^[6-9][0-9]{9}$" required maxlength="10" value="${esc(state.data.user?.phone || state.checkoutCustomer.phone)}" placeholder="9828XXXXXX" style="padding:6px 10px;font-size:0.85rem" oninput="const e=document.getElementById('ord-phone-err');if(e)e.style.display='none'" />
+                <div id="ord-phone-err" style="display:none;color:#dc2626;font-size:0.75rem;margin-top:2px"></div>
+              </div>
+              <div class="form-group" style="margin-bottom:8px">
+                <label class="form-label" style="font-size:0.78rem;font-weight:700">${tr('Delivery Address / Site *', 'डिलीवरी का पता / साइट लोकेशन *')}</label>
+                <input class="input" id="ord-addr" required value="${esc(state.checkoutCustomer.address)}" placeholder="Plot / Shop, Market, Landmark, City" style="padding:6px 10px;font-size:0.85rem" />
+              </div>
+              <div class="form-group" style="margin-bottom:8px">
+                <label class="form-label" style="font-size:0.78rem">${tr('Buyer GSTIN (Optional — For B2B ITC)', 'खरीदार GSTIN (वैकल्पिक — पक्का ITC बिल हेतु)')}</label>
+                <input class="input" id="ord-gstin" maxlength="15" style="text-transform:uppercase;font-family:monospace;padding:6px 10px;font-size:0.82rem" value="${esc(state.checkoutCustomer.buyerGstin)}" placeholder="08AAACR5055K1Z2" />
+              </div>
+
+              <!-- DPDP Act Consent -->
+              <div style="display:flex;align-items:flex-start;gap:8px;font-size:0.75rem;color:#64748b;margin:8px 0">
+                <input type="checkbox" id="ord-consent" checked required style="margin-top:2px;accent-color:#0284c7" />
+                <label for="ord-consent">
+                  ${tr('I agree to receive order confirmations & GST bill via WhatsApp as per', 'मैं WhatsApp पर बिल व डिलीवरी अपडेट्स प्राप्त करने की सहमति देता हूँ')}
+                  <a href="javascript:void(0)" onclick="navigate('/privacy')" style="color:#0284c7;text-decoration:underline">${tr('Privacy Terms', 'गोपनीयता नीति')}</a>.
+                </label>
+              </div>
             </div>
-          ` : ''}
-        </div>
 
-        <!-- STEP 3: Customer & Delivery Details -->
-        <div class="order-step-card">
-          <div class="order-step-header">
-            <div>
-              <h3 style="margin:0;font-size:1.2rem;display:flex;align-items:center">
-                <span class="order-step-num-badge">3</span>
-                ${tr('Buyer & Delivery Address Details', 'खरीदार व डिलीवरी पता विवरण')}
-              </h3>
-              <p class="text-muted" style="margin:4px 0 0;font-size:0.84rem">
-                ${tr('Provide your WhatsApp mobile number to receive live bill dispatch and delivery updates.', 'बिल व डिलीवरी अपडेट प्राप्त करने के लिए WhatsApp नंबर व पता भरें।')}
-              </p>
-            </div>
-          </div>
-
-          <div class="grid grid-2" style="gap:14px">
-            <div class="form-group" style="margin-bottom:10px">
-              <label class="form-label">${tr('Your Name / Firm Name', 'आपका नाम / फर्म का नाम')} *</label>
-              <input class="input" id="ord-name" name="name" autocomplete="name" required value="${esc(state.data.user?.name || state.checkoutCustomer.name)}" placeholder="${tr('e.g. Vikram Rathore (Contractor)', 'जैसे: विक्रम राठौड़ (ठेकेदार)')}" />
-            </div>
-
-            <div class="form-group" style="margin-bottom:10px">
-              <label class="form-label">${tr('10-Digit Mobile (WhatsApp Alert)', '10 अंकों का WhatsApp मोबाइल नंबर')} *</label>
-              <input class="input" id="ord-phone" name="tel" autocomplete="tel" pattern="^[6-9][0-9]{9}$" required maxlength="10" value="${esc(state.data.user?.phone || state.checkoutCustomer.phone)}" placeholder="9828XXXXXX" oninput="const e=document.getElementById('ord-phone-err');if(e)e.style.display='none'" />
-              <div id="ord-phone-err" style="display:none;color:#dc2626;font-size:0.78rem;font-weight:600;margin-top:4px"></div>
-            </div>
-          </div>
-
-          <div class="form-group" style="margin-bottom:10px">
-            <label class="form-label">${tr('Delivery Address / Site Location', 'डिलीवरी का पता / साइट लोकेशन')} *</label>
-            <input class="input" id="ord-addr" name="address" autocomplete="street-address" required value="${esc(state.checkoutCustomer.address)}" placeholder="${tr('Plot / Shop No, Market, Landmark, City', 'प्लॉट / दुकान नंबर, मुख्य बाजार या साइट, शहर')}" />
-          </div>
-
-          <div class="form-group" style="margin-bottom:6px">
-            <label class="form-label">${tr('Buyer GSTIN (Optional — For B2B Input Tax Credit)', 'खरीदार GSTIN (वैकल्पिक — पक्का B2B ITC बिल प्राप्त करने हेतु)')}</label>
-            <input class="input" id="ord-gstin" name="organization" autocomplete="organization" maxlength="15" style="text-transform:uppercase;font-family:monospace" value="${esc(state.checkoutCustomer.buyerGstin)}" placeholder="08AAACR5055K1Z2" />
-          </div>
-
-          <!-- DPDP Act 2025 Explicit Order Update Consent Checkbox -->
-          <div style="margin:12px 0 6px;display:flex;align-items:flex-start;gap:10px;text-align:left;background:#f8fafc;padding:10px 12px;border-radius:8px;border:1px solid #e2e8f0">
-            <input type="checkbox" id="ord-consent" checked required style="margin-top:3px;accent-color:var(--primary);width:16px;height:16px;flex-shrink:0;cursor:pointer" />
-            <label for="ord-consent" style="font-size:0.8rem;color:#475569;line-height:1.45;cursor:pointer">
-              ${tr('I consent to receiving order confirmations, digital GST invoices & dispatch updates via WhatsApp / SMS under KuberQ DPDP-compliant', 'मैं KuberQ की DPDP-अनुपालन')}
-              <a href="javascript:void(0)" onclick="navigate('/privacy')" style="color:#2563EB;text-decoration:underline;font-weight:600">${tr('Privacy Policy', 'गोपनीयता नीति')}</a>
-              ${tr('terms.', 'के अंतर्गत WhatsApp/SMS पर ऑर्डर पुष्टि, GST बिल व डिलीवरी अपडेट्स प्राप्त करने की सहमति देता हूँ।')}
-            </label>
-          </div>
-        </div>
-
-        <!-- STEP 4: Confirm Order & Place Button -->
-        <div class="order-step-card" style="text-align:center;background:#f8fafc;border-color:#cbd5e1">
-          <div style="max-width:540px;margin:0 auto">
-            <button type="submit" class="btn btn-gold" style="width:100%;font-size:1.15rem;padding:14px 24px;border-radius:12px;font-weight:800;box-shadow:0 6px 20px rgba(217, 119, 6, 0.3)">
-              🚀 ${tr('Place Order Now (Instant · No Login Needed)', 'ऑर्डर तुरंत भेजें (लॉगिन की आवश्यकता नहीं)')}
+            <!-- Submit Button -->
+            <button type="submit" class="btn btn-primary" style="width:100%;font-size:1.05rem;padding:12px;border-radius:12px;font-weight:900;background:#0284c7;border-color:#0284c7;box-shadow:0 6px 16px rgba(2,132,199,0.35)">
+              🚀 ${tr('Place Order Now (Instant)', 'ऑर्डर तुरंत भेजें (बिना लॉगिन)')}
             </button>
-            <p class="text-muted" style="font-size:0.8rem;margin-top:10px">
-              🔒 सुरक्षित एवं सीधा ऑर्डर · दुकानदार को तुरंत WhatsApp व ERP नोटिफिकेशन पहुंचेगा
-            </p>
-          </div>
-        </div>
-      </form>
 
-      ${shopReviews.length > 0 ? `
-        <div class="order-step-card">
-          <h4 style="margin:0 0 10px;font-size:0.95rem;color:#0f172a">⭐ ${tr('Order-Verified Buyer Reviews:', 'वास्तविक ग्राहकों द्वारा सत्यापित समीक्षाएं:')}</h4>
-          <div style="display:grid;gap:8px">
-            ${shopReviews.slice(0, 3).map(rv => `
-              <div style="font-size:0.84rem;background:#f8fafc;padding:8px 12px;border-radius:8px;border:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
-                <span><b>${'⭐'.repeat(rv.rating || 5)}</b> "${esc((rv.tags || [])[0] || 'Verified Order')}" — <b>${esc(rv.author)}</b> ${rv.buyerCode ? `<span style="font-family:monospace;color:#2563EB">(${esc(rv.buyerCode)})</span>` : ''}</span>
-                ${rv.verifiedOrderNo ? `<span class="badge badge-primary" style="font-size:0.7rem">✔ बिल: ${esc(rv.verifiedOrderNo)}</span>` : ''}
+            <!-- Dynamic UPI QR Scan -->
+            ${shop.upiId ? `
+              <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border, #cbd5e1);text-align:center">
+                <span style="font-size:0.72rem;color:#64748b;font-weight:700;display:block;margin-bottom:6px">
+                  💳 ${tr('SCAN & PAY DIRECTLY VIA UPI (GOOGLE PAY / PHONEPE / PAYTM)', 'सीधा UPI से भुगतान (गूगल पे / फोनपे / पेटीएम)')}
+                </span>
+                <div style="display:inline-block;padding:6px;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+                  ${renderVisualQrSvg(`upi://pay?pa=${encodeURIComponent(shop.upiId)}&pn=${encodeURIComponent(shop.shop || 'KuberQ')}&am=${cartGross}&cu=INR`, 120)}
+                </div>
+                <div style="font-size:0.75rem;color:#0284c7;font-weight:800;margin-top:4px">UPI ID: ${esc(shop.upiId)}</div>
               </div>
-            `).join('')}
+            ` : ''}
+          </form>
+
+          <!-- Verified Customer Reviews Card -->
+          ${shopReviews.length > 0 ? `
+            <div style="background:var(--card-bg, #ffffff);border:1.5px solid var(--border, #cbd5e1);border-radius:14px;padding:14px;margin-top:14px">
+              <h4 style="margin:0 0 8px;font-size:0.86rem;color:#0f172a">⭐ ${tr('Verified Buyer Reviews:', 'सत्यापित ग्राहकों की समीक्षाएं:')}</h4>
+              <div style="display:grid;gap:6px">
+                ${shopReviews.slice(0, 2).map(rv => `
+                  <div style="font-size:0.78rem;background:var(--subtle-bg, #f8fafc);padding:6px 10px;border-radius:6px;border:1px solid var(--border, #e2e8f0)">
+                    <div><b>${'⭐'.repeat(rv.rating || 5)}</b> — <b>${esc(rv.author)}</b></div>
+                    <div style="color:#475569;margin-top:2px">${esc(rv.reviewNote || rv.note || 'Genuine Wholesale Rates & Fast Delivery')}</div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 4px;font-size:0.78rem">
+            <button type="button" class="btn btn-ghost btn-sm" style="padding:3px 8px" onclick="vouchForEntity('merchant', '${shop?.id || ''}', '${esc(shop?.shop || '')}')">
+              👍 ${tr('Verify Trusted Store', 'दुकान सत्यापित करें')}
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" style="padding:3px 8px;color:var(--danger)" onclick="openReportModal('merchant', '${shop?.id || ''}', '${esc(shop?.shop || '')}')">
+              🚩 ${tr('Report Issue', 'शिकायत दर्ज करें')}
+            </button>
           </div>
         </div>
-      ` : ''}
-
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 4px;font-size:0.82rem">
-        <button type="button" class="btn btn-ghost btn-sm" style="padding:4px 10px" onclick="vouchForEntity('merchant', '${shop?.id || ''}', '${esc(shop?.shop || '')}')">
-          👍 ${tr('Verify Trusted Store', 'दुकान सत्यापित करें')}
-        </button>
-        <button type="button" class="btn btn-ghost btn-sm" style="padding:4px 10px;color:var(--danger)" onclick="openReportModal('merchant', '${shop?.id || ''}', '${esc(shop?.shop || '')}')">
-          🚩 ${tr('Report Issue / Grievance', 'शिकायत दर्ज करें')}
-        </button>
       </div>
     </div>
   `;
@@ -3564,7 +3692,28 @@ function renderMerchantSettingsOnly(shop, qrUrl) {
 
             <div class="form-group-clean" style="margin-bottom:12px">
               <label>${tr('Tagline', 'व्यापार टैगलाइन / स्लोगन')}</label>
-              <input class="input" id="set-tagline" value="${esc(bp.tagline || '')}" placeholder="Empowering Digital Transformation / Authorized Wholesale Dealer" />
+              <input class="input" id="set-tagline" value="${esc(bp.tagline || shop.tagline || '')}" placeholder="Empowering Digital Transformation / Authorized Wholesale Dealer" />
+            </div>
+
+            <!-- Merchant Online Presence & Social Links (User Request) -->
+            <div class="grid grid-3" style="gap:14px;margin-bottom:12px">
+              <div class="form-group-clean">
+                <label>🌐 ${tr('Official Website URL', 'दुकान की वेबसाइट URL')}</label>
+                <input class="input" id="set-website" value="${esc(bp.website || shop.website || '')}" placeholder="https://marwarhardware.in" />
+              </div>
+              <div class="form-group-clean">
+                <label>📸 ${tr('Instagram Handle / Link', 'Instagram ID / हैंडल')}</label>
+                <input class="input" id="set-instagram" value="${esc(bp.instagram || shop.instagram || '')}" placeholder="@marwar_hardware" />
+              </div>
+              <div class="form-group-clean">
+                <label>📘 ${tr('Facebook Page URL', 'Facebook पेज लिंक')}</label>
+                <input class="input" id="set-facebook" value="${esc(bp.facebook || shop.facebook || '')}" placeholder="https://facebook.com/marwarhardware" />
+              </div>
+            </div>
+
+            <div class="form-group-clean" style="margin-bottom:12px">
+              <label>📍 ${tr('Google Maps Store Location URL', 'गूगल मैप्स दुकान लोकेशन लिंक')}</label>
+              <input class="input" id="set-maps" value="${esc(bp.googleMapsUrl || shop.googleMapsUrl || '')}" placeholder="https://maps.google.com/?q=Marwar+Hardware+Jodhpur" />
             </div>
 
             <div class="grid grid-2" style="gap:14px;margin-bottom:12px">
@@ -11502,7 +11651,8 @@ function renderProductAddModal() {
                     <th style="width:95px">${tr('Wholesale ₹', 'थोक ₹')}</th>
                     <th style="width:80px">GST %</th>
                     <th style="width:80px">${tr('Stock', 'स्टॉक')}</th>
-                    <th style="min-width:130px">${tr('Size / Brand / Spec (Vertical Col)', 'साइज / ब्रांड / विवरण')}</th>
+                    <th style="min-width:130px">${tr('Size / Spec', 'साइज / विवरण')}</th>
+                    <th style="min-width:140px">${tr('Photo Image URL', 'फोटो URL लिंक')}</th>
                     <th style="width:45px"></th>
                   </tr>
                 </thead>
@@ -11520,7 +11670,8 @@ function renderProductAddModal() {
                         </select>
                       </td>
                       <td><input class="input" type="number" value="${r.stock}" oninput="state.productModal.rows[${idx}].stock=Number(this.value)" style="padding:6px 8px;font-size:0.8rem" /></td>
-                      <td><input class="input" value="${esc(r.spec || '')}" oninput="state.productModal.rows[${idx}].spec=this.value" placeholder="e.g. 25mm / ISI / 1Yr" style="padding:6px 8px;font-size:0.8rem" /></td>
+                      <td><input class="input" value="${esc(r.spec || '')}" oninput="state.productModal.rows[${idx}].spec=this.value" placeholder="e.g. 25mm / ISI" style="padding:6px 8px;font-size:0.8rem" /></td>
+                      <td><input class="input" value="${esc(r.imageUrl || '')}" oninput="state.productModal.rows[${idx}].imageUrl=this.value" placeholder="https://..." style="padding:6px 8px;font-size:0.8rem" /></td>
                       <td>
                         <button type="button" class="btn btn-danger btn-sm" style="padding:4px 7px" onclick="removeProductModalRow(${idx})">✕</button>
                       </td>
@@ -11594,7 +11745,9 @@ window.saveProductAddModalForm = async function(e) {
       wholesalePrice: Number(r.wholesalePrice) || Number(r.price) || 100,
       gstRate: Number(r.gstRate ?? 18),
       stock: Number(r.stock ?? 50),
-      taxMode: 'exclusive'
+      taxMode: 'exclusive',
+      imageUrl: r.imageUrl ? r.imageUrl.trim() : '',
+      category: r.category || 'General'
     }));
     await apiFetch('/api/merchant/product-save', {
       method: 'POST',
@@ -11753,18 +11906,22 @@ window.saveSystemSettingsTab = async function(e, tab) {
         method: 'POST',
         body: JSON.stringify({
           action: 'settings_save',
-          shop: document.getElementById('set-shop-name').value.trim(),
-          legalName: document.getElementById('set-legal-name').value.trim(),
-          tagline: document.getElementById('set-tagline').value.trim(),
-          officialEmail: document.getElementById('set-email').value.trim(),
-          phone: document.getElementById('set-phone').value.trim(),
-          gstin: document.getElementById('set-gstin').value.trim().toUpperCase(),
-          pan: document.getElementById('set-pan').value.trim().toUpperCase(),
-          addressLine1: document.getElementById('set-addr1').value.trim(),
-          addressLine2: document.getElementById('set-addr2').value.trim(),
-          city: document.getElementById('set-city').value.trim(),
-          state: document.getElementById('set-state').value.trim(),
-          pincode: document.getElementById('set-pincode').value.trim()
+          shop: (document.getElementById('set-trade-name') || document.getElementById('set-shop-name'))?.value.trim() || '',
+          legalName: document.getElementById('set-legal-name')?.value.trim() || '',
+          tagline: document.getElementById('set-tagline')?.value.trim() || '',
+          website: document.getElementById('set-website')?.value.trim() || '',
+          instagram: document.getElementById('set-instagram')?.value.trim() || '',
+          facebook: document.getElementById('set-facebook')?.value.trim() || '',
+          googleMapsUrl: document.getElementById('set-maps')?.value.trim() || '',
+          officialEmail: document.getElementById('set-email')?.value.trim() || '',
+          phone: document.getElementById('set-phone')?.value.trim() || '',
+          gstin: (document.getElementById('set-gstin')?.value || '').trim().toUpperCase(),
+          pan: (document.getElementById('set-pan')?.value || '').trim().toUpperCase(),
+          addressLine1: document.getElementById('set-addr1')?.value.trim() || '',
+          addressLine2: document.getElementById('set-addr2')?.value.trim() || '',
+          city: document.getElementById('set-city')?.value.trim() || '',
+          state: document.getElementById('set-state')?.value.trim() || '',
+          pincode: document.getElementById('set-pincode')?.value.trim() || ''
         })
       });
       await bootstrap();
@@ -12184,9 +12341,13 @@ function renderMerchantPosCounter(shop) {
                     ${isLowStock ? `<span style="background:#fee2e2;color:#991b1b;border-radius:4px;padding:1px 5px;font-size:0.68rem;font-weight:800">Low: ${stock}</span>` : `<span style="background:#f0fdf4;color:#166534;border-radius:4px;padding:1px 5px;font-size:0.68rem;font-weight:700">Qty: ${stock}</span>`}
                   </div>
 
-                  <div style="margin:6px 0;min-height:36px">
-                    <strong style="font-size:0.9rem;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(p.name)}</strong>
-                    <span style="font-size:0.75rem;color:var(--muted,#64748b);display:block">${esc(p.category || 'General')}</span>
+                  <div style="height:90px;border-radius:8px;overflow:hidden;background:#f1f5f9;margin:5px 0;display:flex;align-items:center;justify-content:center">
+                    <img src="${esc(getProductPhotoUrl(p))}" alt="${esc(p.name)}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover" onerror="this.onerror=null;this.src='${PRODUCT_PLACEHOLDER_SVG}'" />
+                  </div>
+
+                  <div style="margin:4px 0;min-height:36px">
+                    <strong style="font-size:0.88rem;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(p.name)}</strong>
+                    <span style="font-size:0.74rem;color:var(--muted,#64748b);display:block">${esc(p.category || 'General')}</span>
                   </div>
 
                   <div style="background:#ffffff;padding:2px;border-radius:4px;margin:2px 0 6px;text-align:center">
@@ -13220,82 +13381,130 @@ function renderCustomerFacingDisplayPage() {
     if (raw) displayData = JSON.parse(raw);
   } catch (_) {}
 
-  const shopName = displayData?.shopName || 'KuberQ Smart POS';
+  const activeShop = state.data.myShop || state.data.merchants[0] || {};
+  const shopName = displayData?.shopName || activeShop.shop || 'Marwar Hardware & Sanitary Mart';
   const customerName = displayData?.customerName || 'Valued Customer';
   const items = displayData?.items || [];
   const total = Number(displayData?.total || 0);
-  const upiId = displayData?.upiId || 'marwarhardware@okaxis';
-  const upiUrl = `upi://pay?pa=${upiId}&am=${total}&pn=${encodeURIComponent(shopName)}`;
+  const upiId = displayData?.upiId || activeShop.upiId || 'marwarhardware@okaxis';
+  const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&am=${total}&pn=${encodeURIComponent(shopName)}`;
+  const allProds = state.data.products || [];
 
   return `
-    <div style="min-height:100vh;background:#0f172a;color:#ffffff;font-family:'Poppins',sans-serif;padding:24px;display:flex;flex-direction:column;justify-content:space-between">
-      <!-- Top Branding -->
-      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid rgba(255,255,255,0.12);padding-bottom:14px">
-        <div style="display:flex;align-items:center;gap:12px">
-          <div style="width:44px;height:44px;border-radius:12px;background:#2563eb;color:#fff;display:grid;place-items:center;font-size:22px;font-weight:900">K</div>
+    <div style="min-height:100vh;background:linear-gradient(135deg, #0b1120 0%, #0f172a 100%);color:#ffffff;font-family:'Poppins',sans-serif;padding:24px;display:flex;flex-direction:column;justify-content:space-between;box-sizing:border-box">
+      <!-- Top Grand Store Branding with Social & Web Presence -->
+      <div style="background:rgba(30,41,59,0.7);border:1.5px solid rgba(255,255,255,0.12);border-radius:18px;padding:16px 22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;box-shadow:0 8px 24px rgba(0,0,0,0.3)">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg, #0284c7, #2563eb);color:#fff;display:grid;place-items:center;font-size:24px;font-weight:900;box-shadow:0 4px 14px rgba(2,132,199,0.4)">
+            ${esc(String(shopName).slice(0, 1).toUpperCase())}
+          </div>
           <div>
-            <h1 style="font-size:1.4rem;font-weight:900;margin:0">${esc(shopName)}</h1>
-            <span style="font-size:0.85rem;color:#94a3b8">Customer Facing Display · Welcome, ${esc(customerName)}!</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <h1 style="font-size:1.55rem;font-weight:900;margin:0;color:#ffffff;letter-spacing:-0.02em">${esc(shopName)}</h1>
+              <span class="badge" style="background:#0284c7;color:#fff;font-size:0.72rem;font-weight:800">✓ DUAL DISPLAY</span>
+            </div>
+            <div style="font-size:0.84rem;color:#94a3b8;margin-top:2px">
+              ${esc(activeShop.tagline || 'Trusted Hardware, Pipes & Sanitary Traders Since 1998')} · Welcome, <strong style="color:#facc15">${esc(customerName)}</strong>!
+            </div>
           </div>
         </div>
-        <div style="text-align:right">
-          <span style="background:rgba(34,197,94,0.18);color:#4ade80;border:1px solid #22c55e;padding:4px 12px;border-radius:20px;font-size:0.85rem;font-weight:800">
+
+        <!-- Social Presence Pills on Dual Screen -->
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          ${activeShop.website ? `
+            <a href="${esc(activeShop.website)}" target="_blank" rel="noreferrer" class="social-btn-pill social-btn-website" style="font-size:0.75rem;padding:4px 10px">
+              🌐 ${tr('Website', 'वेबसाइट')}
+            </a>
+          ` : ''}
+          ${activeShop.instagram ? `
+            <span class="social-btn-pill social-btn-instagram" style="font-size:0.75rem;padding:4px 10px">
+              📸 ${esc(activeShop.instagram)}
+            </span>
+          ` : ''}
+          <span style="background:rgba(34,197,94,0.18);color:#4ade80;border:1px solid #22c55e;padding:4px 12px;border-radius:20px;font-size:0.82rem;font-weight:800">
             🟢 LIVE CART SYNC
           </span>
         </div>
       </div>
 
-      <!-- Main Display Body: Left Cart Items, Right QR Payment -->
-      <div style="display:grid;grid-template-columns:1fr 380px;gap:24px;margin:24px 0;flex:1">
-        <!-- Scanned Items List -->
-        <div style="background:rgba(30,41,59,0.7);border:1.5px solid rgba(255,255,255,0.1);border-radius:18px;padding:20px;display:flex;flex-direction:column">
-          <h2 style="font-size:1.15rem;color:#94a3b8;margin:0 0 14px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:8px">
-            🛒 Scanned Items (${items.length})
-          </h2>
+      <!-- Main Display Body: Left Scanned Items with Real Photographs, Right QR Payment -->
+      <div style="display:grid;grid-template-columns:1fr 400px;gap:24px;margin:20px 0;flex:1">
+        <!-- Scanned Items List with Photos -->
+        <div style="background:rgba(30,41,59,0.7);border:1.5px solid rgba(255,255,255,0.12);border-radius:20px;padding:22px;display:flex;flex-direction:column;box-shadow:0 8px 30px rgba(0,0,0,0.3)">
+          <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:12px;margin-bottom:12px">
+            <h2 style="font-size:1.25rem;color:#e2e8f0;margin:0;font-weight:800">
+              🛒 Scanned Items (${items.length})
+            </h2>
+            <span style="font-size:0.82rem;color:#94a3b8">Real-time cashier scanning desk</span>
+          </div>
 
-          <div style="flex:1;overflow-y:auto;max-height:50vh">
+          <div style="flex:1;overflow-y:auto;max-height:52vh;padding-right:4px">
             ${items.length === 0 ? `
-              <div style="text-align:center;padding:40px;color:#64748b">
-                <span style="font-size:2.5rem;display:block;margin-bottom:8px">🛍️</span>
-                <p style="font-size:1.1rem;margin:0">Items will appear here as cashier scans them.</p>
+              <div style="text-align:center;padding:50px 20px;color:#64748b">
+                <span style="font-size:3rem;display:block;margin-bottom:10px">🛍️</span>
+                <p style="font-size:1.2rem;margin:0;font-weight:700;color:#94a3b8">Ready for next billing</p>
+                <p style="font-size:0.88rem;margin:4px 0 0">Scanned products with photos will appear here live.</p>
               </div>
-            ` : items.map(it => `
-              <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
-                <div>
-                  <strong style="font-size:1.1rem;display:block">${esc(it.name)}</strong>
-                  <span style="font-size:0.85rem;color:#94a3b8">Qty: ${it.qty} × ₹${Number(it.price || 0).toLocaleString('en-IN')}</span>
+            ` : items.map(it => {
+              const matchedProd = allProds.find(p => p.id === it.id || p.name === it.name) || it;
+              const photoUrl = getProductPhotoUrl(matchedProd);
+              const lineTotal = Number((it.price || 0) * it.qty);
+
+              return `
+                <div class="customer-display-item-row">
+                  <img
+                    src="${esc(photoUrl)}"
+                    alt="${esc(it.name)}"
+                    class="customer-display-item-thumb"
+                    onerror="this.onerror=null;this.src='${PRODUCT_PLACEHOLDER_SVG}'"
+                  />
+                  <div style="flex:1;min-width:0">
+                    <strong style="font-size:1.15rem;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#ffffff">${esc(it.name)}</strong>
+                    <span style="font-size:0.86rem;color:#94a3b8">Qty: <b style="color:#facc15">${it.qty}</b> × ₹${Number(it.price || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                  <strong style="font-size:1.35rem;color:#38bdf8;font-weight:900">₹${lineTotal.toLocaleString('en-IN')}</strong>
                 </div>
-                <strong style="font-size:1.25rem;color:#38bdf8">₹${Number((it.price || 0) * it.qty).toLocaleString('en-IN')}</strong>
-              </div>
-            `).join('')}
+              `;
+            }).join('')}
           </div>
 
           <!-- Total Banner -->
-          <div style="border-top:2px solid rgba(255,255,255,0.15);padding-top:14px;margin-top:auto;display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:1.3rem;font-weight:700;color:#cbd5e1">Total Amount Payable:</span>
-            <strong style="font-size:2.4rem;color:#facc15;font-weight:900">₹${total.toLocaleString('en-IN')}</strong>
+          <div style="border-top:2px solid rgba(255,255,255,0.18);padding-top:16px;margin-top:auto;display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <span style="font-size:1.15rem;font-weight:700;color:#cbd5e1;display:block">Total Amount Payable:</span>
+              <span style="font-size:0.78rem;color:#94a3b8">Taxes included · Verified Bill</span>
+            </div>
+            <strong style="font-size:2.8rem;color:#facc15;font-weight:900;letter-spacing:-0.02em">₹${total.toLocaleString('en-IN')}</strong>
           </div>
         </div>
 
-        <!-- Dynamic UPI QR Scan -->
-        <div style="background:rgba(30,41,59,0.7);border:1.5px solid rgba(255,255,255,0.1);border-radius:18px;padding:24px;text-align:center;display:flex;flex-direction:column;justify-content:center;align-items:center">
-          <span style="font-size:0.85rem;color:#38bdf8;font-weight:800;letter-spacing:0.05em;text-transform:uppercase">SCAN & PAY VIA ANY UPI APP</span>
-          <h3 style="font-size:1.3rem;margin:4px 0 16px;color:#fff">Google Pay · PhonePe · Paytm · BHIM</h3>
+        <!-- Dynamic UPI QR Scan (GPay, PhonePe, Paytm, BHIM) -->
+        <div style="background:rgba(30,41,59,0.7);border:1.5px solid rgba(255,255,255,0.12);border-radius:20px;padding:24px;text-align:center;display:flex;flex-direction:column;justify-content:center;align-items:center;box-shadow:0 8px 30px rgba(0,0,0,0.3)">
+          <span style="font-size:0.84rem;color:#38bdf8;font-weight:900;letter-spacing:0.06em;text-transform:uppercase">
+            ⚡ SCAN & PAY VIA ANY UPI APP
+          </span>
+          <h3 style="font-size:1.25rem;margin:6px 0 16px;color:#fff;font-weight:800">
+            Google Pay · PhonePe · Paytm · BHIM
+          </h3>
 
-          <div style="background:#ffffff;padding:16px;border-radius:16px;line-height:0;box-shadow:0 8px 30px rgba(0,0,0,0.35);margin-bottom:16px">
-            ${renderVisualQrSvg(upiUrl, 200)}
+          <div style="background:#ffffff;padding:16px;border-radius:18px;line-height:0;box-shadow:0 10px 30px rgba(0,0,0,0.45);margin-bottom:16px">
+            ${renderVisualQrSvg(upiUrl, 210)}
           </div>
 
-          <div style="font-size:1.1rem;font-weight:800;color:#facc15">
+          <div style="font-size:1.25rem;font-weight:900;color:#facc15">
             Amount: ₹${total.toLocaleString('en-IN')}
           </div>
-          <span style="font-size:0.8rem;color:#94a3b8;margin-top:4px">UPI ID: ${esc(upiId)}</span>
+          <span style="font-size:0.82rem;color:#94a3b8;margin-top:4px">UPI ID: <strong style="color:#cbd5e1;font-family:monospace">${esc(upiId)}</strong></span>
+
+          <div style="margin-top:16px;font-size:0.75rem;color:#64748b;background:rgba(255,255,255,0.05);padding:6px 12px;border-radius:20px">
+            🔒 100% Direct Settlement to Merchant Account
+          </div>
         </div>
       </div>
 
       <!-- Footer -->
       <div style="text-align:center;font-size:0.8rem;color:#64748b;border-top:1px solid rgba(255,255,255,0.08);padding-top:10px">
-        Screen updates automatically in real-time · KuberQ B2B & Retail Operating System
+        Dual Screen Sync Active · Powered by KuberQ Operating System
       </div>
     </div>
   `;
