@@ -415,6 +415,13 @@ function getInitialDb() {
         gstin: '08AABCM1234F1Z5',
         upiId: 'marwarhardware@okaxis',
         address: 'New Power House Road, Industrial Area, Jodhpur',
+        tagline: 'Trusted Hardware, Pipes & Sanitary Traders Since 1998 · Authorized Supreme & Astral Distributor',
+        website: 'https://marwarhardware.in',
+        instagram: '@marwar_hardware',
+        facebook: 'https://facebook.com/marwarhardware',
+        googleMapsUrl: 'https://maps.google.com/?q=Marwar+Hardware+Jodhpur',
+        rating: 4.9,
+        reviewsCount: 128,
         role: 'merchant',
         active: true,
         verified: true,
@@ -442,6 +449,13 @@ function getInitialDb() {
         gstin: '08AAECS9876B1Z9',
         upiId: 'suryaelectricals@ybl',
         address: 'Jalori Gate Market, Jodhpur',
+        tagline: 'Wholesale Industrial Switchgears, Havells Wires & Polycab Cables',
+        website: 'https://suryaelectricals.com',
+        instagram: '@surya_electricals_jodhpur',
+        facebook: 'https://facebook.com/suryaelectricals',
+        googleMapsUrl: 'https://maps.google.com/?q=Surya+Electricals+Jodhpur',
+        rating: 4.8,
+        reviewsCount: 94,
         role: 'manufacturer',
         active: true,
         verified: true,
@@ -456,13 +470,17 @@ function getInitialDb() {
       }
     ],
     products: [
-      { id: 'prd-1', shopId: demoShopId, name: 'Supreme PVC Pipe 1 inch (3m)', hsn: '3917', price: 185, wholesalePrice: 165, moq: 20, gstRate: 18, stock: 120, minStock: 20, taxMode: 'exclusive' },
-      { id: 'prd-2', shopId: demoShopId, name: 'Astral CPVC Pipe 3/4 inch (3m)', hsn: '3917', price: 340, wholesalePrice: 310, moq: 15, gstRate: 18, stock: 85, minStock: 15, taxMode: 'exclusive' },
-      { id: 'prd-3', shopId: demoShopId, name: 'PVC Elbow 1 inch Heavy', hsn: '3917', price: 22, wholesalePrice: 16, moq: 50, gstRate: 18, stock: 12, minStock: 30, taxMode: 'exclusive' },
-      { id: 'prd-4', shopId: demoShopId, name: 'Sintex Water Tank 1000L Triple Layer', hsn: '3925', price: 6800, wholesalePrice: 6350, moq: 2, gstRate: 18, stock: 8, minStock: 3, taxMode: 'exclusive' },
-      { id: 'prd-5', shopId: demoShopId, name: 'JK Wall Putty 40kg Bag', hsn: '3214', price: 890, wholesalePrice: 820, moq: 10, gstRate: 18, stock: 65, minStock: 15, taxMode: 'inclusive' },
-      { id: 'prd-6', shopId: demoElecShopId, name: 'Polycab FR House Wire 1.5 sqmm (90m)', hsn: '8544', price: 1490, wholesalePrice: 1380, moq: 10, gstRate: 18, stock: 50, minStock: 10, taxMode: 'exclusive' },
-      { id: 'prd-7', shopId: demoElecShopId, name: 'Havells Lifeline Wire 2.5 sqmm (90m)', hsn: '8544', price: 2380, wholesalePrice: 2210, moq: 10, gstRate: 18, stock: 40, minStock: 10, taxMode: 'exclusive' }
+      { id: 'prd-1', shopId: demoShopId, name: 'Supreme PVC Pipe 1 inch (3m)', category: 'Hardware & Fittings', hsn: '3917', price: 185, wholesalePrice: 165, moq: 20, gstRate: 18, stock: 120, minStock: 20, unit: 'meter', taxMode: 'exclusive', imageUrl: 'https://images.unsplash.com/photo-1590381105924-c72589b9ef3f?auto=format&fit=crop&w=500&q=80' },
+      { id: 'prd-2', shopId: demoShopId, name: 'Astral CPVC Pipe 3/4 inch (3m)', category: 'Pipes & Sanitary', hsn: '3917', price: 340, wholesalePrice: 310, moq: 15, gstRate: 18, stock: 85, minStock: 15, unit: 'meter', taxMode: 'exclusive', imageUrl: 'https://images.unsplash.com/photo-1542013936693-884638332954?auto=format&fit=crop&w=500&q=80' },
+      { id: 'prd-3', shopId: demoShopId, name: 'PVC Elbow 1 inch Heavy', category: 'Hardware & Fittings', hsn: '3917', price: 22, wholesalePrice: 16, moq: 50, gstRate: 18, stock: 12, minStock: 30, unit: 'pc', taxMode: 'exclusive', imageUrl: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&w=500&q=80' },
+      { id: 'prd-4', shopId: demoShopId, name: 'Sintex Water Tank 1000L Triple Layer', category: 'Pipes & Sanitary', hsn: '3925', price: 6800, wholesalePrice: 6350, moq: 2, gstRate: 18, stock: 8, minStock: 3, unit: 'pc', taxMode: 'exclusive', imageUrl: 'https://images.unsplash.com/photo-1527061011665-3652c757a4d4?auto=format&fit=crop&w=500&q=80' },
+      { id: 'prd-5', shopId: demoShopId, name: 'JK Wall Putty 40kg Bag', category: 'Paints & Chemicals', hsn: '3214', price: 890, wholesalePrice: 820, moq: 10, gstRate: 18, stock: 65, minStock: 15, unit: 'bag', taxMode: 'inclusive', imageUrl: 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?auto=format&fit=crop&w=500&q=80' },
+      { id: 'prd-8', shopId: demoShopId, name: 'Fresh Dairy Butter 200g', category: 'Dairy Products', hsn: '0405', price: 115, wholesalePrice: 105, moq: 10, gstRate: 5, stock: 22, minStock: 5, unit: 'pack', taxMode: 'inclusive', imageUrl: 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?auto=format&fit=crop&w=500&q=80' },
+      { id: 'prd-9', shopId: demoShopId, name: 'Basmati Rice 5 kg Premium', category: 'Grains & Grocery', hsn: '1006', price: 495, wholesalePrice: 450, moq: 5, gstRate: 5, stock: 45, minStock: 10, unit: 'pack', taxMode: 'inclusive', imageUrl: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=500&q=80' },
+      { id: 'prd-10', shopId: demoShopId, name: 'Fresh Croissants 4 Pack', category: 'Bakery & Snacks', hsn: '1905', price: 145, wholesalePrice: 130, moq: 6, gstRate: 5, stock: 18, minStock: 5, unit: 'pack', taxMode: 'inclusive', imageUrl: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=500&q=80' },
+      { id: 'prd-11', shopId: demoShopId, name: 'Cheddar Cheese Block 200g', category: 'Dairy Products', hsn: '0406', price: 160, wholesalePrice: 145, moq: 10, gstRate: 5, stock: 14, minStock: 5, unit: 'pack', taxMode: 'inclusive', imageUrl: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?auto=format&fit=crop&w=500&q=80' },
+      { id: 'prd-6', shopId: demoElecShopId, name: 'Polycab FR House Wire 1.5 sqmm (90m)', category: 'Electricals & Wires', hsn: '8544', price: 1490, wholesalePrice: 1380, moq: 10, gstRate: 18, stock: 50, minStock: 10, unit: 'roll', taxMode: 'exclusive', imageUrl: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=500&q=80' },
+      { id: 'prd-7', shopId: demoElecShopId, name: 'Havells Lifeline Wire 2.5 sqmm (90m)', category: 'Electricals & Wires', hsn: '8544', price: 2380, wholesalePrice: 2210, moq: 10, gstRate: 18, stock: 40, minStock: 10, unit: 'roll', taxMode: 'exclusive', imageUrl: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=500&q=80' }
     ],
     orders: [
       {
@@ -2613,6 +2631,8 @@ async function handleApi(req, res, pathname, query) {
       if (body.stockDelta !== undefined) existing.stock = Math.max(0, Number(existing.stock) + Number(body.stockDelta));
       if (body.stock !== undefined) existing.stock = Math.max(0, Number(body.stock) || 0);
       if (body.taxMode !== undefined) existing.taxMode = body.taxMode === 'inclusive' ? 'inclusive' : 'exclusive';
+      if (body.imageUrl !== undefined) existing.imageUrl = sanitizeString(body.imageUrl, 400);
+      if (body.category !== undefined) existing.category = sanitizeString(body.category, 60);
       saveDb();
       return sendJson(res, 200, { product: existing });
     }
@@ -2626,6 +2646,8 @@ async function handleApi(req, res, pathname, query) {
       id: 'prd-' + crypto.randomUUID().slice(0, 8),
       shopId: user.shopId,
       name,
+      category: sanitizeString(body.category || hsnSuggest.category || 'General Goods', 60),
+      imageUrl: sanitizeString(body.imageUrl || '', 400),
       hsn: sanitizeString(body.hsn || hsnSuggest.hsn, 12),
       costPrice: body.costPrice !== undefined ? Math.max(0, Number(body.costPrice) || 0) : Math.round(wholesaleP * 0.84),
       price: retailP,
@@ -3199,6 +3221,11 @@ Additional text context: ${rawText}`;
         shop.legalName = sanitizeString(d.legalName ?? shop.legalName ?? '', 160);
         shop.tagline = sanitizeString(d.tagline ?? shop.tagline ?? '', 160);
         shop.officialEmail = sanitizeString(d.officialEmail ?? d.email ?? shop.officialEmail ?? '', 100);
+        if (d.website !== undefined) shop.website = sanitizeString(d.website, 200);
+        if (d.instagram !== undefined) shop.instagram = sanitizeString(d.instagram, 100);
+        if (d.facebook !== undefined) shop.facebook = sanitizeString(d.facebook, 200);
+        if (d.googleMapsUrl !== undefined) shop.googleMapsUrl = sanitizeString(d.googleMapsUrl, 300);
+        if (d.coverImage !== undefined) shop.coverImage = sanitizeString(d.coverImage, 300);
         if (d.phone) shop.phone = cleanPhone(d.phone) || shop.phone;
         shop.gstin = gstin;
         if (gstin) shop.stateCode = gstin.slice(0, 2);
