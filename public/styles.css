@@ -3958,3 +3958,323 @@ tr:hover td {
     font-size: 1.4rem;
   }
 }
+
+/* ==========================================================================
+   LOCAL RETAIL DUAL ENTRY FLOW & BILINGUAL SWITCHER (HOME DASHBOARD REFACTOR)
+   ========================================================================== */
+
+/* 1. Bilingual Switcher Component */
+.bilingual-switch-pill {
+  display: inline-flex;
+  align-items: center;
+  background: var(--surface-subtle, #e2e8f0);
+  border: 1.5px solid var(--border, #cbd5e1);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+  user-select: none;
+}
+
+.bilingual-chip {
+  min-height: 34px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted, #475569);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bilingual-chip:hover {
+  color: var(--text, #0f172a);
+}
+
+.bilingual-chip.active {
+  background: #0284c7;
+  color: #ffffff;
+  font-weight: 800;
+  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);
+}
+
+/* 2. Dual Primary Action Entry Grid */
+.home-dual-entry-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+  margin: 10px 0 24px;
+}
+
+@media (min-width: 900px) {
+  .home-dual-entry-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+}
+
+.retail-entry-card {
+  background: #ffffff;
+  border: 2px solid #cbd5e1;
+  border-radius: 20px;
+  padding: 24px 22px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.retail-entry-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.1);
+}
+
+.retail-entry-card.merchant-entry-card {
+  border-color: #f59e0b;
+  background: linear-gradient(180deg, #fffdfa 0%, #ffffff 100%);
+}
+
+.retail-entry-card.customer-entry-card {
+  border-color: #0284c7;
+  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+}
+
+.retail-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.retail-badge {
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.merchant-badge {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.customer-badge {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.retail-sub-badge {
+  font-size: 0.74rem;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.retail-card-title {
+  font-size: clamp(1.25rem, 2.2vw, 1.45rem);
+  font-weight: 900;
+  color: #0f172a;
+  margin: 0 0 8px;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+.retail-card-desc {
+  font-size: 0.88rem;
+  color: #475569;
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+
+.retail-features-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.retail-pill {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #334155;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 3px 8px;
+}
+
+.retail-action-box {
+  margin-bottom: 16px;
+}
+
+.retail-input-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (min-width: 480px) {
+  .retail-input-row {
+    flex-direction: row;
+    align-items: center;
+  }
+  .retail-input-row .retail-input {
+    flex: 1;
+  }
+}
+
+.retail-input {
+  min-height: 48px;
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 16px; /* 16px prevents iOS Safari automatic viewport zooming */
+  font-weight: 600;
+  color: #0f172a;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 12px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.retail-input:focus {
+  border-color: #0284c7;
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.18);
+}
+
+.retail-primary-btn {
+  min-height: 48px;
+  min-width: 48px;
+  padding: 12px 20px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+
+.retail-primary-btn:active {
+  transform: scale(0.98);
+}
+
+.retail-primary-btn.merchant-btn {
+  background: #f59e0b;
+  color: #0f172a;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.retail-primary-btn.merchant-btn:hover {
+  background: #d97706;
+  color: #ffffff;
+}
+
+.retail-primary-btn.customer-btn {
+  background: #0284c7;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+}
+
+.retail-primary-btn.customer-btn:hover {
+  background: #0369a1;
+}
+
+.retail-demo-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.78rem;
+  padding-top: 10px;
+  border-top: 1px dashed #e2e8f0;
+}
+
+.retail-demo-label {
+  color: #64748b;
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+
+.retail-demo-chip {
+  min-height: 36px;
+  padding: 4px 10px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #0f172a;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  touch-action: manipulation;
+  transition: all 0.15s ease;
+}
+
+.retail-demo-chip:hover {
+  border-color: #0284c7;
+  background: #f0f9ff;
+  color: #0284c7;
+}
+
+.retail-demo-chip.customer {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+/* 3. Mobile Viewport Refinements (360px - 420px) */
+@media (max-width: 480px) {
+  .retail-entry-card {
+    padding: 18px 14px;
+    border-radius: 16px;
+  }
+  .retail-card-title {
+    font-size: 1.22rem;
+  }
+  .retail-card-desc {
+    font-size: 0.84rem;
+    margin-bottom: 12px;
+  }
+  .retail-primary-btn {
+    width: 100%;
+    min-height: 48px;
+    font-size: 0.96rem;
+  }
+  .bilingual-switch-pill {
+    padding: 2px;
+  }
+  .bilingual-chip {
+    min-height: 34px;
+    padding: 4px 9px;
+    font-size: 0.78rem;
+  }
+  .btn-checkout-action {
+    min-height: 48px !important;
+    font-size: 0.95rem !important;
+  }
+}
+

@@ -671,6 +671,12 @@ function renderEnterpriseShell(opts) {
             ✨
           </button>
 
+          <!-- Bilingual English / हिन्दी Switcher -->
+          <div class="bilingual-switch-pill" style="margin: 0 4px" title="${tr('Switch Language (English / हिन्दी)', 'भाषा बदलें (English / हिन्दी)')}">
+            <button type="button" class="bilingual-chip ${state.lang === 'en' ? 'active' : ''}" onclick="setLang('en')" aria-label="English">EN</button>
+            <button type="button" class="bilingual-chip ${state.lang === 'hi' ? 'active' : ''}" onclick="setLang('hi')" aria-label="हिन्दी">हिन्दी</button>
+          </div>
+
           <!-- Dark / Light Mode Switch (Item #2) -->
           <button type="button" class="theme-toggle-btn" title="${tr('Switch Dark / Light Mode', 'डार्क / लाइट मोड बदलें')}" onclick="toggleTheme()">
             ${state.theme === 'dark' ? '☀️' : '🌙'}
@@ -853,28 +859,22 @@ function renderHeader() {
         </nav>
 
         <!-- Right: Theme Toggle + Language Toggle + Auth (Aligned Flush Right on Same Row) -->
-        <div class="nav-actions">
-          <button type="button" class="btn btn-ghost btn-sm" style="padding:6px 8px;font-size:0.95rem" title="${tr('Toggle Dark / Light Mode', 'डार्क / लाइट मोड बदलें')}" onclick="toggleTheme()">
+        <div class="nav-actions" style="display:flex;align-items:center;gap:8px">
+          <!-- Lightweight English / हिन्दी Switcher (Requirement 2 & 4) -->
+          <div class="bilingual-switch-pill" title="${tr('Switch Language (English / हिन्दी)', 'भाषा बदलें (English / हिन्दी)')}">
+            <button type="button" class="bilingual-chip ${state.lang === 'en' ? 'active' : ''}" onclick="setLang('en')" aria-label="English">EN</button>
+            <button type="button" class="bilingual-chip ${state.lang === 'hi' ? 'active' : ''}" onclick="setLang('hi')" aria-label="हिन्दी">हिन्दी</button>
+          </div>
+
+          <button type="button" class="btn btn-ghost btn-sm" style="padding:6px 8px;font-size:0.95rem;min-height:36px;min-width:36px;display:grid;place-items:center" title="${tr('Toggle Dark / Light Mode', 'डार्क / लाइट मोड बदलें')}" onclick="toggleTheme()">
             ${state.theme === 'dark' ? '☀️' : '🌙'}
           </button>
 
-          <!-- Desktop Dual Box -->
-          <div class="desktop-only lang-toggle-box" title="${tr('Switch Entire Website Language', 'पूरी वेबसाइट की भाषा बदलें')}">
-            <button type="button" class="lang-btn ${state.lang === 'hi' ? 'active' : ''}" onclick="setLang('hi')">हिन्दी</button>
-            <span style="color:#94a3b8;font-weight:700;font-size:0.8rem">/</span>
-            <button type="button" class="lang-btn ${state.lang === 'en' ? 'active' : ''}" onclick="setLang('en')">ENG</button>
-          </div>
-
-          <!-- Mobile 1-Tap Toggle Pill (Saves 60px so Free Trial Never Clips) -->
-          <button type="button" class="mobile-only btn btn-ghost btn-sm" style="padding:4px 6px;font-size:0.75rem;font-weight:700;border:1px solid #cbd5e1" title="${tr('Switch Language', 'भाषा बदलें')}" onclick="setLang(state.lang === 'hi' ? 'en' : 'hi')">
-            ${state.lang === 'hi' ? 'ENG' : 'हिन्दी'}
-          </button>
-
           ${u ? `
-            <button class="btn btn-ghost btn-sm" onclick="logout()">${tr('Log Out', 'लॉग आउट')}</button>
+            <button class="btn btn-ghost btn-sm" style="min-height:36px" onclick="logout()">${tr('Log Out', 'लॉग आउट')}</button>
           ` : `
-            <button class="btn btn-ghost btn-sm desktop-only" onclick="navigate('/auth')">${tr('Log In', 'लॉगिन')}</button>
-            <button class="btn btn-coral btn-sm" onclick="navigate('/signup')">${tr('Free Trial', 'निःशुल्क ट्रायल')}</button>
+            <button class="btn btn-ghost btn-sm desktop-only" style="min-height:36px" onclick="navigate('/auth')">${tr('Log In', 'लॉगिन')}</button>
+            <button class="btn btn-coral btn-sm" style="min-height:36px;font-weight:800;padding:6px 14px" onclick="navigate('/signup')">${tr('Free Trial', 'निःशुल्क ट्रायल')}</button>
           `}
         </div>
       </div>
@@ -967,34 +967,136 @@ function renderHome() {
       <div class="hero-bg-overlay"></div>
 
       <div class="container hero-content-layer">
-        <!-- MOBILE-ONLY MINIMALIST HERO (Clean, Customer-Centric, Instant Action) -->
-        <div class="mobile-only mobile-hero-clean">
-          <div class="mobile-badge-pill">
-            ⚡ ${tr('Smart B2B Business & Order Desk', 'स्मार्ट B2B व्यापार व ऑर्डर')}
+        <!-- TOP BRAND HEADLINE & SLOGAN -->
+        <div style="text-align:center;margin-bottom:18px">
+          <div class="mobile-badge-pill" style="display:inline-flex;margin-bottom:8px">
+            ⚡ ${tr('Smart B2B Business & Order Desk', 'स्मार्ट B2B व्यापार व ऑर्डर डेस्क')}
           </div>
-          <h1 class="mobile-hero-heading">
-            ${tr('Fast B2B Billing, Live Stock & Direct Orders', 'दुकान का पक्का बिल, स्टॉक और सीधा ऑर्डर')}
+          <h1 style="font-size:clamp(1.4rem, 3.2vw, 2.2rem);font-weight:900;color:#ffffff;margin:0 0 6px;letter-spacing:-0.02em">
+            ${tr('Fast Local Retail & B2B Operating System', 'स्थानीय खुदरा व थोक व्यापार का संपूर्ण डिजिटल समाधान')}
           </h1>
-          <p class="mobile-hero-sub">
+          <p style="font-size:clamp(0.86rem, 1.8vw, 1.02rem);color:#cbd5e1;max-width:680px;margin:0 auto;line-height:1.45">
             ${tr(
-              'Hardware, Sanitary, Electrical & All Traders — 10-Second Simple Solution.',
-              'हार्डवेयर, सेनेटरी, इलेक्ट्रिकल व सभी व्यापारियों के लिए 10-सेकंड आसान समाधान।'
+              'Hardware, Sanitary, Electrical & Local Traders — 10-Second dukaan control & direct customer orders.',
+              'हार्डवेयर, सेनेटरी, इलेक्ट्रिकल व सभी व्यापारियों के लिए 10-सेकंड आसान बिलिंग, स्टॉक और सीधा ऑर्डर।'
             )}
           </p>
+        </div>
 
-          <div class="mobile-cta-stack">
-            <button type="button" class="btn btn-gold mobile-btn-action" onclick="navigate('/order', { shop: '${shops[0]?.id || ''}' })">
-              🛍️ ${tr('Place Order from Shop (Customer)', 'दुकान से सीधा ऑर्डर करें (ग्राहक)')}
-            </button>
-            <button type="button" class="btn btn-primary mobile-btn-action" onclick="navigate(state.data.user ? '/merchant' : '/auth')">
-              🏪 ${tr('Merchant Portal & Billing (Free Trial)', 'व्यापारी पोर्टल व बिलिंग (निःशुल्क ट्रायल)')}
-            </button>
+        <!-- DUAL PRIMARY ACTION ENTRY CARDS FOR LOCAL RETAIL WORKFLOWS (Requirement 1 & 4) -->
+        <div class="home-dual-entry-grid">
+          <!-- CARD A: DUKAAN LOGIN / MERCHANT DESK -->
+          <div class="retail-entry-card merchant-entry-card">
+            <div class="retail-card-top">
+              <span class="retail-badge merchant-badge">🏪 ${tr('DUKAAN / MERCHANT DESK', 'दुकानदार / मर्चेंट डेस्क')}</span>
+              <span class="retail-sub-badge">${tr('Quick Mobile + OTP', 'त्वरित मोबाइल + OTP')}</span>
+            </div>
+
+            <h2 class="retail-card-title">
+              ${tr('Dukaan Login / Merchant Desk', 'दुकानदार लॉगिन व बिज़नेस डेस्क')}
+            </h2>
+            <p class="retail-card-desc">
+              ${tr(
+                'Quick mobile number + OTP login for order alerts, product stock toggle, and Khata ledger.',
+                '10-अंकीय मोबाइल नंबर से तुरंत लॉगिन करें — लाइव ऑर्डर अलर्ट, 1-क्लिक स्टॉक व रेट कंट्रोल और उधार बहीखाता।'
+              )}
+            </p>
+
+            <div class="retail-features-pill-row">
+              <span class="retail-pill">🔔 ${tr('Order Alerts & Dispatch', 'ऑर्डर अलर्ट व डिस्पैच')}</span>
+              <span class="retail-pill">📦 ${tr('Stock & Rate Toggle', 'स्टॉक व रेट कंट्रोल')}</span>
+              <span class="retail-pill">📒 ${tr('Khata & GST Billing', 'उधार बहीखाता व बिलिंग')}</span>
+            </div>
+
+            <!-- Quick Mobile + OTP Login Box -->
+            <form onsubmit="event.preventDefault();handleQuickDukaanLogin(document.getElementById('dukaan-quick-mobile').value)" class="retail-action-box">
+              <div class="retail-input-row">
+                <input
+                  type="tel"
+                  id="dukaan-quick-mobile"
+                  class="retail-input"
+                  maxlength="10"
+                  pattern="[0-9]{10}"
+                  placeholder="${tr('📱 Enter 10-digit mobile number', '📱 10 अंकों का मोबाइल नंबर डालें')}"
+                  required
+                />
+                <button type="submit" class="retail-primary-btn merchant-btn">
+                  ${tr('Get OTP / Enter Desk ➔', 'लॉगिन / डेस्क खोलें ➔')}
+                </button>
+              </div>
+            </form>
+
+            <!-- 1-Click Demo Merchants -->
+            <div class="retail-demo-strip">
+              <span class="retail-demo-label">${tr('Instant 1-Click Demo:', 'त्वरित 1-क्लिक डेमो:')}</span>
+              <button type="button" class="retail-demo-chip" onclick="quickLogin('9829011223', 'Marwar@123', 'merchant')">
+                🏬 ${tr('Marwar Hardware', 'मारवाड़ हार्डवेयर')}
+              </button>
+              <button type="button" class="retail-demo-chip" onclick="quickLogin('9414122334', 'Surya@123', 'merchant')">
+                🏭 ${tr('Surya Electricals', 'सूर्या इलेक्ट्रिकल्स')}
+              </button>
+            </div>
+          </div>
+
+          <!-- CARD B: CUSTOMER / BUYER PORTAL -->
+          <div class="retail-entry-card customer-entry-card">
+            <div class="retail-card-top">
+              <span class="retail-badge customer-badge">🛍️ ${tr('CUSTOMER / BUYER PORTAL', 'ग्राहक / खरीदार पोर्टल')}</span>
+              <span class="retail-sub-badge">${tr('Zero App Download', 'बिना ऐप डाउनलोड')}</span>
+            </div>
+
+            <h2 class="retail-card-title">
+              ${tr('Customer / Buyer Portal', 'ग्राहक पोर्टल — दुकान खोजें व ऑर्डर करें')}
+            </h2>
+            <p class="retail-card-desc">
+              ${tr(
+                'Search store by name, enter Store PIN / Code, or scan counter QR code to view live catalog & order.',
+                'अपनी दुकान का नाम खोजें, स्टोर पिन / कोड (जैसे RM, SE) दर्ज करें या काउंटर QR कोड स्कैन करके सीधा ऑर्डर करें।'
+              )}
+            </p>
+
+            <div class="retail-features-pill-row">
+              <span class="retail-pill">🔍 ${tr('Search by Store Name', 'दुकान के नाम से खोजें')}</span>
+              <span class="retail-pill">🏷️ ${tr('Enter Store PIN (e.g. RM, SE)', 'स्टोर पिन कोड (उदा. RM, SE)')}</span>
+              <span class="retail-pill">💬 ${tr('Direct WhatsApp & UPI', 'सीधा WhatsApp व UPI')}</span>
+            </div>
+
+            <!-- Store Search or PIN Code Input -->
+            <form onsubmit="event.preventDefault();handleStoreSearchOrCode(document.getElementById('buyer-store-input').value)" class="retail-action-box">
+              <div class="retail-input-row">
+                <input
+                  type="text"
+                  id="buyer-store-input"
+                  class="retail-input"
+                  placeholder="${tr('🔍 Store name or PIN / Code (e.g. Marwar, RM, Surya)...', '🔍 दुकान का नाम या कोड लिखें (उदा. Marwar, RM, Surya)...')}"
+                  required
+                />
+                <button type="submit" class="retail-primary-btn customer-btn">
+                  ${tr('Open Catalog ➔', 'कैटलॉग खोलें ➔')}
+                </button>
+              </div>
+            </form>
+
+            <!-- Quick Store Selection & QR Trigger -->
+            <div class="retail-demo-strip">
+              <span class="retail-demo-label">${tr('Popular Local Stores:', 'लोकप्रिय दुकानें:')}</span>
+              <button type="button" class="retail-demo-chip customer" onclick="navigate('/order', { shop: '${shops[0]?.id || 'shp-1'}' })">
+                📍 ${esc(shops[0]?.shop || 'Marwar Hardware')} <span style="opacity:0.75;font-size:0.72rem">(Code: ${esc(shops[0]?.refCode || 'RM')})</span>
+              </button>
+              ${shops[1] ? `
+                <button type="button" class="retail-demo-chip customer" onclick="navigate('/order', { shop: '${shops[1].id}' })">
+                  📍 ${esc(shops[1].shop)} <span style="opacity:0.75;font-size:0.72rem">(Code: ${esc(shops[1].refCode || 'SE')})</span>
+                </button>
+              ` : ''}
+              <button type="button" class="retail-demo-chip" style="background:#fef3c7;border-color:#f59e0b;color:#b45309" onclick="triggerStoreQrScanner()">
+                📷 ${tr('Scan QR', 'QR स्कैन')}
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- DESKTOP-ONLY RICH INTERACTIVE HERO -->
+        <!-- DESKTOP-ONLY INDUSTRY TABS -->
         <div class="desktop-only">
-          <!-- Interactive Industry Scene Tabs (Click to switch background or auto-plays) -->
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
           <div class="hero-scene-tabs" style="margin-bottom:0">
             ${HERO_SCENES.map((sc, i) => `
@@ -2687,10 +2789,18 @@ function renderOrderPage() {
               </div>
             </div>
 
-            <!-- Submit Button -->
-            <button type="submit" class="btn btn-primary" style="width:100%;font-size:1.05rem;padding:12px;border-radius:12px;font-weight:900;background:#0284c7;border-color:#0284c7;box-shadow:0 6px 16px rgba(2,132,199,0.35)">
-              🚀 ${tr('Place Order Now (Instant)', 'ऑर्डर तुरंत भेजें (बिना लॉगिन)')}
-            </button>
+            <!-- Submit Buttons: Place Order Online + Order via WhatsApp (Requirement 3 & 4) -->
+            <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px">
+              <button type="submit" class="btn btn-primary btn-checkout-action" style="width:100%;min-height:48px;font-size:1.02rem;padding:12px;border-radius:12px;font-weight:900;background:#0284c7;border-color:#0284c7;box-shadow:0 4px 14px rgba(2,132,199,0.3);display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation">
+                <span>🚀</span>
+                <span>${tr('Place Order Online (Instant)', 'ऑनलाइन ऑर्डर भेजें (बिना लॉगिन)')}</span>
+              </button>
+
+              <button type="button" class="btn btn-success btn-checkout-action" style="width:100%;min-height:48px;font-size:1.02rem;padding:12px;border-radius:12px;font-weight:900;background:#16a34a;border-color:#16a34a;color:#ffffff;box-shadow:0 4px 14px rgba(22,163,74,0.3);display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation" onclick="triggerOrderViaWhatsApp('${shop?.id || ''}')">
+                <span>💬</span>
+                <span>${tr('Order via WhatsApp', 'WhatsApp पर सीधा ऑर्डर भेजें')}</span>
+              </button>
+            </div>
 
             <!-- Dynamic UPI QR Scan -->
             ${shop.upiId ? `
@@ -8120,6 +8230,102 @@ window.updateCart = function(productId, delta) {
   const cur = state.cart[productId] || 0;
   state.cart[productId] = Math.max(0, cur + delta);
   render();
+};
+
+// ============================================================================
+// DUKAAN & BUYER WORKFLOW HANDLERS (LOCAL RETAIL REFACTOR)
+// ============================================================================
+window.handleQuickDukaanLogin = function(phoneVal) {
+  const clean = String(phoneVal || '').replace(/\D/g, '').slice(-10);
+  if (clean.length === 10) {
+    navigate('/auth', { phone: clean });
+  } else {
+    navigate('/auth');
+  }
+};
+
+window.handleStoreSearchOrCode = function(inputVal) {
+  const q = String(inputVal || '').trim().toLowerCase();
+  const merchants = state.data.merchants || [];
+  if (!q) {
+    navigate('/order', { shop: merchants[0]?.id || '' });
+    return;
+  }
+  const match = merchants.find(m => 
+    (m.refCode || '').toLowerCase() === q ||
+    (m.shop || '').toLowerCase().includes(q) ||
+    (m.city || '').toLowerCase().includes(q)
+  );
+  if (match) {
+    navigate('/order', { shop: match.id });
+    showToast(tr(`Opening ${match.shop}...`, `${match.shop} का स्टोर खोला जा रहा है...`));
+  } else {
+    showToast(tr('Store code not found. Opening nearby catalog...', 'दुकान कोड नहीं मिला। नजदीकी कैटलॉग खोला जा रहा है...'), 'info');
+    navigate('/order', { shop: merchants[0]?.id || '' });
+  }
+};
+
+window.triggerStoreQrScanner = function() {
+  const code = prompt(tr('Enter 2-letter Store Code (e.g. RM for Marwar, SE for Surya):', 'स्टोर का कोड दर्ज करें (उदा. Marwar के लिए RM, Surya के लिए SE):'), 'RM');
+  if (code) {
+    window.handleStoreSearchOrCode(code);
+  }
+};
+
+window.triggerOrderViaWhatsApp = function(shopId) {
+  const shop = (state.data.merchants || []).find(s => s.id === shopId) || state.data.myShop || {};
+  const phone = (shop.phone || CENTRAL_SUPPORT_PHONE || '7240692736').replace(/\D/g, '').slice(-10);
+  const cartEntries = Object.entries(state.cart || {}).filter(([, q]) => q > 0);
+  const allProducts = (state.data.products || []).filter(p => p.shopId === shop?.id);
+  
+  if (cartEntries.length === 0 && (!state.parchiNote || !state.parchiNote.trim())) {
+    showToast(tr('Your cart is empty! Please select products or enter parchi items first.', 'आपका कार्ट खाली है! कृपया पहले सामान चुनें या पर्ची लिखें।'), 'error');
+    return;
+  }
+
+  const nameInput = document.getElementById('ord-name');
+  const phoneInput = document.getElementById('ord-phone');
+  const addrInput = document.getElementById('ord-addr');
+  const gstinInput = document.getElementById('ord-gstin');
+
+  const buyerName = (nameInput?.value || state.data.user?.name || state.checkoutCustomer?.name || 'Customer').trim();
+  const buyerPhone = (phoneInput?.value || state.data.user?.phone || state.checkoutCustomer?.phone || '').trim();
+  const buyerAddr = (addrInput?.value || state.checkoutCustomer?.address || 'Counter Pickup').trim();
+  const buyerGstin = (gstinInput?.value || state.checkoutCustomer?.buyerGstin || '').trim();
+
+  let itemsText = [];
+  let subtotal = 0;
+  cartEntries.forEach(([pid, qty], idx) => {
+    const p = allProducts.find(x => x.id === pid);
+    if (!p) return;
+    const isWholesale = qty >= (p.moq || 9999) && p.wholesalePrice && p.wholesalePrice < p.price;
+    const rate = isWholesale ? p.wholesalePrice : p.price;
+    const lineTotal = rate * qty;
+    subtotal += lineTotal;
+    itemsText.push(`  ${idx + 1}. *${p.name}* — ${qty} ${p.unit || 'pc'} × ₹${rate} = *₹${lineTotal.toLocaleString('en-IN')}*`);
+  });
+
+  if (state.parchiNote && state.parchiNote.trim()) {
+    itemsText.push(`\n📝 *Parchi / Custom Items:*\n${state.parchiNote.trim()}`);
+  }
+
+  const messageLines = [
+    `🛍️ *NEW DIRECT ORDER — ${shop.shop || 'KUBERQ STORE'}*`,
+    `══════════════════════`,
+    `👤 *Buyer:* ${buyerName} ${buyerPhone ? `(📱 ${buyerPhone})` : ''}`,
+    `📍 *Delivery / Site:* ${buyerAddr}`,
+    buyerGstin ? `🏢 *Buyer GSTIN:* ${buyerGstin}` : '',
+    `══════════════════════`,
+    `📦 *Ordered Items (${cartEntries.length}):*`,
+    itemsText.join('\n'),
+    `══════════════════════`,
+    `💰 *Estimated Total:* *₹${subtotal.toLocaleString('en-IN')}*`,
+    `\n🙏 Please confirm dispatch schedule and send bill. Sent via KuberQ Order Desk.`
+  ].filter(Boolean);
+
+  const waUrl = `https://wa.me/91${phone}?text=${encodeURIComponent(messageLines.join('\n'))}`;
+  window.open(waUrl, '_blank');
+  showToast(tr('Opening WhatsApp to send order...', 'ऑर्डर भेजने के लिए WhatsApp खोला जा रहा है...'));
 };
 
 window.submitCustomerOrder = async function(e, shopId) {
