@@ -84,19 +84,213 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/styles.css?v=20261110_v12" />
+  <link rel="stylesheet" href="/styles.css?v=20261110_v13" />
 </head>
 <body>
-  <div id="app">
-    <!-- Instant Shell: Zero-latency branded preview while scripts establish -->
-    <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#F8FAFC;font-family:'Inter',-apple-system,sans-serif;color:#0F172A;padding:20px;text-align:center">
-      <div style="width:52px;height:52px;border-radius:14px;background:#0F172A;color:#FACC15;display:grid;place-items:center;font-size:28px;font-weight:900;box-shadow:0 6px 18px rgba(15,23,42,0.18)">K</div>
-      <div style="font-size:22px;font-weight:800;letter-spacing:-0.02em;margin-top:10px">Kuber<span style="color:#2563EB">Q</span></div>
-      <p style="font-size:13px;color:#64748B;margin:6px 0 16px;max-width:280px">Smart B2B Business & Order Desk</p>
-      <div style="width:34px;height:34px;border:3px solid #E2E8F0;border-top-color:#2563EB;border-radius:50%;animation:kqSpin 0.7s linear infinite"></div>
-      <style>@keyframes kqSpin{to{transform:rotate(360deg)}}</style>
+  <!-- Root SPA Application Mount Point -->
+  <div id="app"></div>
+
+  <!-- Standalone Splash Screen Overlay (Graceful fade-out on mount, 5s fail-safe fallback) -->
+  <div id="kuberq-splash" class="kuberq-splash-screen" role="status" aria-live="polite">
+    <div class="kuberq-splash-card">
+      <div class="kuberq-splash-logo">K</div>
+      <div class="kuberq-splash-brand">Kuber<span>Q</span></div>
+      <p class="kuberq-splash-tagline">Smart B2B Business &amp; Order Desk</p>
+      <div id="splash-loader" class="kuberq-splash-loader"></div>
+
+      <!-- Fallback fail-safe: Automatically reveals if application bundle does not mount within 5 seconds -->
+      <div id="splash-fallback-card" class="kuberq-splash-fallback" style="display:none;" aria-hidden="true">
+        <div class="splash-fallback-badge">⚠️ Loading taking longer than usual...</div>
+        <p class="splash-fallback-desc">
+          The cloud server or network connection is initializing. If the screen doesn't appear, you can reload or go directly to login.
+        </p>
+        <div class="splash-fallback-actions">
+          <button type="button" class="fallback-action-btn primary" onclick="window.location.reload(true)">
+            🔄 Reload Application
+          </button>
+          <a href="/auth" class="fallback-action-btn secondary">
+            🔐 Direct Login
+          </a>
+          <button type="button" class="fallback-action-btn ghost" onclick="try{localStorage.clear();sessionStorage.clear();}catch(_){}window.location.reload(true)">
+            🧹 Reset Cache &amp; Reload
+          </button>
+        </div>
+      </div>
     </div>
   </div>
-  <script src="/app.js?v=20261110_v12"></script>
+
+  <style>
+    .kuberq-splash-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 999999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #F8FAFC;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #0F172A;
+      padding: 20px;
+      text-align: center;
+      transition: opacity 0.4s ease-out, visibility 0.4s ease-out;
+    }
+    .kuberq-splash-screen.splash-fade-out {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .kuberq-splash-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: 380px;
+      width: 100%;
+    }
+    .kuberq-splash-logo {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      background: #0F172A;
+      color: #FACC15;
+      display: grid;
+      place-items: center;
+      font-size: 28px;
+      font-weight: 900;
+      box-shadow: 0 6px 18px rgba(15,23,42,0.18);
+    }
+    .kuberq-splash-brand {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-top: 10px;
+    }
+    .kuberq-splash-brand span {
+      color: #2563EB;
+    }
+    .kuberq-splash-tagline {
+      font-size: 13px;
+      color: #64748B;
+      margin: 6px 0 16px;
+      max-width: 280px;
+    }
+    .kuberq-splash-loader {
+      width: 34px;
+      height: 34px;
+      border: 3px solid #E2E8F0;
+      border-top-color: #2563EB;
+      border-radius: 50%;
+      animation: kqSpin 0.7s linear infinite;
+    }
+    @keyframes kqSpin { to { transform: rotate(360deg); } }
+    .kuberq-splash-fallback {
+      margin-top: 18px;
+      padding: 16px;
+      background: #FFFFFF;
+      border: 1.5px solid #CBD5E1;
+      border-radius: 14px;
+      box-shadow: 0 10px 25px rgba(15,23,42,0.08);
+      animation: kqFadeUp 0.35s ease-out forwards;
+      box-sizing: border-box;
+      width: 100%;
+    }
+    @keyframes kqFadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .splash-fallback-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 800;
+      color: #B45309;
+      background: #FEF3C7;
+      padding: 3px 10px;
+      border-radius: 999px;
+      margin-bottom: 8px;
+    }
+    .splash-fallback-desc {
+      font-size: 12px;
+      color: #64748B;
+      line-height: 1.5;
+      margin: 0 0 14px;
+    }
+    .splash-fallback-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .fallback-action-btn {
+      display: block;
+      width: 100%;
+      padding: 9px 14px;
+      font-size: 13px;
+      font-weight: 700;
+      border-radius: 8px;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+      box-sizing: border-box;
+      text-align: center;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .fallback-action-btn:active {
+      transform: scale(0.98);
+    }
+    .fallback-action-btn.primary {
+      background: #0284C7;
+      color: #FFFFFF;
+    }
+    .fallback-action-btn.primary:hover {
+      background: #0369A1;
+    }
+    .fallback-action-btn.secondary {
+      background: #0F172A;
+      color: #FFFFFF;
+    }
+    .fallback-action-btn.secondary:hover {
+      background: #1E293B;
+    }
+    .fallback-action-btn.ghost {
+      background: #F1F5F9;
+      color: #475569;
+      font-size: 11px;
+    }
+    .fallback-action-btn.ghost:hover {
+      background: #E2E8F0;
+    }
+  </style>
+
+  <!-- Fallback fail-safe timer (5 seconds max) & Dismiss controller -->
+  <script>
+    window.__KUBERQ_MOUNTED__ = false;
+    window.__dismissKuberqSplash = function() {
+      if (window.__KUBERQ_MOUNTED__) return;
+      window.__KUBERQ_MOUNTED__ = true;
+      var splash = document.getElementById('kuberq-splash');
+      if (splash && !splash.classList.contains('splash-fade-out')) {
+        splash.classList.add('splash-fade-out');
+        setTimeout(function() {
+          if (splash && splash.parentNode) {
+            splash.parentNode.removeChild(splash);
+          }
+        }, 450);
+      }
+    };
+
+    // 5-second fail-safe timer
+    setTimeout(function() {
+      if (!window.__KUBERQ_MOUNTED__) {
+        var loader = document.getElementById('splash-loader');
+        var fallback = document.getElementById('splash-fallback-card');
+        if (loader) loader.style.display = 'none';
+        if (fallback) {
+          fallback.style.display = 'block';
+          fallback.setAttribute('aria-hidden', 'false');
+        }
+      }
+    }, 5000);
+  </script>
+
+  <script src="/app.js?v=20261110_v13"></script>
 </body>
 </html>

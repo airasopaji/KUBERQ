@@ -12084,76 +12084,149 @@ window.addJobWorkOrder = addJobWorkOrder;
 window.addProductionBatch = addProductionBatch;
 
 
-function render() {
+// ============================================================================
+// PRODUCTION SPA ERROR BOUNDARY & FAULT-TOLERANT RETRY SCREEN
+// ============================================================================
+function renderErrorBoundary(err) {
+  if (typeof window.__dismissKuberqSplash === 'function') {
+    window.__dismissKuberqSplash();
+  }
   const root = document.getElementById('app');
   if (!root) return;
 
-  // Preserve active input focus and cursor position across full DOM re-renders
-  const activeEl = document.activeElement;
-  let focusInfo = null;
-  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') && activeEl.type !== 'file' && activeEl.type !== 'checkbox' && activeEl.type !== 'radio') {
-    const allInputs = Array.from(root.querySelectorAll('input, textarea'));
-    focusInfo = {
-      id: activeEl.id || '',
-      placeholder: activeEl.getAttribute('placeholder') || '',
-      index: allInputs.indexOf(activeEl),
-      start: activeEl.selectionStart,
-      end: activeEl.selectionEnd
-    };
+  const msg = String(err?.message || err || 'Unknown runtime error');
+  const isChunkError = /Loading chunk|Failed to fetch dynamically imported module|MIME type|SyntaxError|Unexpected token/i.test(msg);
+
+  root.innerHTML = `
+    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#f8fafc;font-family:'Inter',system-ui,sans-serif;color:#0f172a">
+      <div style="max-width:540px;width:100%;background:#ffffff;border:1.5px solid #cbd5e1;border-radius:20px;padding:34px 26px;box-shadow:0 20px 45px rgba(15,23,42,0.08);text-align:center">
+        <div style="width:64px;height:64px;border-radius:18px;background:#fee2e2;color:#dc2626;display:grid;place-items:center;font-size:32px;margin:0 auto 16px;box-shadow:0 6px 16px rgba(220,38,38,0.15)">⚠️</div>
+        
+        <h2 style="font-size:1.4rem;font-weight:900;margin:0 0 8px;letter-spacing:-0.01em">
+          ${tr('Application Encountered an Issue', 'एप्लिकेशन में अस्थायी रुकावट आई है')}
+        </h2>
+        
+        <p style="font-size:0.9rem;color:#64748b;margin:0 0 22px;line-height:1.55">
+          ${isChunkError
+            ? tr('A new update or bundle was recently deployed. Reloading will fetch the latest assets cleanly.', 'नया अपडेट या बंडल डिप्लॉय हुआ है। रीलोड करने पर नवीनतम फ़ाइलें लोड हो जाएँगी।')
+            : tr('An unexpected error occurred while rendering the page. Your stored business data and ledgers are completely safe.', 'पेज रेंडर करते समय त्रुटि हुई। आपका व्यापारिक डेटा और बहीखाता पूरी तरह सुरक्षित है।')}
+        </p>
+
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:22px">
+          <button type="button" class="btn btn-primary" style="background:#0284c7;border-color:#0284c7;padding:11px 22px;font-weight:800;border-radius:10px" onclick="window.location.reload(true)">
+            🔄 ${tr('Reload Application', 'एप्लिकेशन पुनः लोड करें')}
+          </button>
+          <button type="button" class="btn btn-ghost" style="padding:11px 18px;border-radius:10px;border:1px solid #cbd5e1" onclick="window.location.href='/'">
+            🏠 ${tr('Return Home', 'होमपेज पर जाएँ')}
+          </button>
+          <button type="button" class="btn btn-ghost" style="padding:11px 18px;border-radius:10px;color:#dc2626" onclick="try{localStorage.clear();sessionStorage.clear();}catch(_){}window.location.href='/auth'">
+            🧹 ${tr('Clear Cache & Relogin', 'कैश साफ़ करें')}
+          </button>
+        </div>
+
+        <details style="text-align:left;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;font-size:0.76rem;color:#475569">
+          <summary style="cursor:pointer;font-weight:700">Diagnostic Details / तकनीकी विवरण</summary>
+          <pre style="margin:8px 0 0;overflow-x:auto;white-space:pre-wrap;font-family:monospace;font-size:0.72rem;line-height:1.4">${esc(err?.stack || msg)}</pre>
+        </details>
+      </div>
+    </div>
+  `;
+}
+
+// Global unhandled exception & module rejection traps
+window.addEventListener('error', function(event) {
+  console.error('[KuberQ Runtime Error Captured]:', event.error || event.message);
+  if (!window.__KUBERQ_MOUNTED__) {
+    renderErrorBoundary(event.error || new Error(event.message || 'Script initialization failure'));
   }
-
-  let pageHtml = '';
-  const r = state.route;
-  if (r === '/' || r === '/merchants') pageHtml = renderHome();
-  else if (r === '/pricing') pageHtml = renderPricing();
-  else if (r === '/auth') pageHtml = renderAuth(false);
-  else if (r === '/signup') pageHtml = renderAuth(true);
-  else if (r === '/order') pageHtml = renderOrderPage();
-  else if (r === '/merchant') pageHtml = renderMerchantPortal();
-  else if (r === '/admin') pageHtml = renderAdminPortal();
-  else if (r === '/solutions') pageHtml = renderSolutions();
-  else if (r === '/transport') pageHtml = renderTransportPage();
-  else if (r === '/services') pageHtml = renderServicesPage();
-  else if (r === '/partner') pageHtml = renderPartnerPage();
-  else if (r === '/customer') pageHtml = renderCustomerPortal();
-  else if (r === '/terms') pageHtml = renderLegalPage('terms');
-  else if (r === '/privacy') pageHtml = renderLegalPage('privacy');
-  else if (r === '/customer-display' || r === '/customer-screen') pageHtml = renderCustomerFacingDisplayPage(state.data.myShop || state.data.merchants[0]);
-  else if (r === '/grievance') pageHtml = renderLegalPage('grievance');
-  else pageHtml = renderHome();
-
-  const isEnterpriseView = (
-    (r === '/merchant' && state.data.user && state.data.myShop) ||
-    (r === '/admin' && state.data.user && (state.data.user.role === 'admin' || state.data.user.role === 'employee')) ||
-    (r === '/customer' && state.data.user)
-  );
-
-  const extraModals = `${renderFloatingActionHub()}${state.aiChatModalOpen ? renderGlobalAiChatModal() : ''}${state.bulkReviewModal ? renderBulkReviewModal() : ''}${state.voucherModalOpen ? renderVoucherScanModal() : ''}${state.customerModal ? renderCustomerModal() : ''}${state.productModal ? renderProductAddModal() : ''}${state.dealModal ? renderDealModal() : ''}${state.taskModal ? renderTaskModal() : ''}${state.managerModal ? renderManagerModal() : ''}${state.forgotPasswordModal ? renderForgotPasswordModal() : ''}${state.heldSalesModal ? renderHeldSalesModal() : ''}${state.shiftOpenModal ? renderShiftOpenModal() : ''}${state.shiftCloseModal ? renderShiftCloseModal() : ''}${state.zReportModal ? renderZReportModal() : ''}${state.receiveStockModal ? renderReceiveStockModal() : ''}${state.supplierModal ? renderSupplierModal() : ''}${state.thermalReceiptModal ? renderThermalReceiptModal() : ''}${state.storefrontBarcodeSheetModal ? renderStorefrontBarcodeSheetModal(state.data.myShop || state.data.merchants[0]) : ''}`;
-
-  if (isEnterpriseView) {
-    root.innerHTML = `${pageHtml}${state.demoModalOpen ? renderDemoModal() : ''}${state.reportModal ? renderReportModal() : ''}${state.orderReviewModal ? renderOrderReviewModal() : ''}${state.customerBillModal ? renderCustomerBillModal() : ''}${state.partyLedgerModalKey ? renderPartyLedgerModal() : ''}${state.aiModalOpen ? (state.data.myShop ? renderAiScannerModal(state.data.myShop) : '') : ''}${extraModals}`;
-  } else {
-    root.innerHTML = `${renderHeader()}<main>${pageHtml}</main>${renderFooter()}${renderMobileBottomNav()}${state.demoModalOpen ? renderDemoModal() : ''}${state.reportModal ? renderReportModal() : ''}${state.orderReviewModal ? renderOrderReviewModal() : ''}${state.customerBillModal ? renderCustomerBillModal() : ''}${state.partyLedgerModalKey ? renderPartyLedgerModal() : ''}${extraModals}`;
+});
+window.addEventListener('unhandledrejection', function(event) {
+  console.error('[KuberQ Unhandled Rejection Captured]:', event.reason);
+  if (!window.__KUBERQ_MOUNTED__) {
+    renderErrorBoundary(event.reason || new Error('Startup promise rejected'));
   }
+});
 
-  // Restore focus & cursor position if an input was being typed into
-  if (focusInfo) {
-    let target = focusInfo.id ? document.getElementById(focusInfo.id) : null;
-    if (!target && focusInfo.placeholder) {
-      target = Array.from(root.querySelectorAll('input, textarea')).find(el => el.getAttribute('placeholder') === focusInfo.placeholder);
+function render() {
+  try {
+    const root = document.getElementById('app');
+    if (!root) return;
+
+    // Preserve active input focus and cursor position across full DOM re-renders
+    const activeEl = document.activeElement;
+    let focusInfo = null;
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') && activeEl.type !== 'file' && activeEl.type !== 'checkbox' && activeEl.type !== 'radio') {
+      const allInputs = Array.from(root.querySelectorAll('input, textarea'));
+      focusInfo = {
+        id: activeEl.id || '',
+        placeholder: activeEl.getAttribute('placeholder') || '',
+        index: allInputs.indexOf(activeEl),
+        start: activeEl.selectionStart,
+        end: activeEl.selectionEnd
+      };
     }
-    if (!target && focusInfo.index >= 0) {
-      const allNow = Array.from(root.querySelectorAll('input, textarea'));
-      target = allNow[focusInfo.index] || null;
+
+    let pageHtml = '';
+    const r = state.route;
+    if (r === '/' || r === '/merchants') pageHtml = renderHome();
+    else if (r === '/pricing') pageHtml = renderPricing();
+    else if (r === '/auth') pageHtml = renderAuth(false);
+    else if (r === '/signup') pageHtml = renderAuth(true);
+    else if (r === '/order') pageHtml = renderOrderPage();
+    else if (r === '/merchant') pageHtml = renderMerchantPortal();
+    else if (r === '/admin') pageHtml = renderAdminPortal();
+    else if (r === '/solutions') pageHtml = renderSolutions();
+    else if (r === '/transport') pageHtml = renderTransportPage();
+    else if (r === '/services') pageHtml = renderServicesPage();
+    else if (r === '/partner') pageHtml = renderPartnerPage();
+    else if (r === '/customer') pageHtml = renderCustomerPortal();
+    else if (r === '/terms') pageHtml = renderLegalPage('terms');
+    else if (r === '/privacy') pageHtml = renderLegalPage('privacy');
+    else if (r === '/customer-display' || r === '/customer-screen') pageHtml = renderCustomerFacingDisplayPage(state.data.myShop || state.data.merchants[0]);
+    else if (r === '/grievance') pageHtml = renderLegalPage('grievance');
+    else pageHtml = renderHome();
+
+    const isEnterpriseView = (
+      (r === '/merchant' && state.data.user && state.data.myShop) ||
+      (r === '/admin' && state.data.user && (state.data.user.role === 'admin' || state.data.user.role === 'employee')) ||
+      (r === '/customer' && state.data.user)
+    );
+
+    const extraModals = `${renderFloatingActionHub()}${state.aiChatModalOpen ? renderGlobalAiChatModal() : ''}${state.bulkReviewModal ? renderBulkReviewModal() : ''}${state.voucherModalOpen ? renderVoucherScanModal() : ''}${state.customerModal ? renderCustomerModal() : ''}${state.productModal ? renderProductAddModal() : ''}${state.dealModal ? renderDealModal() : ''}${state.taskModal ? renderTaskModal() : ''}${state.managerModal ? renderManagerModal() : ''}${state.forgotPasswordModal ? renderForgotPasswordModal() : ''}${state.heldSalesModal ? renderHeldSalesModal() : ''}${state.shiftOpenModal ? renderShiftOpenModal() : ''}${state.shiftCloseModal ? renderShiftCloseModal() : ''}${state.zReportModal ? renderZReportModal() : ''}${state.receiveStockModal ? renderReceiveStockModal() : ''}${state.supplierModal ? renderSupplierModal() : ''}${state.thermalReceiptModal ? renderThermalReceiptModal() : ''}${state.storefrontBarcodeSheetModal ? renderStorefrontBarcodeSheetModal(state.data.myShop || state.data.merchants[0]) : ''}`;
+
+    if (isEnterpriseView) {
+      root.innerHTML = `${pageHtml}${state.demoModalOpen ? renderDemoModal() : ''}${state.reportModal ? renderReportModal() : ''}${state.orderReviewModal ? renderOrderReviewModal() : ''}${state.customerBillModal ? renderCustomerBillModal() : ''}${state.partyLedgerModalKey ? renderPartyLedgerModal() : ''}${state.aiModalOpen ? (state.data.myShop ? renderAiScannerModal(state.data.myShop) : '') : ''}${extraModals}`;
+    } else {
+      root.innerHTML = `${renderHeader()}<main>${pageHtml}</main>${renderFooter()}${renderMobileBottomNav()}${state.demoModalOpen ? renderDemoModal() : ''}${state.reportModal ? renderReportModal() : ''}${state.orderReviewModal ? renderOrderReviewModal() : ''}${state.customerBillModal ? renderCustomerBillModal() : ''}${state.partyLedgerModalKey ? renderPartyLedgerModal() : ''}${extraModals}`;
     }
-    if (target) {
-      target.focus();
-      try {
-        if (typeof focusInfo.start === 'number' && target.setSelectionRange) {
-          target.setSelectionRange(focusInfo.start, focusInfo.end);
-        }
-      } catch (_) {}
+
+    // Dismiss Splash Screen with smooth fade-out as soon as SPA mounts
+    if (typeof window.__dismissKuberqSplash === 'function') {
+      window.__dismissKuberqSplash();
     }
+
+    // Restore focus & cursor position if an input was being typed into
+    if (focusInfo) {
+      let target = focusInfo.id ? document.getElementById(focusInfo.id) : null;
+      if (!target && focusInfo.placeholder) {
+        target = Array.from(root.querySelectorAll('input, textarea')).find(el => el.getAttribute('placeholder') === focusInfo.placeholder);
+      }
+      if (!target && focusInfo.index >= 0) {
+        const allNow = Array.from(root.querySelectorAll('input, textarea'));
+        target = allNow[focusInfo.index] || null;
+      }
+      if (target) {
+        target.focus();
+        try {
+          if (typeof focusInfo.start === 'number' && target.setSelectionRange) {
+            target.setSelectionRange(focusInfo.start, focusInfo.end);
+          }
+        } catch (_) {}
+      }
+    }
+  } catch (renderErr) {
+    console.error('[KuberQ Render Boundary Caught]:', renderErr);
+    renderErrorBoundary(renderErr);
   }
 }
 
