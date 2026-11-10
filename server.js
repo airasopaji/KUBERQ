@@ -4420,11 +4420,18 @@ const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
+  '.mjs': 'application/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
-  '.ico': 'image/x-icon'
+  '.ico': 'image/x-icon',
+  '.map': 'application/json; charset=utf-8',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf'
 };
 
 const server = http.createServer(async (req, res) => {
@@ -4450,7 +4457,16 @@ const server = http.createServer(async (req, res) => {
       return res.end('Forbidden');
     }
 
+    // Guard: Prevent 404 MIME-type execution errors for missing assets (.js, .css, .png, etc.)
+    const reqExt = path.extname(pathname).toLowerCase();
+    const isAssetRoute = Boolean(reqExt && reqExt !== '.html');
+
     if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+      if (isAssetRoute) {
+        setSecurityHeaders(res);
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end(`404 Asset Not Found: ${pathname}`);
+      }
       filePath = path.join(PUBLIC_DIR, 'index.html');
     }
 
