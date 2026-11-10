@@ -2328,6 +2328,10 @@ async function handleApi(req, res, pathname, query) {
       invoiceNo = `KQ-2627-${seqStr}`;
     }
 
+    // High-Speed POS & Counter Queue Token (Sequential 3-digit: 101 -> 999)
+    shop.dailyTokenCounter = ((Number(shop.dailyTokenCounter) || 100) >= 999) ? 101 : ((Number(shop.dailyTokenCounter) || 100) + 1);
+    const tokenNumber = String(shop.dailyTokenCounter);
+
     const processedItems = [];
     for (const item of rawItems) {
       const qty = Math.max(1, Number(item.qty) || 1);
@@ -2386,6 +2390,7 @@ async function handleApi(req, res, pathname, query) {
     const newOrder = {
       id: invoiceNo,
       invoiceNo,
+      tokenNumber,
       docType: isQuotation ? 'Quotation' : 'Tax Invoice',
       validUntil: isQuotation ? sanitizeString(body.validUntil || new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 10), 20) : undefined,
       shopId,
@@ -2440,7 +2445,7 @@ async function handleApi(req, res, pathname, query) {
     });
 
     saveDb();
-    return sendJson(res, 200, { order: newOrder, totals, mirroredToBuyerShop: Boolean(mirroredPurchase), shopPhone: shop.phone, shopName: shop.shop, upiId: shop.upiId });
+    return sendJson(res, 200, { order: newOrder, tokenNumber, totals, mirroredToBuyerShop: Boolean(mirroredPurchase), shopPhone: shop.phone, shopName: shop.shop, upiId: shop.upiId });
   }
 
   // --------------------------------------------------------------------------
@@ -2568,7 +2573,19 @@ async function handleApi(req, res, pathname, query) {
     });
 
     saveDb();
-    return sendJson(res, 200, { order });
+
+    // Automated Counter Queue WhatsApp Notification URL & Message
+    const tokenTxt = order.tokenNumber ? `#${order.tokenNumber}` : (order.invoiceNo || order.id || '');
+    let alertMsg = `नमस्ते ${order.customer || order.buyerName || 'ग्राहक'}, आपकी पर्ची/ऑर्डर ${tokenTxt} ${shop?.shop || 'दुकान'} पर '${order.status}' स्थिति में है। कुल राशि: ₹${order.totals?.gross || order.total || 0}`;
+    if (order.status === 'Ready for Pickup') {
+      alertMsg = `🎉 नमस्ते ${order.customer || order.buyerName || 'ग्राहक'}, आपका टोकन ${tokenTxt} ${shop?.shop || 'दुकान'} पर तैयार है ('Ready for Pickup')! कृपया काउंटर से अपना सामान प्राप्त करें। कुल राशि: ₹${order.totals?.gross || order.total || 0}`;
+    } else if (order.status === 'In Preparation') {
+      alertMsg = `⏳ नमस्ते ${order.customer || order.buyerName || 'ग्राहक'}, आपका टोकन ${tokenTxt} तैयार किया जा रहा है ('In Preparation')। कृपया 2 मिनट प्रतीक्षा करें। ${shop?.shop || 'दुकान'}`;
+    }
+    const cleanBuyerPhone = String(order.phone || '').replace(/\D/g, '').slice(-10);
+    const alertUrl = cleanBuyerPhone.length === 10 ? `https://wa.me/91${cleanBuyerPhone}?text=${encodeURIComponent(alertMsg)}` : '';
+
+    return sendJson(res, 200, { order, alertMsg, alertUrl });
   }
 
   if (pathname === '/api/merchant/product-save' && req.method === 'POST') {
@@ -3402,6 +3419,11 @@ Additional text context: ${rawText}`;
       const items = Array.isArray(body.items) ? body.items : [];
       if (items.length === 0) return sendJson(res, 400, { error: 'Cart is empty.' });
       const invoiceNo = 'S-' + new Date().getFullYear() + '-' + String(Date.now()).slice(-6);
+      
+      // Sequential 3-Digit Counter Token (#101 - #999)
+      shop.dailyTokenCounter = ((Number(shop.dailyTokenCounter) || 100) >= 999) ? 101 : ((Number(shop.dailyTokenCounter) || 100) + 1);
+      const tokenNumber = String(shop.dailyTokenCounter);
+
       const buyerName = sanitizeString(body.buyerName || 'Walk-in Customer', 100);
       const buyerPhone = cleanPhone(body.buyerPhone || '');
       const paymentMode = sanitizeString(body.paymentMode || 'Cash', 20);
@@ -3436,6 +3458,8 @@ Additional text context: ${rawText}`;
       // Record Order / Sale
       const newOrder = {
         id: invoiceNo,
+        invoiceNo,
+        tokenNumber,
         shopId: user.shopId,
         buyerName,
         phone: buyerPhone || shop.phone,
@@ -3453,7 +3477,7 @@ Additional text context: ${rawText}`;
       db.orders.unshift(newOrder);
       logAct(`Completed POS Retail Sale #${invoiceNo} (₹${total})`);
       saveDb();
-      return sendJson(res, 200, { ok: true, invoiceNo, order: newOrder, products: db.products.filter(p => p.shopId === user.shopId), shifts: db.shifts.filter(s => s.shopId === user.shopId) });
+      return sendJson(res, 200, { ok: true, invoiceNo, tokenNumber, order: newOrder, products: db.products.filter(p => p.shopId === user.shopId), shifts: db.shifts.filter(s => s.shopId === user.shopId) });
     }
 
     // ---- Hold Sale & Held Sales Management ----
