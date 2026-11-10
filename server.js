@@ -161,23 +161,95 @@ function verifyToken(token) {
   }
 }
 
-// Rate Limiter & Brute-Force Lockout Memory Store
+// ============================================================================
+// DEVOPS PERFORMANCE ENGINE: IN-MEMORY CACHE (5-Min TTL for 200+ Concurrency)
+// ============================================================================
+class InMemoryTtlCache {
+  constructor(defaultTtlMs = 300000) { // 5 minutes default TTL
+    this.cache = new Map();
+    this.defaultTtlMs = defaultTtlMs;
+    // Auto-prune expired items every 60 seconds
+    setInterval(() => this.cleanup(), 60000).unref();
+  }
+
+  get(key) {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+      this.cache.delete(key);
+      return null;
+    }
+    return entry.value;
+  }
+
+  set(key, value, ttlMs = this.defaultTtlMs) {
+    if (this.cache.size > 5000) {
+      // LRU-style bulk eviction: drop oldest 500 keys
+      const keys = Array.from(this.cache.keys()).slice(0, 500);
+      keys.forEach(k => this.cache.delete(k));
+    }
+    this.cache.set(key, {
+      value,
+      expiresAt: Date.now() + ttlMs
+    });
+  }
+
+  delete(key) {
+    this.cache.delete(key);
+  }
+
+  invalidatePattern(regexStr) {
+    const rgx = new RegExp(regexStr);
+    for (const k of this.cache.keys()) {
+      if (rgx.test(k)) this.cache.delete(k);
+    }
+  }
+
+  cleanup() {
+    const now = Date.now();
+    for (const [k, v] of this.cache.entries()) {
+      if (now > v.expiresAt) this.cache.delete(k);
+    }
+  }
+}
+
+const catalogCache = new InMemoryTtlCache(300000); // 5-minute in-memory cache
+
+// ============================================================================
+// DEVOPS PERFORMANCE ENGINE: SLIDING WINDOW RATE LIMITER WITH AUTO-PRUNING
+// ============================================================================
 const rateLimitMap = new Map();
 const loginLockoutMap = new Map();
 const passwordResetOtpMap = new Map(); // key: phoneOrEmail, val: { otp, expiresAt, userId, isEmployee }
 
-function checkRateLimit(ip, bucket = 'general', maxReqs = 120, windowMs = 60000) {
+// Auto-prune stale IP rate limit buckets every 5 minutes to prevent memory leaks
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of rateLimitMap.entries()) {
+    if (now > v.resetAt) rateLimitMap.delete(k);
+  }
+}, 300000).unref();
+
+function checkRateLimitDetailed(ip, bucket = 'general', maxReqs = 180, windowMs = 60000) {
   const key = `${ip}:${bucket}`;
   const now = Date.now();
-  const entry = rateLimitMap.get(key) || { count: 0, resetAt: now + windowMs };
-  if (now > entry.resetAt) {
-    entry.count = 1;
-    entry.resetAt = now + windowMs;
+  let entry = rateLimitMap.get(key);
+  if (!entry || now > entry.resetAt) {
+    entry = { count: 1, resetAt: now + windowMs, limit: maxReqs };
   } else {
     entry.count++;
   }
   rateLimitMap.set(key, entry);
-  return entry.count <= maxReqs;
+
+  const allowed = entry.count <= maxReqs;
+  const remaining = Math.max(0, maxReqs - entry.count);
+  const resetSec = Math.max(1, Math.ceil((entry.resetAt - now) / 1000));
+
+  return { allowed, limit: maxReqs, remaining, resetSec };
+}
+
+function checkRateLimit(ip, bucket = 'general', maxReqs = 120, windowMs = 60000) {
+  return checkRateLimitDetailed(ip, bucket, maxReqs, windowMs).allowed;
 }
 
 function sanitizeString(str, maxLen = 500) {
@@ -1768,8 +1840,37 @@ function hasAdminPerm(user, perm) {
 // ============================================================================
 async function handleApi(req, res, pathname, query) {
   const ip = req.socket.remoteAddress || '127.0.0.1';
-  if (!checkRateLimit(ip, 'api', 180, 60000)) {
-    return sendJson(res, 429, { error: 'Too many requests. Please wait a moment.' });
+
+  // Route-Specific Throttling Buckets for 200+ Concurrency Stability
+  let bucket = 'general';
+  let maxReqs = 180;
+  let windowMs = 60000;
+
+  if (pathname.startsWith('/api/auth/otp') || pathname === '/api/auth/login' || pathname === '/api/auth/register') {
+    bucket = 'auth_otp';
+    maxReqs = 10;
+    windowMs = 300000; // 10 reqs per 5 minutes to prevent SMS/OTP spam
+  } else if (pathname === '/api/orders/create') {
+    bucket = 'checkout';
+    maxReqs = 30; // 30 checkouts/min per IP
+    windowMs = 60000;
+  } else if (pathname === '/api/merchant/pro') {
+    bucket = 'merchant_pos';
+    maxReqs = 300; // High burst throughput for fast retail walk-in billing desk
+    windowMs = 60000;
+  }
+
+  const rate = checkRateLimitDetailed(ip, bucket, maxReqs, windowMs);
+  res.setHeader('X-RateLimit-Limit', rate.limit);
+  res.setHeader('X-RateLimit-Remaining', rate.remaining);
+  res.setHeader('X-RateLimit-Reset', rate.resetSec);
+
+  if (!rate.allowed) {
+    res.setHeader('Retry-After', rate.resetSec);
+    return sendJson(res, 429, {
+      error: `Too many requests for ${bucket}. Please wait ${rate.resetSec} seconds before retrying.`,
+      retryAfter: rate.resetSec
+    });
   }
 
   const user = getAuthUser(req);
@@ -1796,6 +1897,16 @@ async function handleApi(req, res, pathname, query) {
   // A. PUBLIC & SESSION BOOTSTRAP (`/api/bootstrap`)
   // --------------------------------------------------------------------------
   if (pathname === '/api/bootstrap' && req.method === 'GET') {
+    // In-Memory Catalog Cache for 100+ Concurrent Guest Buyers (5-min TTL)
+    if (!user) {
+      const cached = catalogCache.get('bootstrap:public');
+      if (cached) {
+        res.setHeader('X-Cache', 'HIT');
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        return sendJson(res, 200, cached);
+      }
+    }
+
     const publicMerchants = db.merchants
       .filter(m => m.active !== false)
       .map(m => ({
@@ -1905,6 +2016,11 @@ async function handleApi(req, res, pathname, query) {
           aiKeyStatus: user.role === 'admin' ? maskKeyStatus(getGeminiApiKey()) : { configured: false, masked: 'Restricted to Super Admin' }
         };
       }
+    } else {
+      // Store in memory cache for 5 minutes (300,000ms) for high concurrency
+      catalogCache.set('bootstrap:public', payload, 300000);
+      res.setHeader('X-Cache', 'MISS');
+      res.setHeader('Cache-Control', 'public, max-age=300');
     }
 
     return sendJson(res, 200, payload);
@@ -4501,11 +4617,30 @@ const server = http.createServer(async (req, res) => {
       'Content-Type': MIME_TYPES[ext] || 'text/plain; charset=utf-8'
     };
 
-    // Instant Revalidation for JS/CSS/HTML so updates are immediately visible without stale cache
-    if (ext === '.webp' || ext === '.svg' || ext === '.png' || ext === '.ico') {
-      headers['Cache-Control'] = 'public, max-age=3600, stale-while-revalidate=86400';
+    // Stat file for high-precision ETag validation
+    const stat = fs.statSync(filePath);
+    const etag = `W/"${stat.size.toString(16)}-${Math.floor(stat.mtimeMs).toString(16)}"`;
+    headers['ETag'] = etag;
+
+    // Cache-Control Offloading (Item #3)
+    // 1-Year Immutable Caching for Static Assets (Images, Fonts, Media)
+    if (ext === '.webp' || ext === '.svg' || ext === '.png' || ext === '.jpg' || ext === '.jpeg' || ext === '.ico' || ext === '.woff' || ext === '.woff2' || ext === '.ttf') {
+      headers['Cache-Control'] = 'public, max-age=31536000, immutable';
+    } else if (ext === '.js' || ext === '.css') {
+      // Bundled JS & CSS with ETag revalidation and stale-while-revalidate
+      headers['Cache-Control'] = 'public, max-age=86400, stale-while-revalidate=604800';
     } else {
-      headers['Cache-Control'] = 'no-cache, must-revalidate';
+      // HTML SPA Bootstrap: Always revalidate so code deployments appear instantaneously
+      headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    }
+
+    // HTTP 304 Not Modified: 0ms response, 0 bandwidth when client has latest version
+    if (req.headers['if-none-match'] === etag) {
+      res.writeHead(304, {
+        'ETag': etag,
+        'Cache-Control': headers['Cache-Control']
+      });
+      return res.end();
     }
 
     // High-speed Gzip Compression: shrinks 500KB app.js to ~65KB (8x faster transfer on 4G/mobile)
@@ -4523,15 +4658,26 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+// Production Keep-Alive Tuning for Render / Reverse Proxy:
+// Set to 65s (longer than Cloudflare/Render router 60s timeout) to prevent 502 Bad Gateway race conditions
+server.keepAliveTimeout = 65000;
+server.headersTimeout = 66000;
+
 server.listen(PORT, () => {
   console.log(`\n==================================================================`);
-  console.log(`  ✦ KuberQ — B2B & Retail Operating System (Hardened Edition)`);
-  console.log(`  ✦ Port: ${PORT} | Mode: Production-Hardened | Vault: AES-256-GCM`);
-  console.log(`  ✦ High-Speed Gzip Compression: ENABLED (8x Faster Asset Transfer)`);
+  console.log(`  ✦ KuberQ — B2B & Retail Operating System (High-Concurrency Edition)`);
+  console.log(`  ✦ Port: ${PORT} | Mode: Production-Hardened | Concurrency: 200+ Active`);
+  console.log(`  ✦ In-Memory Catalog Cache: ENABLED (5-min TTL, Sub-ms RAM Access)`);
+  console.log(`  ✦ Gzip Compression & ETag 304: ENABLED (Bandwidth Offloading)`);
+  console.log(`  ✦ Rate Limiter: Active (OTP: 10/5m, Checkout: 30/1m, POS: 300/1m)`);
   console.log(`  🌐 Live URL:         http://localhost:${PORT}`);
   console.log(`  🔐 Admin Portal:     http://localhost:${PORT}/admin`);
-  console.log(`  🛡️  API Vault:        AES-256-GCM Encrypted (Server-Only)`);
   console.log(`==================================================================\n`);
+
+  // Signal PM2 Cluster Manager that this worker instance is ready to receive traffic
+  if (process.send) {
+    process.send('ready');
+  }
 
   // Automated 24x7 Keep-Alive: If running on Render or APP_URL configured,
   // ping /healthz every 14 minutes to prevent Render free tier from spinning down!
@@ -4547,4 +4693,49 @@ server.listen(PORT, () => {
       } catch (_) {}
     }, 14 * 60 * 1000);
   }
+});
+
+// ============================================================================
+// DEVOPS PROCESS RESILIENCE: GRACEFUL SHUTDOWN & CRASH GUARDS (Item #1)
+// ============================================================================
+let isShuttingDown = false;
+function handleGracefulShutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`\n[DevOps Engine] ${signal} received: draining active connections & saving state...`);
+
+  // 1. Stop accepting new incoming requests
+  server.close(() => {
+    console.log('[DevOps Engine] All active HTTP sockets cleanly drained.');
+    // 2. Persist in-memory database to disk safely
+    try {
+      saveDb();
+      console.log('[DevOps Engine] Database snapshot saved cleanly to disk.');
+    } catch (saveErr) {
+      console.error('[DevOps Engine] Error persisting DB on shutdown:', saveErr);
+    }
+    console.log('[DevOps Engine] Worker process terminated gracefully.');
+    process.exit(0);
+  });
+
+  // 3. Fail-safe timeout: Force terminate if connections do not drain within 5s
+  setTimeout(() => {
+    console.error('[DevOps Engine] Shutdown timeout exceeded (5000ms). Forcing exit.');
+    process.exit(1);
+  }, 5000).unref();
+}
+
+process.on('SIGTERM', () => handleGracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => handleGracefulShutdown('SIGINT'));
+
+// Process Crash Guards
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[DevOps Resilience] Unhandled Promise Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[DevOps Fatal] Uncaught Exception thrown:', err);
+  try { saveDb(); } catch (_) {}
+  // In PM2 cluster mode, exit with code 1 so PM2 immediately respawns a healthy worker
+  process.exit(1);
 });

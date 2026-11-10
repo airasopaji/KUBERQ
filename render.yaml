@@ -2,11 +2,15 @@ services:
   - type: web
     name: kuberq-b2b-os
     runtime: node
-    plan: free
+    plan: starter
     region: singapore
     buildCommand: npm install
-    startCommand: node server.js
+    startCommand: npx pm2-runtime start ecosystem.config.js
     healthCheckPath: /healthz
     envVars:
       - key: NODE_ENV
         value: production
+      - key: WEB_CONCURRENCY
+        value: max
+      - key: MAX_MEMORY_RESTART
+        value: 480M
