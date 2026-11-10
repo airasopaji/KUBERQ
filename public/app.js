@@ -2421,8 +2421,25 @@ function renderOrderPage() {
       <div class="storefront-grand-shell" style="max-width:680px;margin:20px auto">
         <div class="card" style="text-align:center;border:2.5px solid var(--gold);border-radius:20px;padding:32px 24px">
           <span class="badge badge-primary" style="font-size:0.95rem;padding:6px 14px">✓ ${tr('ORDER SAVED SUCCESSFULLY', 'ऑर्डर सफलतापूर्वक दर्ज हो गया')}</span>
-          <h1 style="font-size:2.1rem;margin:14px 0 4px;font-weight:900">${esc(o.invoiceNo)}</h1>
-          <p class="text-muted" style="margin-top:4px;font-size:1.05rem">
+
+          <!-- High-Speed Counter Token Badge -->
+          <div class="token-display-badge">
+            <div style="font-size:0.85rem;text-transform:uppercase;letter-spacing:1px;font-weight:800;color:#0284c7">
+              🎫 ${tr('YOUR COUNTER TOKEN NUMBER', 'आपका काउंटर टोकन नंबर')}
+            </div>
+            <div class="token-huge-number">
+              #${esc(o.tokenNumber || state.lastPlacedOrder.tokenNumber || '101')}
+            </div>
+            <div style="display:inline-block;padding:4px 14px;background:#e0f2fe;color:#0369a1;border-radius:20px;font-weight:700;font-size:0.88rem;margin-bottom:6px">
+              📋 ${tr('Status:', 'स्थिति:')} <b>${tr(o.status || 'Received', 'प्राप्त हुआ')}</b>
+            </div>
+            <div style="font-size:0.86rem;color:#475569;margin-top:4px">
+              ${tr('Please show this Token # at the counter to collect your order instantly.', 'काउंटर पर यह टोकन नंबर दिखाकर अपना सामान तुरंत प्राप्त करें।')}
+            </div>
+          </div>
+
+          <h2 style="font-size:1.6rem;margin:10px 0 4px;font-weight:900">${esc(o.invoiceNo)}</h2>
+          <p class="text-muted" style="margin-top:4px;font-size:1.02rem">
             ${tr('Sent to', 'दुकान:')} <b class="text-gold">${esc(trDyn(shop?.shop))}</b> · ${tr('Total:', 'कुल राशि:')} <b>${fmtINR(o.totals?.gross || 0)}</b>
           </p>
 
@@ -2591,9 +2608,10 @@ function renderOrderPage() {
                   const hasWholesale = p.wholesalePrice && p.wholesalePrice < p.price;
                   const isWholesaleActive = qty >= (p.moq || 9999) && hasWholesale;
                   const photoUrl = getProductPhotoUrl(p);
+                  const isOutOfStock = Number(p.stock || 0) <= 0;
 
                   return `
-                    <div class="storefront-prod-card">
+                    <div class="storefront-prod-card ${isOutOfStock ? 'storefront-out-of-stock' : ''}">
                       <!-- Real Product Photo with Instant Vector SVG Fallback (0ms Lag) -->
                       <div class="storefront-img-wrap">
                         <img
@@ -2604,18 +2622,30 @@ function renderOrderPage() {
                           class="storefront-prod-img"
                           onerror="this.onerror=null;this.src='${PRODUCT_PLACEHOLDER_SVG}'"
                         />
-                        <span class="storefront-stock-chip">
-                          ${p.stock > 10 ? `✓ In Stock: ${p.stock}` : (p.stock > 0 ? `⚠️ Low: ${p.stock}` : 'Out of Stock')}
+                        <span class="storefront-stock-chip" style="${isOutOfStock ? 'background:#ef4444;color:#fff' : ''}">
+                          ${p.stock > 10 ? `✓ In Stock: ${p.stock}` : (p.stock > 0 ? `⚠️ Low: ${p.stock}` : tr('Out of Stock', 'स्टॉक समाप्त'))}
                         </span>
+
+                        <!-- Real-Time Out of Stock Overlay -->
+                        ${isOutOfStock ? `
+                          <div class="out-of-stock-overlay">
+                            🚫 ${tr('Out of Stock', 'स्टॉक समाप्त')}
+                          </div>
+                        ` : `
+                          <!-- High-Speed Catalogue Quick-Add Floating Button -->
+                          <button type="button" class="quick-add-float-btn" title="${tr('Quick Add (+1)', 'तुरंत जोड़ें (+1)')}" onclick="event.stopPropagation();updateCart('${p.id}', 1)" aria-label="${tr('Add to Cart', 'कार्ट में जोड़ें')}">
+                            +
+                          </button>
+                        `}
                       </div>
 
                       <div class="storefront-card-body">
-                        <span style="font-size:0.72rem;color:#0284c7;font-weight:800;text-transform:uppercase;margin-bottom:2px">${esc(p.category || 'General')}</span>
-                        <h3 class="storefront-card-title" title="${esc(p.name)}">${esc(trDyn(p.name))}</h3>
+                        <span style="font-size:0.72rem;color:var(--primary-contrast, #1e40af);font-weight:800;text-transform:uppercase;margin-bottom:2px">${esc(p.category || 'General')}</span>
+                        <h3 class="storefront-card-title" title="${esc(p.name)}" style="color:var(--text, #0f172a)">${esc(trDyn(p.name))}</h3>
 
                         <div class="storefront-pricing-block">
                           <div style="display:flex;align-items:baseline;gap:6px">
-                            <span class="storefront-retail-rate">${fmtINR(p.price)}</span>
+                            <span class="storefront-retail-rate" style="color:var(--primary-contrast, #1e40af)">${fmtINR(p.price)}</span>
                             <span style="font-size:0.75rem;color:#64748b">/${p.unit || 'pc'}</span>
                           </div>
 
@@ -2635,8 +2665,12 @@ function renderOrderPage() {
 
                         <!-- Stepper / Add to Cart Action -->
                         <div class="storefront-card-actions">
-                          ${qty === 0 ? `
-                            <button type="button" class="btn btn-primary btn-sm" style="width:100%;font-weight:800;border-radius:8px;background:#0284c7;border-color:#0284c7" onclick="updateCart('${p.id}', 1)">
+                          ${isOutOfStock ? `
+                            <button type="button" disabled class="btn btn-sm btn-disabled" style="width:100%;cursor:not-allowed;background:#94a3b8;color:#ffffff;border:none;font-weight:700">
+                              🚫 ${tr('Out of Stock', 'स्टॉक समाप्त')}
+                            </button>
+                          ` : (qty === 0 ? `
+                            <button type="button" class="btn btn-primary btn-sm" style="width:100%;font-weight:800;border-radius:8px;background:#0284c7;border-color:#0284c7;min-height:38px" onclick="updateCart('${p.id}', 1)">
                               + ${tr('Add to Cart', 'कार्ट में जोड़ें')}
                             </button>
                           ` : `
@@ -2652,7 +2686,7 @@ function renderOrderPage() {
                                 </button>
                               ` : ''}
                             </div>
-                          `}
+                          `)}
                         </div>
                       </div>
                     </div>
@@ -4266,6 +4300,7 @@ function renderMerchantPortal() {
   const rawNavItems = [
     ['Dashboard', '📊', tr('Dashboard', 'एग्जीक्यूटिव डैशबोर्ड'), '', 'dashboard'],
     ['POS Counter', '🛒', tr('POS Counter', 'पीओएस काउंटर (Fast Billing)'), 'New', 'pos_counter'],
+    ['Queue Board', '🎫', tr('Queue & Tokens', 'टोकन व कतार'), 'LIVE', 'pos_counter'],
     ['Sales Return', '↩️', tr('Sales Returns', 'सेल वापसी (Returns)'), '', 'returns'],
     ['Expiry & Batches', '⏳', tr('Expiry & Batches', 'बैच व एक्सपायरी (FEFO)'), '', 'expiry_batches'],
     ['Shifts & Drawer', '💼', tr('Shifts & Cash Drawer', 'गल्ला व Z-रिपोर्ट'), '', 'shifts_close'],
@@ -4326,6 +4361,15 @@ function renderMerchantPortal() {
       <button class="btn btn-primary btn-sm" style="background:#0284c7;border-color:#38bdf8" onclick="openStorefrontBarcodeSheet()">🖨️ ${tr('Storefront Barcodes', 'बारकोड कैटलॉग शीट')}</button>
     `;
     contentHtml = renderMerchantPosCounter(shop);
+  } else if (curTab === 'Queue Board') {
+    bannerIcon = '🎫';
+    bannerTitle = tr('Live Counter Queue & Token Display Board', 'लाइव काउंटर टोकन एवं कतार बोर्ड');
+    bannerSubtitle = tr('Real-time 3-digit token queue for retail counter: Received, In Preparation, Ready for Pickup & Automated WhatsApp alerts', 'काउंटर पर 15-20 ग्राहकों के लिए 3-अंकीय टोकन कतार, स्थिति परिवर्तन व 1-क्लिक WhatsApp अलर्ट');
+    bannerActionHtml = `
+      <button class="btn btn-gold btn-sm" onclick="bootstrap();render()">🔄 ${tr('Refresh Queue', 'कतार रिफ्रेश')}</button>
+      <button class="btn btn-ghost btn-sm" style="color:#ffffff;border-color:rgba(255,255,255,0.4)" onclick="state.merchantTab='POS Counter';render()">🛒 ${tr('POS Billing', 'पीओएस बिलिंग')}</button>
+    `;
+    contentHtml = renderCounterQueueBoard(shop);
   } else if (curTab === 'Sales Return') {
     bannerIcon = '↩️';
     bannerTitle = tr('Customer Sales Return & Credit Notes', 'ग्राहक सामान वापसी एवं रिफंड / क्रेडिट नोट');
@@ -12541,6 +12585,12 @@ function renderMerchantPosCounter(shop) {
     <div style="display:grid;gap:14px">
       <!-- Top-Middle Module Tabs (Counter vs Cart vs Shift vs Held vs Barcodes) -->
       <div class="pos-top-nav-strip no-print">
+        <button type="button" class="pos-nav-chip ${state.posCounterMode ? 'active' : ''}" style="${state.posCounterMode ? 'background:#f59e0b;color:#0f172a;font-weight:900;border-color:#f59e0b' : ''}" onclick="state.posCounterMode=!state.posCounterMode;render()">
+          ⚡ ${tr('Counter Mode', 'काउंटर मोड')} ${state.posCounterMode ? '✓ ON' : ''}
+        </button>
+        <button type="button" class="pos-nav-chip" onclick="state.merchantTab='Queue Board';render()">
+          🎫 ${tr('Queue & Tokens', 'टोकन व कतार')}
+        </button>
         <button type="button" class="pos-nav-chip ${posMobileView === 'products' ? 'active' : ''}" onclick="state.posMobileView='products';render()">
           🛒 ${tr('Products Catalog', 'प्रोडक्ट कैटलॉग')} (${filteredProducts.length})
         </button>
@@ -12611,13 +12661,15 @@ function renderMerchantPosCounter(shop) {
             ` : filteredProducts.map(p => {
               const unit = p.unit || 'pc';
               const stock = Number(p.stock || 0);
-              const isLowStock = stock <= Number(p.reorderLevel || 10);
+              const isOutOfStock = stock <= 0;
+              const isLowStock = !isOutOfStock && stock <= Number(p.reorderLevel || 10);
               const barcode = p.barcode || p.sku || ('2000' + String(p.id).replace(/\D/g, '').slice(-8));
               return `
-                <div class="pos-product-card" onclick="addPosItemToCart('${p.id}')">
+                <div class="pos-product-card ${isOutOfStock ? 'storefront-out-of-stock' : ''}" style="${isOutOfStock ? 'opacity:0.5;filter:grayscale(85%);cursor:not-allowed;position:relative' : ''}" onclick="${isOutOfStock ? 'return false' : `addPosItemToCart('${p.id}')`}">
+                  ${isOutOfStock ? `<div class="out-of-stock-overlay" style="font-size:0.75rem;padding:2px">🚫 ${tr('Out of Stock', 'स्टॉक समाप्त')}</div>` : ''}
                   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px">
                     <span style="font-size:0.75rem;font-weight:800;color:var(--muted,#64748b);font-family:monospace">${esc(p.sku || 'SKU')}</span>
-                    ${isLowStock ? `<span style="background:#fee2e2;color:#991b1b;border-radius:4px;padding:1px 5px;font-size:0.68rem;font-weight:800">Low: ${stock}</span>` : `<span style="background:#f0fdf4;color:#166534;border-radius:4px;padding:1px 5px;font-size:0.68rem;font-weight:700">Qty: ${stock}</span>`}
+                    ${isOutOfStock ? `<span style="background:#ef4444;color:#ffffff;border-radius:4px;padding:1px 5px;font-size:0.68rem;font-weight:800">${tr('Out: 0', 'समाप्त: 0')}</span>` : (isLowStock ? `<span style="background:#fee2e2;color:#991b1b;border-radius:4px;padding:1px 5px;font-size:0.68rem;font-weight:800">Low: ${stock}</span>` : `<span style="background:#f0fdf4;color:#166534;border-radius:4px;padding:1px 5px;font-size:0.68rem;font-weight:700">Qty: ${stock}</span>`)}
                   </div>
 
                   <div style="height:90px;border-radius:8px;overflow:hidden;background:#f1f5f9;margin:5px 0;display:flex;align-items:center;justify-content:center">
@@ -12638,7 +12690,7 @@ function renderMerchantPosCounter(shop) {
                       <span style="font-size:1.05rem;font-weight:900">₹${Number(p.price || 0).toLocaleString('en-IN')}</span>
                       <span style="font-size:0.72rem;color:var(--muted,#64748b)">/${unit}</span>
                     </div>
-                    <button type="button" class="btn btn-primary" style="width:28px;height:28px;border-radius:50%;padding:0;display:grid;place-items:center;font-size:1.1rem;font-weight:900;background:#0284c7;border:none" onclick="event.stopPropagation();addPosItemToCart('${p.id}')">+</button>
+                    <button type="button" class="btn btn-primary" style="width:28px;height:28px;border-radius:50%;padding:0;display:grid;place-items:center;font-size:1.1rem;font-weight:900;background:${isOutOfStock ? '#94a3b8' : '#0284c7'};border:none;cursor:${isOutOfStock ? 'not-allowed' : 'pointer'}" ${isOutOfStock ? 'disabled' : ''} onclick="event.stopPropagation();${isOutOfStock ? '' : `addPosItemToCart('${p.id}')`}">${isOutOfStock ? '✕' : '+'}</button>
                   </div>
                 </div>
               `;
@@ -12672,21 +12724,34 @@ function renderMerchantPosCounter(shop) {
             ` : cart.map((it, idx) => {
               const lineTotal = Number(it.price || 0) * Number(it.qty || 1);
               return `
-                <div class="pos-cart-item">
-                  <div style="flex:1;min-width:0">
-                    <strong style="font-size:0.86rem;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(it.name)}</strong>
-                    <span style="font-size:0.75rem;color:var(--muted,#64748b)">₹${Number(it.price || 0).toLocaleString('en-IN')} × ${it.qty}</span>
+                <div class="pos-cart-item" style="${state.posCounterMode ? 'flex-wrap:wrap;padding:8px;gap:6px' : ''}">
+                  <div style="flex:1;min-width:120px">
+                    <strong style="font-size:0.88rem;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(it.name)}</strong>
+                    ${state.posCounterMode ? `
+                      <div style="display:flex;align-items:center;gap:4px;margin-top:2px">
+                        <span style="font-size:0.75rem;color:var(--muted,#64748b)">Rate: ₹</span>
+                        <input type="number" class="counter-price-override" value="${it.price}" onchange="setPosItemPrice(${idx}, this.value)" title="${tr('Override unit price for this bill', 'यूनिट रेट बदलें')}" />
+                        <span style="font-size:0.75rem;color:var(--muted,#64748b)">× ${it.qty}</span>
+                      </div>
+                    ` : `
+                      <span style="font-size:0.75rem;color:var(--muted,#64748b)">₹${Number(it.price || 0).toLocaleString('en-IN')} × ${it.qty}</span>
+                    `}
                   </div>
 
-                  <!-- Qty Controls -->
-                  <div style="display:flex;align-items:center;gap:3px">
+                  <!-- Qty Controls & Counter Mode Fast Increments -->
+                  <div style="display:flex;align-items:center;gap:4px">
                     <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-weight:900;border:1px solid var(--border,#cbd5e1)" onclick="updatePosItemQty(${idx}, -1)">-</button>
                     <input type="number" min="1" value="${it.qty}" style="width:38px;padding:3px;text-align:center;border-radius:4px;border:1px solid var(--border,#cbd5e1);font-weight:700;font-size:0.84rem" onchange="setPosItemQty(${idx}, this.value)" />
                     <button type="button" class="btn btn-ghost btn-sm" style="padding:2px 7px;font-weight:900;border:1px solid var(--border,#cbd5e1)" onclick="updatePosItemQty(${idx}, 1)">+</button>
+                    
+                    ${state.posCounterMode ? `
+                      <button type="button" class="quick-qty-chip primary" title="+5 units" onclick="updatePosCartItemQty(${idx}, 5)">+5</button>
+                      <button type="button" class="quick-qty-chip" title="+10 units" onclick="updatePosCartItemQty(${idx}, 10)">+10</button>
+                    ` : ''}
                   </div>
 
-                  <div style="text-align:right;min-width:60px">
-                    <strong style="font-size:0.92rem;display:block">₹${lineTotal.toLocaleString('en-IN')}</strong>
+                  <div style="text-align:right;min-width:60px;margin-left:auto">
+                    <strong style="font-size:0.95rem;display:block">₹${lineTotal.toLocaleString('en-IN')}</strong>
                     <button type="button" style="background:none;border:none;color:#ef4444;font-size:0.76rem;cursor:pointer;padding:0" onclick="removePosItem(${idx})">✕</button>
                   </div>
                 </div>
@@ -12728,20 +12793,32 @@ function renderMerchantPosCounter(shop) {
 
           <!-- Payment Mode Selection -->
           <div style="padding:10px 14px">
-            <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:6px;margin-bottom:8px">
-              <button type="button" class="btn btn-sm ${state.posPaymentMode === 'Cash' ? 'btn-primary' : 'btn-ghost'}" style="${state.posPaymentMode === 'Cash' ? 'background:#16a34a;border-color:#16a34a;color:#fff' : ''};padding:8px 0;font-weight:800;font-size:0.84rem" onclick="state.posPaymentMode='Cash';render()">
+            <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:4px;margin-bottom:8px">
+              <button type="button" class="btn btn-sm ${state.posPaymentMode === 'Cash' ? 'btn-primary' : 'btn-ghost'}" style="${state.posPaymentMode === 'Cash' ? 'background:#16a34a;border-color:#16a34a;color:#fff' : ''};padding:8px 0;font-weight:800;font-size:0.8rem" onclick="state.posPaymentMode='Cash';render()">
                 💵 Cash
               </button>
-              <button type="button" class="btn btn-sm ${state.posPaymentMode === 'Card' ? 'btn-primary' : 'btn-ghost'}" style="${state.posPaymentMode === 'Card' ? 'background:#2563eb;border-color:#2563eb;color:#fff' : ''};padding:8px 0;font-weight:800;font-size:0.84rem" onclick="state.posPaymentMode='Card';render()">
+              <button type="button" class="btn btn-sm ${state.posPaymentMode === 'UPI' ? 'btn-primary' : 'btn-ghost'}" style="${state.posPaymentMode === 'UPI' ? 'background:#7c3aed;border-color:#7c3aed;color:#fff' : ''};padding:8px 0;font-weight:800;font-size:0.8rem" onclick="state.posPaymentMode='UPI';render()">
+                📱 UPI
+              </button>
+              <button type="button" class="btn btn-sm ${state.posPaymentMode === 'Card' ? 'btn-primary' : 'btn-ghost'}" style="${state.posPaymentMode === 'Card' ? 'background:#2563eb;border-color:#2563eb;color:#fff' : ''};padding:8px 0;font-weight:800;font-size:0.8rem" onclick="state.posPaymentMode='Card';render()">
                 💳 Card
               </button>
-              <button type="button" class="btn btn-sm ${state.posPaymentMode === 'UPI' ? 'btn-primary' : 'btn-ghost'}" style="${state.posPaymentMode === 'UPI' ? 'background:#7c3aed;border-color:#7c3aed;color:#fff' : ''};padding:8px 0;font-weight:800;font-size:0.84rem" onclick="state.posPaymentMode='UPI';render()">
-                📱 UPI
+              <button type="button" class="btn btn-sm ${state.posPaymentMode === 'Credit' ? 'btn-primary' : 'btn-ghost'}" style="${state.posPaymentMode === 'Credit' ? 'background:#ea580c;border-color:#ea580c;color:#fff' : ''};padding:8px 0;font-weight:800;font-size:0.8rem" onclick="state.posPaymentMode='Credit';render()">
+                📒 Udhaar
               </button>
             </div>
 
-            <!-- Customer Tendered & Change Return Calculation -->
+            <!-- Fast Tender Amount Buttons (Cash Mode) -->
             ${state.posPaymentMode === 'Cash' ? `
+              <div style="display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap">
+                <button type="button" class="tender-quick-btn" onclick="state.posTendered=${grandTotal};render()">Exact</button>
+                <button type="button" class="tender-quick-btn" onclick="state.posTendered=100;render()">₹100</button>
+                <button type="button" class="tender-quick-btn" onclick="state.posTendered=200;render()">₹200</button>
+                <button type="button" class="tender-quick-btn" onclick="state.posTendered=500;render()">₹500</button>
+                <button type="button" class="tender-quick-btn" onclick="state.posTendered=2000;render()">₹2000</button>
+              </div>
+
+              <!-- Customer Tendered & Change Return Calculation -->
               <div style="background:var(--subtle-bg,#f1f5f9);border-radius:8px;padding:8px 10px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;font-size:0.84rem">
                 <div>
                   <span style="color:var(--muted,#475569);display:block;font-size:0.75rem">${tr('Customer Gave (नकद प्राप्त):', 'ग्राहक ने दिए:')}</span>
@@ -12760,7 +12837,7 @@ function renderMerchantPosCounter(shop) {
                 ⏸️ ${tr('Hold Sale', 'बिल होल्ड')}
               </button>
               <button type="button" class="btn btn-primary" style="padding:10px 14px;font-size:0.98rem;font-weight:900;background:#0284c7;border-color:#0284c7;box-shadow:0 4px 14px rgba(2,132,199,0.3)" onclick="completePosSale()">
-                ⚡ ${tr('Payment & Thermal Print', 'पेमेंट व पर्ची प्रिंट →')}
+                ⚡ ${tr('Payment & Token Print', 'पेमेंट व टोकन रसीद →')}
               </button>
             </div>
 
@@ -12791,7 +12868,153 @@ function renderMerchantPosCounter(shop) {
   `;
 }
 
+// ============================================================================
+// LIVE COUNTER QUEUE & TOKEN STATUS BOARD (Item #2)
+// ============================================================================
+function renderCounterQueueBoard(shop) {
+  const allOrders = (state.data.myOrders || state.data.orders || []).filter(o => o.shopId === shop.id && o.docType !== 'Quotation');
+  
+  // Group orders into Kanban stages
+  const receivedList = allOrders.filter(o => !o.status || ['Received', 'Pending', 'Placed'].includes(o.status));
+  const prepList = allOrders.filter(o => ['In Preparation', 'Accepted'].includes(o.status));
+  const readyList = allOrders.filter(o => ['Ready for Pickup', 'Packed'].includes(o.status));
+  const doneList = allOrders.filter(o => ['Completed', 'Delivered'].includes(o.status)).slice(0, 8);
 
+  function renderQueueCard(o) {
+    const token = o.tokenNumber || (o.invoiceNo ? String(o.invoiceNo).slice(-3) : '101');
+    const itemsText = (o.items || []).map(i => `${esc(i.name)} × ${i.qty}`).join(', ') || esc(o.note || 'Counter Item');
+    const gross = Number(o.totals?.gross || o.total || 0);
+    const cleanPhone = String(o.phone || '').replace(/\D/g, '').slice(-10);
+    const custName = o.customer || o.buyerName || 'Walk-in Buyer';
+
+    let nextBtnHtml = '';
+    if (!o.status || ['Received', 'Pending', 'Placed'].includes(o.status)) {
+      nextBtnHtml = `<button type="button" class="queue-status-btn prep" onclick="updateOrderStatusFromQueue('${o.id}', 'In Preparation')">⚙️ ${tr('Start Packing', 'तैयारी शुरू करें')} ➔</button>`;
+    } else if (['In Preparation', 'Accepted'].includes(o.status)) {
+      nextBtnHtml = `<button type="button" class="queue-status-btn ready" onclick="updateOrderStatusFromQueue('${o.id}', 'Ready for Pickup')">🔔 ${tr('Mark Ready for Pickup', 'काउंटर पर तैयार')} ➔</button>`;
+    } else if (['Ready for Pickup', 'Packed'].includes(o.status)) {
+      nextBtnHtml = `<button type="button" class="queue-status-btn done" onclick="updateOrderStatusFromQueue('${o.id}', 'Completed')">✅ ${tr('Hand Over to Buyer (Complete)', 'ग्राहक को सुपुर्द करें')} ✓</button>`;
+    }
+
+    const waMsg = `🎉 नमस्ते ${custName}, आपका टोकन #${token} ${shop.shop} पर तैयार है ('Ready for Pickup')! कृपया काउंटर से अपना सामान प्राप्त करें। कुल राशि: ₹${gross}`;
+    const waUrl = cleanPhone.length === 10 ? `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(waMsg)}` : '';
+
+    return `
+      <div class="queue-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+          <span class="queue-token-badge">#${esc(token)}</span>
+          <span style="font-size:0.75rem;color:var(--muted,#64748b);font-family:monospace">${esc(o.invoiceNo || o.id)}</span>
+        </div>
+        <div style="font-size:0.95rem;font-weight:800;color:var(--text,#0f172a);margin-bottom:2px">
+          👤 ${esc(custName)}
+        </div>
+        ${cleanPhone ? `<div style="font-size:0.78rem;color:var(--muted,#64748b);margin-bottom:4px">📱 ${esc(cleanPhone)}</div>` : ''}
+        <div style="background:var(--subtle-bg,#f8fafc);padding:6px 8px;border-radius:6px;margin:6px 0;font-size:0.8rem;color:var(--text,#334155);max-height:60px;overflow-y:auto">
+          📦 ${itemsText}
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:0.85rem;margin:6px 0">
+          <span style="color:var(--muted,#64748b)">${tr('Total Payable:', 'कुल राशि:')}</span>
+          <strong style="font-size:1.08rem;color:var(--primary-contrast,#1e40af)">₹${gross.toLocaleString('en-IN')}</strong>
+        </div>
+        ${nextBtnHtml}
+        ${waUrl ? `
+          <a href="${waUrl}" target="_blank" class="queue-whatsapp-alert-btn">
+            💬 ${tr('Notify Buyer on WhatsApp', 'WhatsApp पर अलर्ट भेजें')}
+          </a>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  return `
+    <div style="margin-bottom:14px">
+      <!-- Sub-tabs bar -->
+      <div class="pos-top-nav-strip no-print">
+        <button type="button" class="pos-nav-chip" onclick="state.merchantTab='POS Counter';render()">
+          🛒 ${tr('POS Billing Desk', 'पीओएस बिलिंग डेस्क')}
+        </button>
+        <button type="button" class="pos-nav-chip active" style="background:#0284c7;color:#fff;border-color:#0284c7" onclick="render()">
+          🎫 ${tr('Queue Board & Tokens', 'टोकन कतार बोर्ड')} (${receivedList.length + prepList.length + readyList.length})
+        </button>
+        <button type="button" class="pos-nav-chip" onclick="window.open('/customer-display', '_blank', 'width=900,height=600')">
+          🖥️ ${tr('Customer Screen', 'ग्राहक स्क्रीन')}
+        </button>
+      </div>
+
+      <div class="live-queue-board">
+        <!-- 1. Received Column -->
+        <div class="queue-column">
+          <div class="queue-col-header received">
+            <h3 style="font-size:1rem;font-weight:900;color:#f59e0b;margin:0">📥 ${tr('Received / Placed', 'प्राप्त पर्चियाँ')} (${receivedList.length})</h3>
+          </div>
+          <div style="flex:1;overflow-y:auto">
+            ${receivedList.length === 0 ? `<p style="text-align:center;padding:30px 10px;color:var(--muted,#94a3b8);font-size:0.85rem">${tr('No new orders waiting', 'कोई नई पर्ची प्रतीक्षारत नहीं')}</p>` : receivedList.map(renderQueueCard).join('')}
+          </div>
+        </div>
+
+        <!-- 2. In Preparation Column -->
+        <div class="queue-column">
+          <div class="queue-col-header prep">
+            <h3 style="font-size:1rem;font-weight:900;color:#0284c7;margin:0">⚙️ ${tr('In Preparation', 'तैयारी जारी')} (${prepList.length})</h3>
+          </div>
+          <div style="flex:1;overflow-y:auto">
+            ${prepList.length === 0 ? `<p style="text-align:center;padding:30px 10px;color:var(--muted,#94a3b8);font-size:0.85rem">${tr('No orders being packed', 'पैकिंग में कोई ऑर्डर नहीं')}</p>` : prepList.map(renderQueueCard).join('')}
+          </div>
+        </div>
+
+        <!-- 3. Ready for Pickup Column -->
+        <div class="queue-column">
+          <div class="queue-col-header ready">
+            <h3 style="font-size:1rem;font-weight:900;color:#10b981;margin:0">🔔 ${tr('Ready for Pickup', 'काउंटर पर तैयार')} (${readyList.length})</h3>
+          </div>
+          <div style="flex:1;overflow-y:auto">
+            ${readyList.length === 0 ? `<p style="text-align:center;padding:30px 10px;color:var(--muted,#94a3b8);font-size:0.85rem">${tr('No orders waiting for pickup', 'पिकअप हेतु कोई ऑर्डर नहीं')}</p>` : readyList.map(renderQueueCard).join('')}
+          </div>
+        </div>
+
+        <!-- 4. Completed Today Column -->
+        <div class="queue-column">
+          <div class="queue-col-header done">
+            <h3 style="font-size:1rem;font-weight:900;color:#64748b;margin:0">✅ ${tr('Completed Today', 'आज पूर्ण हुए')} (${doneList.length})</h3>
+          </div>
+          <div style="flex:1;overflow-y:auto">
+            ${doneList.length === 0 ? `<p style="text-align:center;padding:30px 10px;color:var(--muted,#94a3b8);font-size:0.85rem">${tr('No completed orders yet', 'अभी तक कोई पूर्ण ऑर्डर नहीं')}</p>` : doneList.map(renderQueueCard).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+window.updateOrderStatusFromQueue = async function(orderId, newStatus) {
+  try {
+    const res = await api('/api/merchant/order-update', 'POST', { orderId, status: newStatus });
+    if (res && res.alertUrl && newStatus === 'Ready for Pickup') {
+      window.open(res.alertUrl, '_blank');
+    }
+    showToast(tr(`Order status updated to "${newStatus}"!`, `ऑर्डर स्थिति बदलकर "${newStatus}" कर दी गई!`));
+    await bootstrap();
+    render();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.setPosItemPrice = function(idx, val) {
+  if (state.posCart && state.posCart[idx]) {
+    state.posCart[idx].price = Math.max(0, Number(val) || 0);
+    syncCustomerScreenBroadcast();
+    render();
+  }
+};
+
+window.updatePosCartItemQty = function(idx, delta) {
+  if (state.posCart && state.posCart[idx]) {
+    state.posCart[idx].qty = Math.max(1, (Number(state.posCart[idx].qty) || 1) + delta);
+    syncCustomerScreenBroadcast();
+    render();
+  }
+};
 
 // ============================================================================
 // 2. SALES RETURN & REFUND MODAL / VIEW (Matching Image 2)
@@ -14076,18 +14299,19 @@ window.completePosSale = async function() {
   const tax = Math.round((subtotal - discount) * 0.18);
   const total = Math.max(0, subtotal - discount + tax);
 
+  const payload = {
+    action: 'pos_sale_complete',
+    buyerName: state.posCustomer?.name || 'Walk-in Customer',
+    buyerPhone: state.posCustomer?.phone || '',
+    paymentMode: state.posPaymentMode || 'Cash',
+    subtotal,
+    discount,
+    tax,
+    total,
+    items: cart
+  };
+
   try {
-    const payload = {
-      action: 'pos_sale_complete',
-      buyerName: state.posCustomer?.name || 'Walk-in Customer',
-      buyerPhone: state.posCustomer?.phone || '',
-      paymentMode: state.posPaymentMode || 'Cash',
-      subtotal,
-      discount,
-      tax,
-      total,
-      items: cart
-    };
     const res = await apiFetch('/api/merchant/pro', {
       method: 'POST',
       body: JSON.stringify(payload)
@@ -14099,9 +14323,9 @@ window.completePosSale = async function() {
         if (!Array.isArray(state.data.myOrders)) state.data.myOrders = [];
         state.data.myOrders.unshift(res.order);
       }
-      // Open Thermal Receipt Modal immediately
+      // Open Thermal Receipt Modal immediately with 3-digit token
       state.thermalReceiptModal = {
-        order: res.order || { id: res.invoiceNo, items: cart, total, subtotal, tax, paymentMode: state.posPaymentMode },
+        order: res.order || { id: res.invoiceNo, tokenNumber: res.tokenNumber, items: cart, total, subtotal, tax, paymentMode: state.posPaymentMode },
         shop: state.data.myShop
       };
       state.posCart = [];
@@ -14111,9 +14335,84 @@ window.completePosSale = async function() {
       render();
     }
   } catch (err) {
-    alert('Failed to complete sale: ' + err.message);
+    // Offline Resilience Fallback (Item #3)
+    console.warn('Network offline or unstable, queuing POS sale locally:', err);
+    try {
+      const offlineQueue = JSON.parse(localStorage.getItem('kuberq_offline_queue') || '[]');
+      offlineQueue.push({ type: 'pos_sale', payload, timestamp: Date.now() });
+      localStorage.setItem('kuberq_offline_queue', JSON.stringify(offlineQueue));
+
+      const offToken = String(Math.floor(100 + Math.random() * 899));
+      const offInv = 'OFF-S-' + new Date().getFullYear() + '-' + String(Date.now()).slice(-6);
+      const simulatedOrder = {
+        id: offInv,
+        invoiceNo: offInv,
+        tokenNumber: offToken,
+        buyerName: payload.buyerName,
+        phone: payload.buyerPhone,
+        items: cart,
+        total,
+        subtotal,
+        tax,
+        paymentMode: payload.paymentMode,
+        status: 'Completed (Offline Queued)',
+        createdAt: new Date().toISOString()
+      };
+
+      if (!Array.isArray(state.data.myOrders)) state.data.myOrders = [];
+      state.data.myOrders.unshift(simulatedOrder);
+
+      state.thermalReceiptModal = {
+        order: simulatedOrder,
+        shop: state.data.myShop
+      };
+      state.posCart = [];
+      state.posDiscount = 0;
+      state.posTendered = 0;
+      syncCustomerScreenBroadcast();
+      render();
+      showToast(tr(`⚡ Offline Mode: Sale saved locally (Token #${offToken}). Will auto-sync when online!`, `⚡ ऑफलाइन मोड: बिल डिवाइस में सेव (टोकन #${offToken})। इंटरनेट चालू होने पर स्वतः सिंक होगा!`));
+    } catch (localErr) {
+      alert('Failed to complete sale: ' + err.message);
+    }
   }
 };
+
+// Automatic Background Queue Sync for Crowded Market Drops
+window.syncOfflineOrdersQueue = async function() {
+  try {
+    const qStr = localStorage.getItem('kuberq_offline_queue');
+    if (!qStr) return;
+    const queue = JSON.parse(qStr);
+    if (!Array.isArray(queue) || queue.length === 0) return;
+    
+    let synced = 0;
+    const remaining = [];
+    for (const item of queue) {
+      try {
+        if (item.type === 'pos_sale') {
+          await apiFetch('/api/merchant/pro', { method: 'POST', body: JSON.stringify(item.payload) });
+          synced++;
+        }
+      } catch (_) {
+        remaining.push(item);
+      }
+    }
+    if (remaining.length > 0) {
+      localStorage.setItem('kuberq_offline_queue', JSON.stringify(remaining));
+    } else {
+      localStorage.removeItem('kuberq_offline_queue');
+    }
+    if (synced > 0) {
+      showToast(tr(`✅ Synced ${synced} offline counter sales to server!`, `✅ इंटरनेट बहाल: ${synced} ऑफलाइन काउंटर सेल सर्वर पर सिंक हो गईं!`));
+      if (typeof bootstrap === 'function') await bootstrap();
+      render();
+    }
+  } catch (e) {
+    console.warn('Queue sync error:', e);
+  }
+};
+window.addEventListener('online', window.syncOfflineOrdersQueue);
 
 window.sharePosThermalWhatsApp = function(orderId, total) {
   const phone = prompt('Enter customer WhatsApp mobile number (10-digits):', state.posCustomer?.phone || '');

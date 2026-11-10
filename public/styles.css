@@ -2041,12 +2041,36 @@ tr:hover td {
 /* ============================================================================
    RESPONSIVE UTILITY CLASSES (Desktop vs Mobile-First)
    ============================================================================ */
-.desktop-only {
-  display: block;
+@media (min-width: 901px) {
+  .desktop-only {
+    display: block !important;
+  }
+  span.desktop-only {
+    display: inline !important;
+  }
+  .mobile-only {
+    display: none !important;
+  }
 }
 
-.mobile-only {
-  display: none !important;
+@media (max-width: 900px) {
+  .desktop-only,
+  .table-wrap.desktop-only,
+  .bulk-table-wrap.desktop-only {
+    display: none !important;
+  }
+  .mobile-only {
+    display: block !important;
+  }
+  span.mobile-only {
+    display: inline !important;
+  }
+  .mobile-flex {
+    display: flex !important;
+  }
+  .mobile-grid {
+    display: grid !important;
+  }
 }
 
 /* Mobile-First Clean Hero & Actions */
@@ -4276,5 +4300,315 @@ tr:hover td {
     min-height: 48px !important;
     font-size: 0.95rem !important;
   }
+}
+
+/* ============================================================================
+   HIGH-SPEED POS, TOKEN QUEUE BOARD & HIGH CONTRAST ENHANCEMENTS
+   ============================================================================ */
+
+/* High-Contrast Readability Overrides (Fixes Points #3 & #4) */
+:root {
+  --primary-contrast: #1e40af;
+}
+[data-theme="dark"] {
+  --primary-contrast: #38bdf8;
+}
+
+/* Ensure clickable customer and item names have sharp contrast */
+.table-wrap b, .table-wrap td strong, .mobile-app-card-title {
+  color: var(--primary-contrast, #1e40af);
+}
+[data-theme="dark"] .table-wrap b,
+[data-theme="dark"] .table-wrap td strong,
+[data-theme="dark"] .mobile-app-card-title {
+  color: #38bdf8 !important;
+}
+
+/* Storefront Catalogue Quick-Add Floating Button */
+.storefront-img-wrap {
+  position: relative;
+  overflow: hidden;
+}
+.quick-add-float-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  border-radius: 50%;
+  background: #0284c7;
+  color: #ffffff;
+  border: 2px solid #ffffff;
+  font-size: 1.35rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.45);
+  transition: all 0.15s ease;
+  z-index: 5;
+  user-select: none;
+}
+.quick-add-float-btn:hover {
+  background: #0369a1;
+  transform: scale(1.08);
+}
+.quick-add-float-btn:active {
+  transform: scale(0.92);
+}
+
+/* Real-Time Inventory Lockout & Out of Stock Overlay */
+.storefront-prod-card.storefront-out-of-stock {
+  opacity: 0.58;
+  filter: grayscale(85%);
+  cursor: not-allowed;
+  position: relative;
+}
+.out-of-stock-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.72);
+  color: #ffffff;
+  font-size: 0.92rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: 12px;
+  z-index: 6;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+}
+
+/* Sequential 3-Digit Token Badge on Order Confirmation Screen */
+.token-display-badge {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 2.5px solid #0284c7;
+  border-radius: 18px;
+  padding: 20px;
+  margin: 16px 0;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(2, 132, 199, 0.15);
+}
+[data-theme="dark"] .token-display-badge {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  border-color: #38bdf8;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+.token-huge-number {
+  font-size: 3.8rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #0369a1;
+  letter-spacing: -1px;
+  margin: 8px 0;
+}
+[data-theme="dark"] .token-huge-number {
+  color: #38bdf8;
+}
+
+/* High-Speed POS Counter Mode */
+.pos-counter-mode-badge {
+  background: #f59e0b;
+  color: #0f172a;
+  font-weight: 900;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.counter-price-override {
+  width: 72px;
+  padding: 4px 6px;
+  border: 1.5px solid #0284c7;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 0.88rem;
+  text-align: right;
+  background: #ffffff;
+  color: #0f172a;
+}
+[data-theme="dark"] .counter-price-override {
+  background: #0f172a;
+  color: #f8fafc;
+  border-color: #38bdf8;
+}
+.quick-qty-chip {
+  padding: 4px 8px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s ease;
+}
+.quick-qty-chip:hover {
+  background: #e2e8f0;
+}
+.quick-qty-chip:active {
+  transform: scale(0.92);
+}
+.quick-qty-chip.primary {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #0284c7;
+}
+
+/* Fast Tender Amount Buttons */
+.tender-quick-btn {
+  padding: 8px 12px;
+  min-height: 44px;
+  font-size: 0.92rem;
+  font-weight: 800;
+  border-radius: 8px;
+  border: 1.5px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+  flex: 1 1 60px;
+  transition: all 0.1s ease;
+}
+.tender-quick-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+.tender-quick-btn:active {
+  transform: scale(0.95);
+}
+[data-theme="dark"] .tender-quick-btn {
+  background: #1e293b;
+  color: #f8fafc;
+  border-color: #334155;
+}
+
+/* Live Counter Queue & Token Status Board */
+.live-queue-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 14px;
+}
+.queue-column {
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  min-height: 480px;
+}
+[data-theme="dark"] .queue-column {
+  background: #0f172a;
+  border-color: #334155;
+}
+.queue-col-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 2px solid;
+}
+.queue-col-header.received {
+  border-color: #f59e0b;
+}
+.queue-col-header.prep {
+  border-color: #0284c7;
+}
+.queue-col-header.ready {
+  border-color: #10b981;
+}
+.queue-col-header.done {
+  border-color: #64748b;
+}
+
+.queue-card {
+  background: #ffffff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.queue-card:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+[data-theme="dark"] .queue-card {
+  background: #1e293b;
+  border-color: #334155;
+}
+.queue-token-badge {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #0284c7;
+  background: #e0f2fe;
+  padding: 2px 10px;
+  border-radius: 8px;
+  display: inline-block;
+}
+[data-theme="dark"] .queue-token-badge {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+}
+.queue-status-btn {
+  min-height: 48px;
+  font-weight: 800;
+  font-size: 0.92rem;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 8px;
+  transition: all 0.15s ease;
+}
+.queue-status-btn.prep {
+  background: #0284c7;
+  color: #ffffff;
+}
+.queue-status-btn.ready {
+  background: #10b981;
+  color: #ffffff;
+}
+.queue-status-btn.done {
+  background: #475569;
+  color: #ffffff;
+}
+.queue-status-btn:active {
+  transform: scale(0.96);
+}
+.queue-whatsapp-alert-btn {
+  min-height: 42px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  border-radius: 8px;
+  background: #25D366;
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 6px;
+  text-decoration: none;
 }
 
