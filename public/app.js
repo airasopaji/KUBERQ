@@ -10,21 +10,21 @@ const CENTRAL_SUPPORT_PHONE = '7240692736';
 const state = {
   lang: localStorage.getItem('kuberq_lang') || 'en',
   token: localStorage.getItem('kuberq_token') || '',
-  route: window.location.pathname || '/',
+  route: (window.location.pathname.length > 1 && window.location.pathname.endsWith('/')) ? window.location.pathname.slice(0, -1) : (window.location.pathname || '/'),
   query: Object.fromEntries(new URLSearchParams(window.location.search)),
   data: {
     settings: { enableTransportLive: true, enableServicesLive: true, adminWhatsApp: '7240692736' },
     user: null,
     merchants: [
       {
-        id: 'MQM-31CD16',
+        id: 'shop-marwar-hw-01',
         shop: 'Marwar Hardware & Sanitary Mart',
         city: 'Jodhpur',
         state: 'Rajasthan',
         category: 'Hardware & Sanitary',
         phone: CENTRAL_SUPPORT_PHONE,
         refCode: 'KQM-31CD16',
-        communityVerifications: 14
+        communityVerifications: 18
       }
     ],
     products: [],
@@ -327,11 +327,22 @@ if (typeof window !== 'undefined' && !window._ctrlKBound) {
 }
 
 function navigate(path, queryParams = {}) {
-  const qs = new URLSearchParams(queryParams).toString();
-  const fullUrl = qs ? `${path}?${qs}` : path;
+  let cleanPath = path || '/';
+  let parsedQuery = { ...queryParams };
+  if (cleanPath.includes('?')) {
+    const parts = cleanPath.split('?');
+    cleanPath = parts[0];
+    const fromPath = Object.fromEntries(new URLSearchParams(parts[1]));
+    parsedQuery = { ...fromPath, ...parsedQuery };
+  }
+  if (cleanPath.length > 1 && cleanPath.endsWith('/')) {
+    cleanPath = cleanPath.slice(0, -1);
+  }
+  const qs = new URLSearchParams(parsedQuery).toString();
+  const fullUrl = qs ? `${cleanPath}?${qs}` : cleanPath;
   window.history.pushState({}, '', fullUrl);
-  state.route = path;
-  state.query = queryParams;
+  state.route = cleanPath;
+  state.query = parsedQuery;
   if (state.query.forgot === '1') {
     openForgotPasswordModal();
   }
@@ -340,7 +351,9 @@ function navigate(path, queryParams = {}) {
 }
 
 window.addEventListener('popstate', () => {
-  state.route = window.location.pathname || '/';
+  let rawPath = window.location.pathname || '/';
+  if (rawPath.length > 1 && rawPath.endsWith('/')) rawPath = rawPath.slice(0, -1);
+  state.route = rawPath;
   state.query = Object.fromEntries(new URLSearchParams(window.location.search));
   render();
 });
@@ -4350,8 +4363,9 @@ function renderMerchantSettingsOnly(shop, qrUrl) {
 
 function renderMerchantPortal() {
   const u = state.data.user;
-  const shop = state.data.myShop;
-  if (!u || !shop) {
+  const shop = state.data.myShop || (state.data.merchants || []).find(m => m.id === u?.shopId) || (state.data.merchants || [])[0];
+  if (shop && !state.data.myShop) state.data.myShop = shop;
+  if (!u) {
     return `
       <div class="container" style="max-width:640px;padding:60px 20px;text-align:center">
         <div class="card" style="box-shadow:var(--shadow-lg);border-radius:18px;padding:32px">
@@ -4382,6 +4396,7 @@ function renderMerchantPortal() {
   }
 
   let curTab = state.merchantTab || 'Dashboard';
+  if (curTab === 'pos' || curTab === 'pos_counter' || curTab === 'POS') curTab = 'POS Counter';
   if (curTab === 'GST Invoice') curTab = 'Billing';
   if (curTab === 'Udhaar Khata') curTab = 'Udhaar';
   if (curTab === 'More Tools') curTab = 'Standee';
@@ -8298,6 +8313,10 @@ window.launchDemoPortal = async function(type = 'merchant') {
     if (res && res.token) {
       state.token = res.token;
       localStorage.setItem('kuberq_token', res.token);
+      state.data.user = res.user || { name: res.name, role: res.role, shopId: res.shopId };
+      if (res.shopId) {
+        state.data.myShop = (state.data.merchants || []).find(m => m.id === res.shopId) || (state.data.merchants || [])[0];
+      }
       await bootstrap();
       showToast(tr(`Welcome to ${res.name} Demo!`, `${res.name} डेमो में स्वागत है!`));
       if (type === 'customer') {
@@ -8305,7 +8324,7 @@ window.launchDemoPortal = async function(type = 'merchant') {
       } else if (type === 'admin') {
         navigate('/admin');
       } else {
-        state.merchantTab = 'pos';
+        state.merchantTab = 'POS Counter';
         navigate('/merchant');
       }
     }
@@ -8336,13 +8355,17 @@ window.quickLogin = async function(identifier, password, role) {
 
     state.token = res.token;
     localStorage.setItem('kuberq_token', res.token);
+    state.data.user = res.user || { name: res.name, role: res.role, shopId: res.shopId };
+    if (res.shopId) {
+      state.data.myShop = (state.data.merchants || []).find(m => m.id === res.shopId) || (state.data.merchants || [])[0];
+    }
     saveBrowserAccount(identifier, res.name, res.role);
     await bootstrap();
-    showToast(`Welcome, ${res.name}!`);
+    showToast(tr(`Welcome, ${res.name}!`, `स्वागत है, ${res.name}!`));
     if (res.role === 'admin' || res.role === 'employee') navigate('/admin');
     else if (res.role === 'customer') navigate('/customer');
     else {
-      state.merchantTab = 'pos';
+      state.merchantTab = 'POS Counter';
       navigate('/merchant');
     }
   } catch (err) {
@@ -12576,7 +12599,7 @@ function render() {
     else pageHtml = renderHome();
 
     const isEnterpriseView = (
-      (r === '/merchant' && state.data.user && state.data.myShop) ||
+      (r === '/merchant' && state.data.user) ||
       (r === '/admin' && state.data.user && (state.data.user.role === 'admin' || state.data.user.role === 'employee')) ||
       (r === '/customer' && state.data.user)
     );
