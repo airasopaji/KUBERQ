@@ -502,6 +502,15 @@ function setEnterpriseNavTab(key) {
   render();
 }
 
+window.handleGlobalSearchInput = function(inputEl) {
+  state.globalSearchQuery = inputEl.value;
+  state.globalSearchOpen = Boolean(inputEl.value.trim());
+  const c = document.getElementById('global-search-dropdown-container');
+  if (c) {
+    c.innerHTML = renderGlobalSearchDropdown();
+  }
+};
+
 function renderGlobalSearchDropdown() {
   const q = (state.globalSearchQuery || '').trim().toLowerCase();
   if (!state.globalSearchOpen || !q) return '';
@@ -629,21 +638,23 @@ function renderEnterpriseShell(opts) {
           </div>
         </div>
 
-        <!-- Center: YBT-Style Global Search Bar (Ctrl+K) -->
+        <!-- Center: YBT-Style Global Search Bar (Ctrl+K) (Zero-re-render typing to prevent backwards input) -->
         <div class="topbar-global-search-wrap desktop-only" onclick="event.stopPropagation()">
           <div class="topbar-global-search-box">
             <span style="font-size:0.88rem;opacity:0.8">🔍</span>
             <input
               id="global-ctrl-k-input"
               class="topbar-global-search-input"
+              dir="ltr"
+              autocomplete="off"
               placeholder="${tr('Search customers, invoices, leads... (Ctrl+K)', 'ग्राहक, इनवॉइस, लीड या सामान खोजें... (Ctrl+K)')}"
               value="${esc(state.globalSearchQuery || '')}"
-              onfocus="state.globalSearchOpen=true;render()"
-              oninput="state.globalSearchQuery=this.value;state.globalSearchOpen=true;render()"
+              onfocus="state.globalSearchOpen=true;const c=document.getElementById('global-search-dropdown-container');if(c&&state.globalSearchQuery)c.style.display='block'"
+              oninput="window.handleGlobalSearchInput(this)"
             />
             <span class="topbar-kbd-badge">Ctrl+K</span>
           </div>
-          ${renderGlobalSearchDropdown()}
+          <div id="global-search-dropdown-container">${renderGlobalSearchDropdown()}</div>
         </div>
 
         <div class="topbar-right-ribbon">
@@ -699,8 +710,8 @@ function renderEnterpriseShell(opts) {
           </button>
 
           <button class="topbar-logout-btn" onclick="logout()" title="${tr('Secure Logout', 'सुरक्षित लॉगआउट')}">
-            <span class="desktop-only">🚪 ${tr('LOGOUT', 'लॉगआउट')}</span>
-            <span class="mobile-only" style="display:inline">🚪</span>
+            <span>🚪</span>
+            <span>${tr('Log Out', 'लॉग आउट')}</span>
           </button>
         </div>
       </header>
@@ -871,7 +882,10 @@ function renderHeader() {
           </button>
 
           ${u ? `
-            <button class="btn btn-ghost btn-sm" style="min-height:36px" onclick="logout()">${tr('Log Out', 'लॉग आउट')}</button>
+            <button class="btn btn-danger btn-sm" style="min-height:36px;font-weight:800;padding:6px 12px;border-radius:8px;background:#ef4444;color:#ffffff;border:none;box-shadow:0 2px 6px rgba(239,68,68,0.3);display:inline-flex;align-items:center;gap:4px" onclick="logout()" title="${tr('Log Out', 'लॉग आउट')}">
+              <span>🚪</span>
+              <span>${tr('Log Out', 'लॉग आउट')}</span>
+            </button>
           ` : `
             <button class="btn btn-ghost btn-sm desktop-only" style="min-height:36px" onclick="navigate('/auth')">${tr('Log In', 'लॉगिन')}</button>
             <button class="btn btn-coral btn-sm" style="min-height:36px;font-weight:800;padding:6px 14px" onclick="navigate('/signup')">${tr('Free Trial', 'निःशुल्क ट्रायल')}</button>
@@ -926,10 +940,10 @@ function renderFooter() {
 function renderMobileBottomNav() {
   const u = state.data.user;
   const merchantTarget = !u ? '/auth' : (u.role === 'admin' || u.role === 'employee' ? '/admin' : '/merchant');
-  const supportPhone = state.data.settings?.adminWhatsApp || CENTRAL_SUPPORT_PHONE;
   const isHome = state.route === '/';
   const isOrder = state.route === '/order';
   const isMerchant = state.route === '/merchant' || state.route === '/admin' || state.route === '/auth';
+  const cartCount = Object.values(state.cart || {}).filter(q => q > 0).reduce((a, b) => a + b, 0);
 
   return `
     <nav class="mobile-bottom-nav mobile-only no-print" aria-label="Mobile Navigation">
@@ -937,18 +951,32 @@ function renderMobileBottomNav() {
         <span class="mobile-nav-icon">🏠</span>
         <span class="mobile-nav-label">${tr('Home', 'होम')}</span>
       </button>
-      <button type="button" class="mobile-nav-btn ${isOrder ? 'active' : ''}" onclick="navigate('/order', { shop: state.selectedShopId || (state.data.merchants[0]?.id || '') })">
-        <span class="mobile-nav-icon">🛒</span>
-        <span class="mobile-nav-label">${tr('Order', 'ऑर्डर')}</span>
+      <button type="button" class="mobile-nav-btn ${isOrder && state.orderPageTab !== 'cart' ? 'active' : ''}" onclick="state.orderPageTab='catalog';navigate('/order', { shop: state.selectedShopId || (state.data.merchants[0]?.id || '') })">
+        <span class="mobile-nav-icon">📦</span>
+        <span class="mobile-nav-label">${tr('Catalog', 'कैटलॉग')}</span>
+      </button>
+      <button type="button" class="mobile-nav-btn ${isOrder && state.orderPageTab === 'cart' ? 'active' : ''}" onclick="state.orderPageTab='cart';navigate('/order', { shop: state.selectedShopId || (state.data.merchants[0]?.id || '') })">
+        <span class="mobile-nav-icon" style="position:relative">
+          🛒
+          ${cartCount > 0 ? `<span class="mobile-badge-dot">${cartCount}</span>` : ''}
+        </span>
+        <span class="mobile-nav-label">${tr('Cart', 'कार्ट')}</span>
       </button>
       <button type="button" class="mobile-nav-btn ${isMerchant ? 'active' : ''}" onclick="navigate('${merchantTarget}')">
-        <span class="mobile-nav-icon">🏪</span>
-        <span class="mobile-nav-label">${tr('Merchant', 'व्यापारी')}</span>
+        <span class="mobile-nav-icon">⚡</span>
+        <span class="mobile-nav-label">${tr('Desk', 'डेस्क')}</span>
       </button>
-      <a class="mobile-nav-btn" href="https://wa.me/91${supportPhone}?text=${encodeURIComponent(state.lang === 'hi' ? 'नमस्ते KuberQ, मुझे सहायता चाहिए।' : 'Hello KuberQ, I need assistance.')}" target="_blank" rel="noreferrer">
-        <span class="mobile-nav-icon">💬</span>
-        <span class="mobile-nav-label">${tr('Help', 'सहायता')}</span>
-      </a>
+      ${u ? `
+        <button type="button" class="mobile-nav-btn" style="color:#ef4444" onclick="logout()" title="${tr('Log Out', 'लॉग आउट')}">
+          <span class="mobile-nav-icon">🚪</span>
+          <span class="mobile-nav-label" style="color:#ef4444;font-weight:800">${tr('Logout', 'लॉगआउट')}</span>
+        </button>
+      ` : `
+        <button type="button" class="mobile-nav-btn" onclick="navigate('/auth')">
+          <span class="mobile-nav-icon">👤</span>
+          <span class="mobile-nav-label">${tr('Login', 'लॉगिन')}</span>
+        </button>
+      `}
     </nav>
   `;
 }
@@ -2565,329 +2593,385 @@ function renderOrderPage() {
         </div>
       </section>
 
-      <!-- 2. TWO-COLUMN INSIDE-STORE LAYOUT (Matching POS Counter Richness) -->
-      <div class="storefront-2col-layout">
-        <!-- LEFT COLUMN: Catalog / Product Grid -->
-        <div>
-          <!-- Search & Mode Switcher Bar -->
-          <div style="background:var(--card-bg, #ffffff);border:1.5px solid var(--border, #cbd5e1);border-radius:16px;padding:14px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.04)">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:12px">
-              <div style="display:flex;gap:8px">
-                <button type="button" class="btn btn-sm ${orderMode === 'catalog' ? 'btn-primary' : 'btn-ghost'}" style="${orderMode === 'catalog' ? 'background:#0284c7;border-color:#0284c7;font-weight:800' : ''}" onclick="state.orderPageTab='catalog';render()">
-                  📦 ${tr('1. Inside Store Catalog', '1. स्टोर कैटलॉग')} (${allProducts.length})
-                </button>
-                <button type="button" class="btn btn-sm ${orderMode === 'parchi' ? 'btn-primary' : 'btn-ghost'}" style="${orderMode === 'parchi' ? 'background:#0284c7;border-color:#0284c7;font-weight:800' : ''}" onclick="state.orderPageTab='parchi';render()">
-                  📝 ${tr('2. Quick Parchi / Direct List', '2. त्वरित पर्ची लिखकर भेजें')}
-                </button>
-              </div>
+      <!-- 2. 4-TAB NATIVE APPLICATION SEGMENT BAR (Max 4 tabs per row, Play Store Application View) -->
+      <div class="store-app-tabs-bar no-print" style="margin-bottom:14px">
+        <button type="button" class="store-app-tab ${orderMode === 'catalog' ? 'active' : ''}" onclick="state.orderPageTab='catalog';render()">
+          <span class="tab-icon">📦</span>
+          <span class="tab-text">${tr('Catalog', 'कैटलॉग')}</span>
+          <span class="tab-chip">${allProducts.length}</span>
+        </button>
+        <button type="button" class="store-app-tab ${orderMode === 'cart' ? 'active' : ''}" onclick="state.orderPageTab='cart';render()">
+          <span class="tab-icon">🛒</span>
+          <span class="tab-text">${tr('Cart & Pay', 'कार्ट व बिल')}</span>
+          ${cartEntries.length > 0 ? `<span class="tab-chip alert">${cartEntries.length}</span>` : ''}
+        </button>
+        <button type="button" class="store-app-tab ${orderMode === 'parchi' ? 'active' : ''}" onclick="state.orderPageTab='parchi';render()">
+          <span class="tab-icon">📝</span>
+          <span class="tab-text">${tr('Parchi', 'पर्ची लिस्ट')}</span>
+        </button>
+        <button type="button" class="store-app-tab ${orderMode === 'queue' ? 'active' : ''}" onclick="state.orderPageTab='queue';render()">
+          <span class="tab-icon">🎫</span>
+          <span class="tab-text">${tr('Live Queue', 'टोकन कतार')}</span>
+        </button>
+      </div>
 
-              ${orderMode === 'catalog' ? `
-                <div style="flex:1;max-width:320px;min-width:180px">
-                  <input class="input" style="font-size:0.86rem;padding:7px 12px;border-radius:999px" placeholder="🔍 ${tr('Search pipes, fitting, butter, wires...', 'सामान या ब्रांड खोजें...')}" value="${esc(state.orderCatalogSearch || '')}" oninput="state.orderCatalogSearch=this.value;render()" />
-                </div>
-              ` : ''}
-            </div>
-
-            <!-- Category Pills Ribbon (Image 2 style) -->
-            ${orderMode === 'catalog' && categories.length > 1 ? `
-              <div class="storefront-category-ribbon">
-                ${categories.map(cat => {
-                  const count = cat === 'ALL' ? allProducts.length : allProducts.filter(p => (p.category || 'General') === cat).length;
-                  const isActive = activeCat === cat;
-                  return `
-                    <button type="button" class="storefront-cat-pill ${isActive ? 'active' : ''}" onclick="state.storefrontCategoryFilter='${cat}';render()">
-                      ${cat === 'ALL' ? '✦ ' + tr('All Products', 'सभी सामान') : esc(cat)} (${count})
+      ${orderMode === 'queue' ? `
+        <!-- Live Counter Queue Display Tab -->
+        <div style="background:var(--card-bg, #ffffff);border:1.5px solid var(--border, #cbd5e1);border-radius:18px;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,0.06);margin-bottom:20px">
+          ${renderCounterQueueBoard(shop)}
+        </div>
+      ` : `
+        <!-- TWO-COLUMN INSIDE-STORE LAYOUT (Full width on mobile, side-by-side on desktop) -->
+        <div class="storefront-2col-layout">
+          <!-- LEFT COLUMN: Catalog / Product Grid / Parchi -->
+          <div class="storefront-catalog-col ${orderMode === 'cart' ? 'mobile-hidden' : ''}">
+            <!-- Search & Filters Bar (Only in catalog mode) -->
+            ${orderMode === 'catalog' ? `
+              <div style="background:var(--card-bg, #ffffff);border:1.5px solid var(--border, #cbd5e1);border-radius:16px;padding:14px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,0.04)">
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+                  <div style="flex:1;min-width:200px">
+                    <input
+                      id="order-catalog-search-input"
+                      dir="ltr"
+                      autocomplete="off"
+                      class="input"
+                      style="font-size:0.9rem;padding:8px 14px;border-radius:999px;width:100%"
+                      placeholder="🔍 ${tr('Search pipes, fitting, butter, wires...', 'सामान या ब्रांड खोजें...')}"
+                      value="${esc(state.orderCatalogSearch || '')}"
+                      oninput="state.orderCatalogSearch=this.value;render()"
+                    />
+                  </div>
+                  ${state.orderCatalogSearch ? `
+                    <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.8rem;padding:4px 8px" onclick="state.orderCatalogSearch='';render()">
+                      ✕ ${tr('Clear', 'साफ़ करें')}
                     </button>
-                  `;
-                }).join('')}
+                  ` : ''}
+                </div>
+
+                <!-- Category Pills Ribbon -->
+                ${categories.length > 1 ? `
+                  <div class="storefront-category-ribbon">
+                    ${categories.map(cat => {
+                      const count = cat === 'ALL' ? allProducts.length : allProducts.filter(p => (p.category || 'General') === cat).length;
+                      const isActive = activeCat === cat;
+                      return `
+                        <button type="button" class="storefront-cat-pill ${isActive ? 'active' : ''}" onclick="state.storefrontCategoryFilter='${cat}';render()">
+                          ${cat === 'ALL' ? '✦ ' + tr('All Products', 'सभी सामान') : esc(cat)} (${count})
+                        </button>
+                      `;
+                    }).join('')}
+                  </div>
+                ` : ''}
               </div>
             ` : ''}
-          </div>
 
-          <!-- Product Catalog Content -->
-          ${orderMode === 'catalog' ? `
-            ${products.length === 0 ? `
-              <div style="text-align:center;padding:48px 20px;background:var(--card-bg, #ffffff);border-radius:16px;border:1.5px dashed var(--border, #cbd5e1)">
-                <span style="font-size:3rem;display:block;margin-bottom:8px">📦</span>
-                <p class="text-muted" style="font-size:1.05rem;font-weight:600">${tr('No products matching search criteria.', 'खोजे गए नाम का कोई सामान नहीं मिला।')}</p>
-                <button type="button" class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="state.orderCatalogSearch='';state.storefrontCategoryFilter='ALL';render()">
-                  🔄 ${tr('Show All Store Products', 'सभी सामान देखें')}
-                </button>
-              </div>
-            ` : `
-              <div class="storefront-prod-grid">
-                ${products.map(p => {
-                  const qty = state.cart[p.id] || 0;
-                  const hasWholesale = p.wholesalePrice && p.wholesalePrice < p.price;
-                  const isWholesaleActive = qty >= (p.moq || 9999) && hasWholesale;
-                  const photoUrl = getProductPhotoUrl(p);
-                  const isOutOfStock = Number(p.stock || 0) <= 0;
+            <!-- Product Catalog Content -->
+            ${orderMode === 'catalog' ? `
+              ${products.length === 0 ? `
+                <div style="text-align:center;padding:48px 20px;background:var(--card-bg, #ffffff);border-radius:16px;border:1.5px dashed var(--border, #cbd5e1)">
+                  <span style="font-size:3rem;display:block;margin-bottom:8px">📦</span>
+                  <p class="text-muted" style="font-size:1.05rem;font-weight:600">${tr('No products matching search criteria.', 'खोजे गए नाम का कोई सामान नहीं मिला।')}</p>
+                  <button type="button" class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="state.orderCatalogSearch='';state.storefrontCategoryFilter='ALL';render()">
+                    🔄 ${tr('Show All Store Products', 'सभी सामान देखें')}
+                  </button>
+                </div>
+              ` : `
+                <div class="storefront-prod-grid">
+                  ${products.map(p => {
+                    const qty = state.cart[p.id] || 0;
+                    const hasWholesale = p.wholesalePrice && p.wholesalePrice < p.price;
+                    const isWholesaleActive = qty >= (p.moq || 9999) && hasWholesale;
+                    const photoUrl = getProductPhotoUrl(p);
+                    const isOutOfStock = Number(p.stock || 0) <= 0;
 
-                  return `
-                    <div class="storefront-prod-card ${isOutOfStock ? 'storefront-out-of-stock' : ''}">
-                      <!-- Real Product Photo with Instant Vector SVG Fallback (0ms Lag) -->
-                      <div class="storefront-img-wrap">
-                        <img
-                          src="${esc(photoUrl)}"
-                          alt="${esc(p.name)}"
-                          loading="lazy"
-                          decoding="async"
-                          class="storefront-prod-img"
-                          onerror="this.onerror=null;this.src='${PRODUCT_PLACEHOLDER_SVG}'"
-                        />
-                        <span class="storefront-stock-chip" style="${isOutOfStock ? 'background:#ef4444;color:#fff' : ''}">
-                          ${p.stock > 10 ? `✓ In Stock: ${p.stock}` : (p.stock > 0 ? `⚠️ Low: ${p.stock}` : tr('Out of Stock', 'स्टॉक समाप्त'))}
-                        </span>
+                    return `
+                      <div class="storefront-prod-card ${isOutOfStock ? 'storefront-out-of-stock' : ''}">
+                        <!-- Real Product Photo with Instant Vector SVG Fallback (0ms Lag) -->
+                        <div class="storefront-img-wrap">
+                          <img
+                            src="${esc(photoUrl)}"
+                            alt="${esc(p.name)}"
+                            loading="lazy"
+                            decoding="async"
+                            class="storefront-prod-img"
+                            onerror="this.onerror=null;this.src='${PRODUCT_PLACEHOLDER_SVG}'"
+                          />
+                          <span class="storefront-stock-chip" style="${isOutOfStock ? 'background:#ef4444;color:#fff' : ''}">
+                            ${p.stock > 10 ? `✓ In Stock: ${p.stock}` : (p.stock > 0 ? `⚠️ Low: ${p.stock}` : tr('Out of Stock', 'स्टॉक समाप्त'))}
+                          </span>
 
-                        <!-- Real-Time Out of Stock Overlay -->
-                        ${isOutOfStock ? `
-                          <div class="out-of-stock-overlay">
-                            🚫 ${tr('Out of Stock', 'स्टॉक समाप्त')}
-                          </div>
-                        ` : `
-                          <!-- High-Speed Catalogue Quick-Add Floating Button -->
-                          <button type="button" class="quick-add-float-btn" title="${tr('Quick Add (+1)', 'तुरंत जोड़ें (+1)')}" onclick="event.stopPropagation();updateCart('${p.id}', 1)" aria-label="${tr('Add to Cart', 'कार्ट में जोड़ें')}">
-                            +
-                          </button>
-                        `}
-                      </div>
-
-                      <div class="storefront-card-body">
-                        <span style="font-size:0.72rem;color:var(--primary-contrast, #1e40af);font-weight:800;text-transform:uppercase;margin-bottom:2px">${esc(p.category || 'General')}</span>
-                        <h3 class="storefront-card-title" title="${esc(p.name)}" style="color:var(--text, #0f172a)">${esc(trDyn(p.name))}</h3>
-
-                        <div class="storefront-pricing-block">
-                          <div style="display:flex;align-items:baseline;gap:6px">
-                            <span class="storefront-retail-rate" style="color:var(--primary-contrast, #1e40af)">${fmtINR(p.price)}</span>
-                            <span style="font-size:0.75rem;color:#64748b">/${p.unit || 'pc'}</span>
-                          </div>
-
-                          ${hasWholesale ? `
-                            <div class="storefront-wholesale-rate">
-                              <span>${tr('Wholesale:', 'थोक:')} <b>${fmtINR(p.wholesalePrice)}</b></span>
-                              <span class="storefront-moq-badge">MOQ: ${p.moq || 10}</span>
-                            </div>
-                          ` : ''}
-
-                          ${isWholesaleActive ? `
-                            <div style="margin-top:4px;font-size:0.72rem;font-weight:800;color:#16a34a">
-                              ✔ ${tr('Wholesale Rate Active!', 'थोक रेट लागू!')}
-                            </div>
-                          ` : ''}
-                        </div>
-
-                        <!-- Stepper / Add to Cart Action -->
-                        <div class="storefront-card-actions">
+                          <!-- Real-Time Out of Stock Overlay -->
                           ${isOutOfStock ? `
-                            <button type="button" disabled class="btn btn-sm btn-disabled" style="width:100%;cursor:not-allowed;background:#94a3b8;color:#ffffff;border:none;font-weight:700">
+                            <div class="out-of-stock-overlay">
                               🚫 ${tr('Out of Stock', 'स्टॉक समाप्त')}
-                            </button>
-                          ` : (qty === 0 ? `
-                            <button type="button" class="btn btn-primary btn-sm" style="width:100%;font-weight:800;border-radius:8px;background:#0284c7;border-color:#0284c7;min-height:38px" onclick="updateCart('${p.id}', 1)">
-                              + ${tr('Add to Cart', 'कार्ट में जोड़ें')}
-                            </button>
-                          ` : `
-                            <div style="display:flex;width:100%;gap:4px">
-                              <div class="storefront-stepper" style="flex:1">
-                                <button type="button" class="storefront-stepper-btn" onclick="updateCart('${p.id}', -1)">−</button>
-                                <span class="storefront-stepper-qty">${qty}</span>
-                                <button type="button" class="storefront-stepper-btn" onclick="updateCart('${p.id}', 1)">+</button>
-                              </div>
-                              ${hasWholesale && qty < (p.moq || 10) ? `
-                                <button type="button" class="btn btn-gold btn-sm" style="padding:4px 8px;font-size:0.75rem;font-weight:800" title="${tr('Add MOQ to unlock wholesale price', 'थोक रेट लागू करने के लिए MOQ जोड़ें')}" onclick="updateCart('${p.id}', ${(p.moq || 10) - qty})">
-                                  +MOQ
-                                </button>
-                              ` : ''}
                             </div>
-                          `)}
+                          ` : `
+                            <!-- High-Speed Catalogue Quick-Add Floating Button -->
+                            <button type="button" class="quick-add-float-btn" title="${tr('Quick Add (+1)', 'तुरंत जोड़ें (+1)')}" onclick="event.stopPropagation();updateCart('${p.id}', 1)" aria-label="${tr('Add to Cart', 'कार्ट में जोड़ें')}">
+                              +
+                            </button>
+                          `}
+                        </div>
+
+                        <div class="storefront-card-body">
+                          <span style="font-size:0.72rem;color:var(--primary-contrast, #1e40af);font-weight:800;text-transform:uppercase;margin-bottom:2px">${esc(p.category || 'General')}</span>
+                          <h3 class="storefront-card-title" title="${esc(p.name)}" style="color:var(--text, #0f172a)">${esc(trDyn(p.name))}</h3>
+
+                          <div class="storefront-pricing-block">
+                            <div style="display:flex;align-items:baseline;gap:6px">
+                              <span class="storefront-retail-rate" style="color:var(--primary-contrast, #1e40af)">${fmtINR(p.price)}</span>
+                              <span style="font-size:0.75rem;color:#64748b">/${p.unit || 'pc'}</span>
+                            </div>
+
+                            ${hasWholesale ? `
+                              <div class="storefront-wholesale-rate">
+                                <span>${tr('Wholesale:', 'थोक:')} <b>${fmtINR(p.wholesalePrice)}</b></span>
+                                <span class="storefront-moq-badge">MOQ: ${p.moq || 10}</span>
+                              </div>
+                            ` : ''}
+
+                            ${isWholesaleActive ? `
+                              <div style="margin-top:4px;font-size:0.72rem;font-weight:800;color:#16a34a">
+                                ✔ ${tr('Wholesale Rate Active!', 'थोक रेट लागू!')}
+                              </div>
+                            ` : ''}
+                          </div>
+
+                          <!-- Stepper / Add to Cart Action -->
+                          <div class="storefront-card-actions">
+                            ${isOutOfStock ? `
+                              <button type="button" disabled class="btn btn-sm btn-disabled" style="width:100%;cursor:not-allowed;background:#94a3b8;color:#ffffff;border:none;font-weight:700">
+                                🚫 ${tr('Out of Stock', 'स्टॉक समाप्त')}
+                              </button>
+                            ` : (qty === 0 ? `
+                              <button type="button" class="btn btn-primary btn-sm" style="width:100%;font-weight:800;border-radius:8px;background:#0284c7;border-color:#0284c7;min-height:38px" onclick="updateCart('${p.id}', 1)">
+                                + ${tr('Add to Cart', 'कार्ट में जोड़ें')}
+                              </button>
+                            ` : `
+                              <div style="display:flex;width:100%;gap:4px">
+                                <div class="storefront-stepper" style="flex:1">
+                                  <button type="button" class="storefront-stepper-btn" onclick="updateCart('${p.id}', -1)">−</button>
+                                  <span class="storefront-stepper-qty">${qty}</span>
+                                  <button type="button" class="storefront-stepper-btn" onclick="updateCart('${p.id}', 1)">+</button>
+                                </div>
+                                ${hasWholesale && qty < (p.moq || 10) ? `
+                                  <button type="button" class="btn btn-gold btn-sm" style="padding:4px 8px;font-size:0.75rem;font-weight:800" title="${tr('Add MOQ to unlock wholesale price', 'थोक रेट लागू करने के लिए MOQ जोड़ें')}" onclick="updateCart('${p.id}', ${(p.moq || 10) - qty})">
+                                    +MOQ
+                                  </button>
+                                ` : ''}
+                              </div>
+                            `)}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  `;
-                }).join('')}
+                    `;
+                  }).join('')}
+                </div>
+              `}
+            ` : `
+              <!-- Quick Parchi Writer Mode -->
+              <div style="background:var(--card-bg, #ffffff);border:1.5px solid var(--border, #cbd5e1);border-radius:16px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.04)">
+                <label class="form-label" style="font-size:0.95rem;font-weight:800">
+                  📝 ${tr('Write or Paste Your Parchi List (Hardware, Sanitary, Groceries, Electrical, etc.):', 'अपनी पर्ची सूची लिखें या पेस्ट करें:')}
+                </label>
+                <textarea class="textarea" rows="5" id="ord-note" style="font-size:0.95rem" placeholder="${tr('e.g. 15 Supreme 1 inch PVC pipe, 30 elbow, 5 JK wall putty 40kg, 2 Fresh Butter...', 'जैसे: 15 सुप्रीम 1 इंच पीवीसी पाइप, 30 एल्बो, 5 जेके वॉल पुट्टी 40kg, 2 फ्रेश बटर...')}" oninput="state.parchiNote=this.value">${esc(state.parchiNote)}</textarea>
+                <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+                  <span class="text-muted" style="font-size:0.8rem">${tr('Quick suggestions:', 'त्वरित सुझाव जोड़ें:')}</span>
+                  <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.76rem;padding:2px 8px" onclick="state.parchiNote=(state.parchiNote ? state.parchiNote + ', ' : '') + '10 PVC Elbow 1 inch';render()">+ 10 PVC Elbow</button>
+                  <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.76rem;padding:2px 8px" onclick="state.parchiNote=(state.parchiNote ? state.parchiNote + ', ' : '') + '5 Astral CPVC Pipe 3/4 inch';render()">+ 5 CPVC Pipe</button>
+                  <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.76rem;padding:2px 8px" onclick="state.parchiNote=(state.parchiNote ? state.parchiNote + ', ' : '') + '2 Water Tank 1000L';render()">+ 2 Water Tank</button>
+                </div>
               </div>
             `}
-          ` : `
-            <!-- Quick Parchi Writer Mode -->
-            <div style="background:var(--card-bg, #ffffff);border:1.5px solid var(--border, #cbd5e1);border-radius:16px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.04)">
-              <label class="form-label" style="font-size:0.95rem;font-weight:800">
-                📝 ${tr('Write or Paste Your Parchi List (Hardware, Sanitary, Groceries, Electrical, etc.):', 'अपनी पर्ची सूची लिखें या पेस्ट करें:')}
-              </label>
-              <textarea class="textarea" rows="5" id="ord-note" style="font-size:0.95rem" placeholder="${tr('e.g. 15 Supreme 1 inch PVC pipe, 30 elbow, 5 JK wall putty 40kg, 2 Fresh Butter...', 'जैसे: 15 सुप्रीम 1 इंच पीवीसी पाइप, 30 एल्बो, 5 जेके वॉल पुट्टी 40kg, 2 फ्रेश बटर...')}" oninput="state.parchiNote=this.value">${esc(state.parchiNote)}</textarea>
-              <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-                <span class="text-muted" style="font-size:0.8rem">${tr('Quick suggestions:', 'त्वरित सुझाव जोड़ें:')}</span>
-                <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.76rem;padding:2px 8px" onclick="state.parchiNote=(state.parchiNote ? state.parchiNote + ', ' : '') + '10 PVC Elbow 1 inch';render()">+ 10 PVC Elbow</button>
-                <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.76rem;padding:2px 8px" onclick="state.parchiNote=(state.parchiNote ? state.parchiNote + ', ' : '') + '5 Astral CPVC Pipe 3/4 inch';render()">+ 5 CPVC Pipe</button>
-                <button type="button" class="btn btn-ghost btn-sm" style="font-size:0.76rem;padding:2px 8px" onclick="state.parchiNote=(state.parchiNote ? state.parchiNote + ', ' : '') + '2 Water Tank 1000L';render()">+ 2 Water Tank</button>
-              </div>
+          </div>
+
+          <!-- RIGHT COLUMN: Sticky Live Cart & Instant Checkout Desk -->
+          <div class="storefront-cart-col ${orderMode !== 'cart' ? 'mobile-hidden' : ''}" style="position:sticky;top:80px">
+            <!-- Mobile Return to Catalog Button -->
+            <div class="mobile-only" style="margin-bottom:12px">
+              <button type="button" class="btn btn-ghost" style="font-weight:800;font-size:0.92rem;padding:10px 14px;border:1.5px solid var(--border,#cbd5e1);border-radius:12px;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--card-bg,#fff)" onclick="state.orderPageTab='catalog';render()">
+                <span>←</span>
+                <span>${tr('Back to Products / Add More Items', '← और सामान जोड़ें / कैटलॉग पर वापस')}</span>
+              </button>
             </div>
-          `}
-        </div>
 
-        <!-- RIGHT COLUMN: Sticky Live Cart & Instant Checkout Desk -->
-        <div style="position:sticky;top:80px">
-          <form onsubmit="submitCustomerOrder(event, '${shop?.id || ''}')" style="background:var(--card-bg, #ffffff);border:1.5px solid var(--border, #cbd5e1);border-radius:18px;padding:20px;box-shadow:0 6px 20px rgba(0,0,0,0.06)">
-            ${orderMode === 'catalog' ? `
-              <input type="hidden" id="ord-note" value="${esc(state.parchiNote)}" />
-            ` : ''}
+            <form onsubmit="submitCustomerOrder(event, '${shop?.id || ''}')" style="background:var(--card-bg, #ffffff);border:1.5px solid var(--border, #cbd5e1);border-radius:18px;padding:20px;box-shadow:0 6px 20px rgba(0,0,0,0.06)">
+              ${orderMode === 'catalog' ? `
+                <input type="hidden" id="ord-note" value="${esc(state.parchiNote)}" />
+              ` : ''}
 
-            <!-- Cart Header -->
-            <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid var(--border, #e2e8f0);padding-bottom:12px;margin-bottom:14px">
-              <div>
-                <h3 style="font-size:1.15rem;font-weight:900;margin:0;color:var(--text, #0f172a)">
-                  🛒 ${tr('Your Order Cart', 'आपका ऑर्डर कार्ट')}
-                </h3>
-                <span style="font-size:0.78rem;color:#64748b">${cartEntries.length} ${tr('item(s) selected', 'सामान चुना गया')}</span>
+              <!-- Cart Header -->
+              <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid var(--border, #e2e8f0);padding-bottom:12px;margin-bottom:14px">
+                <div>
+                  <h3 style="font-size:1.15rem;font-weight:900;margin:0;color:var(--text, #0f172a)">
+                    🛒 ${tr('Your Order Cart', 'आपका ऑर्डर कार्ट')}
+                  </h3>
+                  <span style="font-size:0.78rem;color:#64748b">${cartEntries.length} ${tr('item(s) selected', 'सामान चुना गया')}</span>
+                </div>
+                ${cartEntries.length > 0 ? `
+                  <button type="button" class="btn btn-ghost btn-sm" style="color:#ef4444;font-size:0.78rem;padding:2px 6px" onclick="state.cart={};render()">
+                    🗑️ ${tr('Clear', 'खाली करें')}
+                  </button>
+                ` : ''}
               </div>
-              ${cartEntries.length > 0 ? `
-                <button type="button" class="btn btn-ghost btn-sm" style="color:#ef4444;font-size:0.78rem;padding:2px 6px" onclick="state.cart={};render()">
-                  🗑️ ${tr('Clear', 'खाली करें')}
+
+              <!-- Cart Items List with Photos -->
+              <div style="max-height:260px;overflow-y:auto;margin-bottom:14px;padding-right:4px">
+                ${cartEntries.length === 0 ? `
+                  <div style="text-align:center;padding:24px 10px;color:#94a3b8">
+                    <span style="font-size:2rem;display:block;margin-bottom:6px">🛍️</span>
+                    <p style="font-size:0.88rem;margin:0;font-weight:600">${tr('Cart is empty', 'कार्ट खाली है')}</p>
+                    <p style="font-size:0.76rem;margin:2px 0 0">${tr('Tap "+ Add to Cart" on any product.', 'सामान चुनने के लिए ऊपर दिए गए उत्पादों पर टैप करें।')}</p>
+                  </div>
+                ` : cartEntries.map(([pid, qty]) => {
+                  const p = allProducts.find(x => x.id === pid);
+                  if (!p) return '';
+                  const isWholesale = qty >= (p.moq || 9999) && p.wholesalePrice && p.wholesalePrice < p.price;
+                  const rate = isWholesale ? p.wholesalePrice : p.price;
+                  const lineTot = rate * qty;
+                  const pPhoto = getProductPhotoUrl(p);
+
+                  return `
+                    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border, #f1f5f9)">
+                      <img src="${esc(pPhoto)}" alt="${esc(p.name)}" style="width:40px;height:40px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#f1f5f9" onerror="this.onerror=null;this.src='${PRODUCT_PLACEHOLDER_SVG}'" />
+                      <div style="flex:1;min-width:0">
+                        <strong style="font-size:0.84rem;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</strong>
+                        <span style="font-size:0.74rem;color:#64748b">${fmtINR(rate)} × ${qty} ${isWholesale ? '<span style="color:#16a34a;font-weight:700">(थोक)</span>' : ''}</span>
+                      </div>
+                      <div style="display:flex;align-items:center;gap:4px">
+                        <button type="button" class="btn btn-ghost btn-sm" style="padding:1px 6px;font-size:0.8rem;border:1px solid #cbd5e1" onclick="updateCart('${p.id}', -1)">-</button>
+                        <span style="font-weight:800;font-size:0.82rem;min-width:18px;text-align:center">${qty}</span>
+                        <button type="button" class="btn btn-ghost btn-sm" style="padding:1px 6px;font-size:0.8rem;border:1px solid #cbd5e1" onclick="updateCart('${p.id}', 1)">+</button>
+                      </div>
+                      <strong style="font-size:0.88rem;min-width:55px;text-align:right">${fmtINR(lineTot)}</strong>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+
+              <!-- Wholesale Savings Callout -->
+              ${wholesaleSavings > 0 ? `
+                <div style="background:#ecfdf5;border:1.5px solid #10b981;padding:8px 12px;border-radius:10px;color:#065f46;font-size:0.82rem;margin-bottom:12px;display:flex;align-items:center;gap:6px">
+                  <span>🎉</span>
+                  <div><b>${tr('Wholesale Savings Applied:', 'B2B थोक रेट बचत लागू:')}</b> ${fmtINR(wholesaleSavings)}!</div>
+                </div>
+              ` : ''}
+
+              <!-- Price Breakdown -->
+              <div style="background:var(--subtle-bg, #f8fafc);padding:10px 14px;border-radius:12px;margin-bottom:14px;font-size:0.85rem">
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                  <span class="text-muted">${tr('Subtotal:', 'उपयोग (Subtotal):')}</span>
+                  <strong>${fmtINR(cartSubtotal)}</strong>
+                </div>
+                ${cartTax > 0 ? `
+                  <div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#64748b">
+                    <span>${tr('GST (18% Estimated):', 'लागू GST (18%):')}</span>
+                    <span>${fmtINR(cartTax)}</span>
+                  </div>
+                ` : ''}
+                <div style="display:flex;justify-content:space-between;font-size:1.2rem;font-weight:900;border-top:1.5px dashed var(--border, #cbd5e1);padding-top:6px;margin-top:6px">
+                  <span>${tr('Total Payable:', 'कुल देय राशि:')}</span>
+                  <span style="color:#0284c7">${fmtINR(cartGross)}</span>
+                </div>
+              </div>
+
+              <!-- Customer Details Form -->
+              <div style="margin-bottom:14px">
+                <div class="form-group" style="margin-bottom:8px">
+                  <label class="form-label" style="font-size:0.78rem;font-weight:700">${tr('Your Name / Firm *', 'आपका नाम / फर्म का नाम *')}</label>
+                  <input class="input" id="ord-name" required value="${esc(state.data.user?.name || state.checkoutCustomer.name)}" placeholder="e.g. Vikram Rathore" style="padding:6px 10px;font-size:0.85rem" />
+                </div>
+                <div class="form-group" style="margin-bottom:8px">
+                  <label class="form-label" style="font-size:0.78rem;font-weight:700">${tr('10-Digit WhatsApp Mobile *', '10 अंकों का WhatsApp नंबर *')}</label>
+                  <input class="input" id="ord-phone" pattern="^[6-9][0-9]{9}$" required maxlength="10" value="${esc(state.data.user?.phone || state.checkoutCustomer.phone)}" placeholder="9828XXXXXX" style="padding:6px 10px;font-size:0.85rem" oninput="const e=document.getElementById('ord-phone-err');if(e)e.style.display='none'" />
+                  <div id="ord-phone-err" style="display:none;color:#dc2626;font-size:0.75rem;margin-top:2px"></div>
+                </div>
+                <div class="form-group" style="margin-bottom:8px">
+                  <label class="form-label" style="font-size:0.78rem;font-weight:700">${tr('Delivery Address / Site *', 'डिलीवरी का पता / साइट लोकेशन *')}</label>
+                  <input class="input" id="ord-addr" required value="${esc(state.checkoutCustomer.address)}" placeholder="Plot / Shop, Market, Landmark, City" style="padding:6px 10px;font-size:0.85rem" />
+                </div>
+                <div class="form-group" style="margin-bottom:8px">
+                  <label class="form-label" style="font-size:0.78rem">${tr('Buyer GSTIN (Optional — For B2B ITC)', 'खरीदार GSTIN (वैकल्पिक — पक्का ITC बिल हेतु)')}</label>
+                  <input class="input" id="ord-gstin" maxlength="15" style="text-transform:uppercase;font-family:monospace;padding:6px 10px;font-size:0.82rem" value="${esc(state.checkoutCustomer.buyerGstin)}" placeholder="08AAACR5055K1Z2" />
+                </div>
+
+                <!-- DPDP Act Consent -->
+                <div style="display:flex;align-items:flex-start;gap:8px;font-size:0.75rem;color:#64748b;margin:8px 0">
+                  <input type="checkbox" id="ord-consent" checked required style="margin-top:2px;accent-color:#0284c7" />
+                  <label for="ord-consent">
+                    ${tr('I agree to receive order confirmations & GST bill via WhatsApp as per', 'मैं WhatsApp पर बिल व डिलीवरी अपडेट्स प्राप्त करने की सहमति देता हूँ')}
+                    <a href="javascript:void(0)" onclick="navigate('/privacy')" style="color:#0284c7;text-decoration:underline">${tr('Privacy Terms', 'गोपनीयता नीति')}</a>.
+                  </label>
+                </div>
+              </div>
+
+              <!-- Submit Buttons: Place Order Online + Order via WhatsApp -->
+              <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px">
+                <button type="submit" class="btn btn-primary btn-checkout-action" style="width:100%;min-height:48px;font-size:1.02rem;padding:12px;border-radius:12px;font-weight:900;background:#0284c7;border-color:#0284c7;box-shadow:0 4px 14px rgba(2,132,199,0.3);display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation">
+                  <span>🚀</span>
+                  <span>${tr('Place Order Online (Instant)', 'ऑनलाइन ऑर्डर भेजें (बिना लॉगिन)')}</span>
                 </button>
-              ` : ''}
-            </div>
 
-            <!-- Cart Items List with Photos -->
-            <div style="max-height:260px;overflow-y:auto;margin-bottom:14px;padding-right:4px">
-              ${cartEntries.length === 0 ? `
-                <div style="text-align:center;padding:24px 10px;color:#94a3b8">
-                  <span style="font-size:2rem;display:block;margin-bottom:6px">🛍️</span>
-                  <p style="font-size:0.88rem;margin:0;font-weight:600">${tr('Cart is empty', 'कार्ट खाली है')}</p>
-                  <p style="font-size:0.76rem;margin:2px 0 0">${tr('Tap "+ Add to Cart" on any product.', 'सामान चुनने के लिए ऊपर दिए गए उत्पादों पर टैप करें।')}</p>
-                </div>
-              ` : cartEntries.map(([pid, qty]) => {
-                const p = allProducts.find(x => x.id === pid);
-                if (!p) return '';
-                const isWholesale = qty >= (p.moq || 9999) && p.wholesalePrice && p.wholesalePrice < p.price;
-                const rate = isWholesale ? p.wholesalePrice : p.price;
-                const lineTot = rate * qty;
-                const pPhoto = getProductPhotoUrl(p);
+                <button type="button" class="btn btn-success btn-checkout-action" style="width:100%;min-height:48px;font-size:1.02rem;padding:12px;border-radius:12px;font-weight:900;background:#16a34a;border-color:#16a34a;color:#ffffff;box-shadow:0 4px 14px rgba(22,163,74,0.3);display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation" onclick="triggerOrderViaWhatsApp('${shop?.id || ''}')">
+                  <span>💬</span>
+                  <span>${tr('Order via WhatsApp', 'WhatsApp पर सीधा ऑर्डर भेजें')}</span>
+                </button>
+              </div>
 
-                return `
-                  <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border, #f1f5f9)">
-                    <img src="${esc(pPhoto)}" alt="${esc(p.name)}" style="width:40px;height:40px;border-radius:8px;object-fit:cover;flex-shrink:0;background:#f1f5f9" onerror="this.onerror=null;this.src='${PRODUCT_PLACEHOLDER_SVG}'" />
-                    <div style="flex:1;min-width:0">
-                      <strong style="font-size:0.84rem;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</strong>
-                      <span style="font-size:0.74rem;color:#64748b">${fmtINR(rate)} × ${qty} ${isWholesale ? '<span style="color:#16a34a;font-weight:700">(थोक)</span>' : ''}</span>
-                    </div>
-                    <div style="display:flex;align-items:center;gap:4px">
-                      <button type="button" class="btn btn-ghost btn-sm" style="padding:1px 6px;font-size:0.8rem;border:1px solid #cbd5e1" onclick="updateCart('${p.id}', -1)">-</button>
-                      <span style="font-weight:800;font-size:0.82rem;min-width:18px;text-align:center">${qty}</span>
-                      <button type="button" class="btn btn-ghost btn-sm" style="padding:1px 6px;font-size:0.8rem;border:1px solid #cbd5e1" onclick="updateCart('${p.id}', 1)">+</button>
-                    </div>
-                    <strong style="font-size:0.88rem;min-width:55px;text-align:right">${fmtINR(lineTot)}</strong>
+              <!-- Dynamic UPI QR Scan -->
+              ${shop.upiId ? `
+                <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border, #cbd5e1);text-align:center">
+                  <span style="font-size:0.72rem;color:#64748b;font-weight:700;display:block;margin-bottom:6px">
+                    💳 ${tr('SCAN & PAY DIRECTLY VIA UPI (GOOGLE PAY / PHONEPE / PAYTM)', 'सीधा UPI से भुगतान (गूगल पे / फोनपे / पेटीएम)')}
+                  </span>
+                  <div style="display:inline-block;padding:6px;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+                    ${renderVisualQrSvg(`upi://pay?pa=${encodeURIComponent(shop.upiId)}&pn=${encodeURIComponent(shop.shop || 'KuberQ')}&am=${cartGross}&cu=INR`, 120)}
                   </div>
-                `;
-              }).join('')}
-            </div>
+                  <div style="font-size:0.75rem;color:#0284c7;font-weight:800;margin-top:4px">UPI ID: ${esc(shop.upiId)}</div>
+                </div>
+              ` : ''}
+            </form>
 
-            <!-- Wholesale Savings Callout -->
-            ${wholesaleSavings > 0 ? `
-              <div style="background:#ecfdf5;border:1.5px solid #10b981;padding:8px 12px;border-radius:10px;color:#065f46;font-size:0.82rem;margin-bottom:12px;display:flex;align-items:center;gap:6px">
-                <span>🎉</span>
-                <div><b>${tr('Wholesale Savings Applied:', 'B2B थोक रेट बचत लागू:')}</b> ${fmtINR(wholesaleSavings)}!</div>
+            <!-- Verified Customer Reviews Card -->
+            ${shopReviews.length > 0 ? `
+              <div style="background:var(--card-bg, #ffffff);border:1.5px solid var(--border, #cbd5e1);border-radius:14px;padding:14px;margin-top:14px">
+                <h4 style="margin:0 0 8px;font-size:0.86rem;color:#0f172a">⭐ ${tr('Verified Buyer Reviews:', 'सत्यापित ग्राहकों की समीक्षाएं:')}</h4>
+                <div style="display:grid;gap:6px">
+                  ${shopReviews.slice(0, 2).map(rv => `
+                    <div style="font-size:0.78rem;background:var(--subtle-bg, #f8fafc);padding:6px 10px;border-radius:6px;border:1px solid var(--border, #e2e8f0)">
+                      <div><b>${'⭐'.repeat(rv.rating || 5)}</b> — <b>${esc(rv.author)}</b></div>
+                      <div style="color:#475569;margin-top:2px">${esc(rv.reviewNote || rv.note || 'Genuine Wholesale Rates & Fast Delivery')}</div>
+                    </div>
+                  `).join('')}
+                </div>
               </div>
             ` : ''}
 
-            <!-- Price Breakdown -->
-            <div style="background:var(--subtle-bg, #f8fafc);padding:10px 14px;border-radius:12px;margin-bottom:14px;font-size:0.85rem">
-              <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-                <span class="text-muted">${tr('Subtotal:', 'उपयोग (Subtotal):')}</span>
-                <strong>${fmtINR(cartSubtotal)}</strong>
-              </div>
-              ${cartTax > 0 ? `
-                <div style="display:flex;justify-content:space-between;margin-bottom:4px;color:#64748b">
-                  <span>${tr('GST (18% Estimated):', 'लागू GST (18%):')}</span>
-                  <span>${fmtINR(cartTax)}</span>
-                </div>
-              ` : ''}
-              <div style="display:flex;justify-content:space-between;font-size:1.2rem;font-weight:900;border-top:1.5px dashed var(--border, #cbd5e1);padding-top:6px;margin-top:6px">
-                <span>${tr('Total Payable:', 'कुल देय राशि:')}</span>
-                <span style="color:#0284c7">${fmtINR(cartGross)}</span>
-              </div>
-            </div>
-
-            <!-- Customer Details Form -->
-            <div style="margin-bottom:14px">
-              <div class="form-group" style="margin-bottom:8px">
-                <label class="form-label" style="font-size:0.78rem;font-weight:700">${tr('Your Name / Firm *', 'आपका नाम / फर्म का नाम *')}</label>
-                <input class="input" id="ord-name" required value="${esc(state.data.user?.name || state.checkoutCustomer.name)}" placeholder="e.g. Vikram Rathore" style="padding:6px 10px;font-size:0.85rem" />
-              </div>
-              <div class="form-group" style="margin-bottom:8px">
-                <label class="form-label" style="font-size:0.78rem;font-weight:700">${tr('10-Digit WhatsApp Mobile *', '10 अंकों का WhatsApp नंबर *')}</label>
-                <input class="input" id="ord-phone" pattern="^[6-9][0-9]{9}$" required maxlength="10" value="${esc(state.data.user?.phone || state.checkoutCustomer.phone)}" placeholder="9828XXXXXX" style="padding:6px 10px;font-size:0.85rem" oninput="const e=document.getElementById('ord-phone-err');if(e)e.style.display='none'" />
-                <div id="ord-phone-err" style="display:none;color:#dc2626;font-size:0.75rem;margin-top:2px"></div>
-              </div>
-              <div class="form-group" style="margin-bottom:8px">
-                <label class="form-label" style="font-size:0.78rem;font-weight:700">${tr('Delivery Address / Site *', 'डिलीवरी का पता / साइट लोकेशन *')}</label>
-                <input class="input" id="ord-addr" required value="${esc(state.checkoutCustomer.address)}" placeholder="Plot / Shop, Market, Landmark, City" style="padding:6px 10px;font-size:0.85rem" />
-              </div>
-              <div class="form-group" style="margin-bottom:8px">
-                <label class="form-label" style="font-size:0.78rem">${tr('Buyer GSTIN (Optional — For B2B ITC)', 'खरीदार GSTIN (वैकल्पिक — पक्का ITC बिल हेतु)')}</label>
-                <input class="input" id="ord-gstin" maxlength="15" style="text-transform:uppercase;font-family:monospace;padding:6px 10px;font-size:0.82rem" value="${esc(state.checkoutCustomer.buyerGstin)}" placeholder="08AAACR5055K1Z2" />
-              </div>
-
-              <!-- DPDP Act Consent -->
-              <div style="display:flex;align-items:flex-start;gap:8px;font-size:0.75rem;color:#64748b;margin:8px 0">
-                <input type="checkbox" id="ord-consent" checked required style="margin-top:2px;accent-color:#0284c7" />
-                <label for="ord-consent">
-                  ${tr('I agree to receive order confirmations & GST bill via WhatsApp as per', 'मैं WhatsApp पर बिल व डिलीवरी अपडेट्स प्राप्त करने की सहमति देता हूँ')}
-                  <a href="javascript:void(0)" onclick="navigate('/privacy')" style="color:#0284c7;text-decoration:underline">${tr('Privacy Terms', 'गोपनीयता नीति')}</a>.
-                </label>
-              </div>
-            </div>
-
-            <!-- Submit Buttons: Place Order Online + Order via WhatsApp (Requirement 3 & 4) -->
-            <div style="display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px">
-              <button type="submit" class="btn btn-primary btn-checkout-action" style="width:100%;min-height:48px;font-size:1.02rem;padding:12px;border-radius:12px;font-weight:900;background:#0284c7;border-color:#0284c7;box-shadow:0 4px 14px rgba(2,132,199,0.3);display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation">
-                <span>🚀</span>
-                <span>${tr('Place Order Online (Instant)', 'ऑनलाइन ऑर्डर भेजें (बिना लॉगिन)')}</span>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 4px;font-size:0.78rem">
+              <button type="button" class="btn btn-ghost btn-sm" style="padding:3px 8px" onclick="vouchForEntity('merchant', '${shop?.id || ''}', '${esc(shop?.shop || '')}')">
+                👍 ${tr('Verify Trusted Store', 'दुकान सत्यापित करें')}
               </button>
-
-              <button type="button" class="btn btn-success btn-checkout-action" style="width:100%;min-height:48px;font-size:1.02rem;padding:12px;border-radius:12px;font-weight:900;background:#16a34a;border-color:#16a34a;color:#ffffff;box-shadow:0 4px 14px rgba(22,163,74,0.3);display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation" onclick="triggerOrderViaWhatsApp('${shop?.id || ''}')">
-                <span>💬</span>
-                <span>${tr('Order via WhatsApp', 'WhatsApp पर सीधा ऑर्डर भेजें')}</span>
+              <button type="button" class="btn btn-ghost btn-sm" style="padding:3px 8px;color:var(--danger)" onclick="openReportModal('merchant', '${shop?.id || ''}', '${esc(shop?.shop || '')}')">
+                🚩 ${tr('Report Issue', 'शिकायत दर्ज करें')}
               </button>
             </div>
-
-            <!-- Dynamic UPI QR Scan -->
-            ${shop.upiId ? `
-              <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border, #cbd5e1);text-align:center">
-                <span style="font-size:0.72rem;color:#64748b;font-weight:700;display:block;margin-bottom:6px">
-                  💳 ${tr('SCAN & PAY DIRECTLY VIA UPI (GOOGLE PAY / PHONEPE / PAYTM)', 'सीधा UPI से भुगतान (गूगल पे / फोनपे / पेटीएम)')}
-                </span>
-                <div style="display:inline-block;padding:6px;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
-                  ${renderVisualQrSvg(`upi://pay?pa=${encodeURIComponent(shop.upiId)}&pn=${encodeURIComponent(shop.shop || 'KuberQ')}&am=${cartGross}&cu=INR`, 120)}
-                </div>
-                <div style="font-size:0.75rem;color:#0284c7;font-weight:800;margin-top:4px">UPI ID: ${esc(shop.upiId)}</div>
-              </div>
-            ` : ''}
-          </form>
-
-          <!-- Verified Customer Reviews Card -->
-          ${shopReviews.length > 0 ? `
-            <div style="background:var(--card-bg, #ffffff);border:1.5px solid var(--border, #cbd5e1);border-radius:14px;padding:14px;margin-top:14px">
-              <h4 style="margin:0 0 8px;font-size:0.86rem;color:#0f172a">⭐ ${tr('Verified Buyer Reviews:', 'सत्यापित ग्राहकों की समीक्षाएं:')}</h4>
-              <div style="display:grid;gap:6px">
-                ${shopReviews.slice(0, 2).map(rv => `
-                  <div style="font-size:0.78rem;background:var(--subtle-bg, #f8fafc);padding:6px 10px;border-radius:6px;border:1px solid var(--border, #e2e8f0)">
-                    <div><b>${'⭐'.repeat(rv.rating || 5)}</b> — <b>${esc(rv.author)}</b></div>
-                    <div style="color:#475569;margin-top:2px">${esc(rv.reviewNote || rv.note || 'Genuine Wholesale Rates & Fast Delivery')}</div>
-                  </div>
-                `).join('')}
-              </div>
-            </div>
-          ` : ''}
-
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 4px;font-size:0.78rem">
-            <button type="button" class="btn btn-ghost btn-sm" style="padding:3px 8px" onclick="vouchForEntity('merchant', '${shop?.id || ''}', '${esc(shop?.shop || '')}')">
-              👍 ${tr('Verify Trusted Store', 'दुकान सत्यापित करें')}
-            </button>
-            <button type="button" class="btn btn-ghost btn-sm" style="padding:3px 8px;color:var(--danger)" onclick="openReportModal('merchant', '${shop?.id || ''}', '${esc(shop?.shop || '')}')">
-              🚩 ${tr('Report Issue', 'शिकायत दर्ज करें')}
-            </button>
           </div>
         </div>
-      </div>
+      `}
+
+      <!-- Floating Bottom Cart Bar (Swiggy / Blinkit / Play Store Native E-Commerce Style) -->
+      ${orderMode === 'catalog' && cartEntries.length > 0 ? `
+        <div class="mobile-floating-cart-bar no-print mobile-only" onclick="state.orderPageTab='cart';render()">
+          <div class="mfc-info">
+            <span class="mfc-count-pill">🛒 ${cartEntries.length} ${tr('Items', 'सामान')}</span>
+            <span class="mfc-amount">${fmtINR(cartGross)}</span>
+          </div>
+          <button type="button" class="mfc-action-btn" onclick="event.stopPropagation();state.orderPageTab='cart';render()">
+            <span>${tr('View Cart & Pay', 'कार्ट देखें व बिल करें')}</span>
+            <span>➔</span>
+          </button>
+        </div>
+      ` : ''}
     </div>
   `;
 }
@@ -12455,17 +12539,19 @@ function render() {
     const root = document.getElementById('app');
     if (!root) return;
 
-    // Preserve active input focus and cursor position across full DOM re-renders
+    // Preserve active input focus and cursor position across full DOM re-renders (Fix reverse typing)
     const activeEl = document.activeElement;
     let focusInfo = null;
     if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA') && activeEl.type !== 'file' && activeEl.type !== 'checkbox' && activeEl.type !== 'radio') {
       const allInputs = Array.from(root.querySelectorAll('input, textarea'));
+      const prevLen = (activeEl.value || '').length;
       focusInfo = {
         id: activeEl.id || '',
         placeholder: activeEl.getAttribute('placeholder') || '',
         index: allInputs.indexOf(activeEl),
-        start: activeEl.selectionStart,
-        end: activeEl.selectionEnd
+        start: typeof activeEl.selectionStart === 'number' ? activeEl.selectionStart : prevLen,
+        end: typeof activeEl.selectionEnd === 'number' ? activeEl.selectionEnd : prevLen,
+        prevLen: prevLen
       };
     }
 
@@ -12508,7 +12594,7 @@ function render() {
       window.__dismissKuberqSplash();
     }
 
-    // Restore focus & cursor position if an input was being typed into
+    // Restore focus & cursor position: Ensure cursor never jumps backwards to position 0
     if (focusInfo) {
       let target = focusInfo.id ? document.getElementById(focusInfo.id) : null;
       if (!target && focusInfo.placeholder) {
@@ -12521,8 +12607,14 @@ function render() {
       if (target) {
         target.focus();
         try {
-          if (typeof focusInfo.start === 'number' && target.setSelectionRange) {
-            target.setSelectionRange(focusInfo.start, focusInfo.end);
+          if (target.setSelectionRange) {
+            const currentLen = (target.value || '').length;
+            let cursor = currentLen;
+            if (typeof focusInfo.end === 'number' && focusInfo.end > 0) {
+              const diff = currentLen - (focusInfo.prevLen || 0);
+              cursor = Math.min(currentLen, Math.max(0, focusInfo.end + (diff > 0 ? diff : 0)));
+            }
+            target.setSelectionRange(cursor, cursor);
           }
         } catch (_) {}
       }
@@ -12636,22 +12728,32 @@ function renderMerchantPosCounter(shop) {
 
   return `
     <div style="display:grid;gap:14px">
-      <!-- Top-Middle Module Tabs (Counter vs Cart vs Shift vs Held vs Barcodes) -->
-      <div class="pos-top-nav-strip no-print">
+      <!-- Primary 4-Tab Segment Bar (Max 4 tabs per row, Native App View) -->
+      <div class="store-app-tabs-bar no-print" style="margin-bottom:8px">
+        <button type="button" class="store-app-tab ${posMobileView === 'products' ? 'active' : ''}" onclick="state.posMobileView='products';render()">
+          <span class="tab-icon">🛒</span>
+          <span class="tab-text">${tr('Catalog', 'कैटलॉग')}</span>
+          <span class="tab-chip">${filteredProducts.length}</span>
+        </button>
+        <button type="button" class="store-app-tab ${posMobileView === 'cart' ? 'active' : ''}" onclick="state.posMobileView='cart';render()">
+          <span class="tab-icon">🛍️</span>
+          <span class="tab-text">${tr('Billing Cart', 'बिलिंग कार्ट')}</span>
+          ${cart.length > 0 ? `<span class="tab-chip alert">${cart.length}</span>` : ''}
+        </button>
+        <button type="button" class="store-app-tab" onclick="state.merchantTab='Queue Board';render()">
+          <span class="tab-icon">🎫</span>
+          <span class="tab-text">${tr('Tokens', 'टोकन कतार')}</span>
+        </button>
+        <button type="button" class="store-app-tab" onclick="state.merchantTab='Shifts & Drawer';render()">
+          <span class="tab-icon">💼</span>
+          <span class="tab-text">${tr('Shift & Cash', 'गल्ला व शिफ्ट')}</span>
+        </button>
+      </div>
+
+      <!-- Secondary Utility Strip (Smooth Horizontal Scroll for fast POS tools) -->
+      <div class="pos-top-nav-strip no-print" style="margin-bottom:8px;padding-bottom:4px">
         <button type="button" class="pos-nav-chip ${state.posCounterMode ? 'active' : ''}" style="${state.posCounterMode ? 'background:#f59e0b;color:#0f172a;font-weight:900;border-color:#f59e0b' : ''}" onclick="state.posCounterMode=!state.posCounterMode;render()">
           ⚡ ${tr('Counter Mode', 'काउंटर मोड')} ${state.posCounterMode ? '✓ ON' : ''}
-        </button>
-        <button type="button" class="pos-nav-chip" onclick="state.merchantTab='Queue Board';render()">
-          🎫 ${tr('Queue & Tokens', 'टोकन व कतार')}
-        </button>
-        <button type="button" class="pos-nav-chip ${posMobileView === 'products' ? 'active' : ''}" onclick="state.posMobileView='products';render()">
-          🛒 ${tr('Products Catalog', 'प्रोडक्ट कैटलॉग')} (${filteredProducts.length})
-        </button>
-        <button type="button" class="pos-nav-chip ${posMobileView === 'cart' ? 'active' : ''}" onclick="state.posMobileView='cart';render()">
-          🛍️ ${tr('Billing Cart & Pay', 'बिलिंग कार्ट व पेमेंट')} <span class="badge ${cart.length > 0 ? 'badge-primary' : 'badge-ghost'}" style="margin-left:4px">${cart.length}</span>
-        </button>
-        <button type="button" class="pos-nav-chip" onclick="state.merchantTab='Shifts & Drawer';render()">
-          💼 ${tr('Shift & Drawer', 'गल्ला व शिफ्ट')}
         </button>
         <button type="button" class="pos-nav-chip" onclick="openHeldSalesModal()">
           ⏸️ ${tr('Held Bills', 'होल्ड बिल')} ${heldSalesCount > 0 ? `(${heldSalesCount})` : ''}
@@ -12679,9 +12781,9 @@ function renderMerchantPosCounter(shop) {
             <button type="button" class="btn btn-ghost btn-sm" style="padding:4px 8px;font-size:0.8rem;white-space:nowrap" onclick="openCustomerModal()" title="${tr('Add New Customer', 'नया ग्राहक जोड़ें')}">+ New</button>
           </div>
 
-          <!-- Barcode & SKU Fast Search Input -->
+          <!-- Barcode & SKU Fast Search Input (dir=ltr ensures forward typing) -->
           <div style="display:flex;gap:6px;align-items:center;flex:1 1 200px">
-            <input type="text" id="pos-barcode-search" class="form-input" placeholder="${tr('🔍 Scan barcode with gun / type SKU or name...', '🔍 बारकोड गन से स्कैन करें या नाम/SKU लिखें...')}" style="padding:7px 12px;border-radius:8px;border:1.5px solid #0284c7;font-size:0.88rem;font-weight:600;width:100%" onkeydown="handlePosBarcodeScan(event)" />
+            <input type="text" id="pos-barcode-search" dir="ltr" class="form-input" placeholder="${tr('🔍 Scan barcode with gun / type SKU or name...', '🔍 बारकोड गन से स्कैन करें या नाम/SKU लिखें...')}" style="padding:7px 12px;border-radius:8px;border:1.5px solid #0284c7;font-size:0.88rem;font-weight:600;width:100%" onkeydown="handlePosBarcodeScan(event)" />
             <button type="button" class="btn btn-gold btn-sm" style="white-space:nowrap;padding:7px 10px" onclick="triggerBarcodeCameraScan()">📷 ${tr('Scan', 'स्कैन')}</button>
           </div>
         </div>
