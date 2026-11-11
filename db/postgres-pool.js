@@ -14,19 +14,18 @@ const pool = new Pool({
   connectionString,
   ssl: process.env.NODE_ENV === 'production' && !process.env.DISABLE_DB_SSL ? { rejectUnauthorized: false } : false,
 
-  // Sizing limits per worker process:
-  // With PM2 cluster mode (e.g. 4 CPU workers):
-  // 4 workers * 20 max connections = 80 total connections (comfortably within Render's 100 max limit)
-  max: parseInt(process.env.DB_POOL_MAX || '20', 10),
+  // Conservative Sizing for Render 512MB RAM tier & high stability
+  // Avoids socket exhaustion and DB connection timeouts
+  max: parseInt(process.env.DB_POOL_MAX || '5', 10),
 
-  // Keep 4 warm connections ready per worker so incoming queries execute with 0ms handshake lag
-  min: parseInt(process.env.DB_POOL_MIN || '4', 10),
+  // Keep 1 warm connection ready so incoming queries execute immediately without memory bloat
+  min: parseInt(process.env.DB_POOL_MIN || '1', 10),
 
   // Close idle clients after 30 seconds to release memory and database locks
   idleTimeoutMillis: 30000,
 
-  // Return an error if a connection cannot be acquired within 5000ms rather than hanging indefinitely
-  connectionTimeoutMillis: 5000,
+  // Return an error if a connection cannot be acquired within 3000ms rather than hanging indefinitely
+  connectionTimeoutMillis: 3000,
 
   // Statement timeout (max query execution time: 10s) to prevent runaway lockups
   statement_timeout: 10000,

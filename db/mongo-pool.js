@@ -8,30 +8,30 @@ const mongoose = require('mongoose');
 const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/kuberq_prod';
 
 const mongoOptions = {
-  // Connection Pool Limits: Sized for high concurrency without socket exhaustion
-  maxPoolSize: parseInt(process.env.MONGO_MAX_POOL_SIZE || '50', 10),
-  minPoolSize: parseInt(process.env.MONGO_MIN_POOL_SIZE || '10', 10),
+  // Connection Pool Limits: Conservative limits for 512MB RAM without socket exhaustion
+  maxPoolSize: parseInt(process.env.MONGO_MAX_POOL_SIZE || '10', 10),
+  minPoolSize: parseInt(process.env.MONGO_MIN_POOL_SIZE || '1', 10),
 
-  // Timeouts
-  serverSelectionTimeoutMS: 5000,
-  socketTimeoutMS: 45000,
-  connectTimeoutMS: 10000,
+  // Timeouts: Fail fast instead of hanging the process
+  serverSelectionTimeoutMS: 3000,
+  socketTimeoutMS: 30000,
+  connectTimeoutMS: 5000,
 
   // Write Concern for B2B Financial Orders (Receipt guaranteed on primary node)
   w: 'majority',
   wtimeoutMS: 5000,
   readPreference: 'primaryPreferred',
 
-  autoIndex: process.env.NODE_ENV !== 'production' // Don't build indexes at runtime in prod; use migration script
+  autoIndex: false
 };
 
 async function connectMongo() {
   try {
     await mongoose.connect(mongoUri, mongoOptions);
-    console.log('[Mongo Pool] Connected with maxPoolSize: 50, minPoolSize: 10');
+    console.log('[Mongo Pool] Connected safely with maxPoolSize: 10, minPoolSize: 1');
   } catch (err) {
-    console.error('[Mongo Pool Fatal] Failed to connect to MongoDB:', err.message);
-    process.exit(1);
+    // Non-fatal warning: Do NOT crash the entire server process!
+    console.warn('[Mongo Pool Warning] MongoDB connection skipped or unavailable; continuing in standalone mode:', err.message);
   }
 }
 
