@@ -5,12 +5,10 @@ services:
     plan: starter
     region: singapore
     buildCommand: npm install
-    startCommand: npx pm2-runtime start ecosystem.config.js
+    startCommand: node server.js
     healthCheckPath: /healthz
     envVars:
       - key: NODE_ENV
         value: production
-      - key: WEB_CONCURRENCY
-        value: max
-      - key: MAX_MEMORY_RESTART
-        value: 480M
+      - key: PORT
+        value: "4500"

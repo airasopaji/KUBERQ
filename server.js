@@ -1554,15 +1554,43 @@ function matchParchiToCatalogFallback(parchiText, shopProducts) {
 // ============================================================================
 // 6. HTTP REQUEST HELPERS & SECURITY HEADERS
 // ============================================================================
-function setSecurityHeaders(res) {
+function getClientIp(req) {
+  if (!req) return '127.0.0.1';
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    const first = String(forwarded).split(',')[0].trim();
+    if (first) return first;
+  }
+  return req.headers['x-real-ip'] || req.socket?.remoteAddress || '127.0.0.1';
+}
+
+function setSecurityHeaders(res, req = null) {
+  const origin = (req && req.headers && req.headers.origin) || '';
+  const allowedOrigins = [
+    'https://kuberq.onrender.com',
+    'http://localhost:4500',
+    'http://localhost:3000',
+    'http://127.0.0.1:4500'
+  ];
+  if (origin && (allowedOrigins.includes(origin) || origin.endsWith('.onrender.com'))) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Cache-Control');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-XSS-Protection', '1; mode=block');
 }
 
-function sendJson(res, statusCode, payload) {
-  setSecurityHeaders(res);
+function sendJson(res, statusCode, payload, req = null) {
+  setSecurityHeaders(res, req);
   res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(payload));
 }
@@ -1839,38 +1867,34 @@ function hasAdminPerm(user, perm) {
 // 7. API ROUTER & HANDLERS
 // ============================================================================
 async function handleApi(req, res, pathname, query) {
-  const ip = req.socket.remoteAddress || '127.0.0.1';
+  const ip = getClientIp(req);
 
-  // Route-Specific Throttling Buckets for 200+ Concurrency Stability
-  let bucket = 'general';
-  let maxReqs = 180;
-  let windowMs = 60000;
-
-  if (pathname.startsWith('/api/auth/otp') || pathname === '/api/auth/login' || pathname === '/api/auth/register') {
-    bucket = 'auth_otp';
-    maxReqs = 10;
-    windowMs = 300000; // 10 reqs per 5 minutes to prevent SMS/OTP spam
+  // Rate Limiting strictly scoped ONLY to sensitive endpoints (/api/auth/ and /api/orders/)
+  // Requirement 3: DO NOT apply rate limiting globally or on static files (avoids 429 locks)
+  if (pathname.startsWith('/api/auth/') && pathname !== '/api/auth/demo-login') {
+    const rate = checkRateLimitDetailed(ip, 'auth', 60, 60000); // 60 auth requests per min per client IP
+    res.setHeader('X-RateLimit-Limit', rate.limit);
+    res.setHeader('X-RateLimit-Remaining', rate.remaining);
+    res.setHeader('X-RateLimit-Reset', rate.resetSec);
+    if (!rate.allowed) {
+      res.setHeader('Retry-After', rate.resetSec);
+      return sendJson(res, 429, {
+        error: `Too many auth requests. Please wait ${rate.resetSec} seconds before retrying.`,
+        retryAfter: rate.resetSec
+      }, req);
+    }
   } else if (pathname === '/api/orders/create') {
-    bucket = 'checkout';
-    maxReqs = 30; // 30 checkouts/min per IP
-    windowMs = 60000;
-  } else if (pathname === '/api/merchant/pro') {
-    bucket = 'merchant_pos';
-    maxReqs = 300; // High burst throughput for fast retail walk-in billing desk
-    windowMs = 60000;
-  }
-
-  const rate = checkRateLimitDetailed(ip, bucket, maxReqs, windowMs);
-  res.setHeader('X-RateLimit-Limit', rate.limit);
-  res.setHeader('X-RateLimit-Remaining', rate.remaining);
-  res.setHeader('X-RateLimit-Reset', rate.resetSec);
-
-  if (!rate.allowed) {
-    res.setHeader('Retry-After', rate.resetSec);
-    return sendJson(res, 429, {
-      error: `Too many requests for ${bucket}. Please wait ${rate.resetSec} seconds before retrying.`,
-      retryAfter: rate.resetSec
-    });
+    const rate = checkRateLimitDetailed(ip, 'orders', 120, 60000); // 120 orders per min per client IP
+    res.setHeader('X-RateLimit-Limit', rate.limit);
+    res.setHeader('X-RateLimit-Remaining', rate.remaining);
+    res.setHeader('X-RateLimit-Reset', rate.resetSec);
+    if (!rate.allowed) {
+      res.setHeader('Retry-After', rate.resetSec);
+      return sendJson(res, 429, {
+        error: `Order checkout rate limit reached. Please wait ${rate.resetSec} seconds before retrying.`,
+        retryAfter: rate.resetSec
+      }, req);
+    }
   }
 
   const user = getAuthUser(req);
@@ -2027,6 +2051,50 @@ async function handleApi(req, res, pathname, query) {
   }
 
   // --------------------------------------------------------------------------
+  // B0. 1-CLICK INSTANT DEMO LOGIN (Zero Rate-Limit, Zero Password Roadblocks)
+  // --------------------------------------------------------------------------
+  if (pathname === '/api/auth/demo-login') {
+    let reqRole = (query.role || query.type || '').toLowerCase();
+    if (req.method === 'POST') {
+      try {
+        const b = await parseBody(req);
+        if (b.role || b.type) reqRole = String(b.role || b.type).toLowerCase();
+      } catch (_) {}
+    }
+
+    let targetUser = null;
+    if (reqRole === 'customer') {
+      targetUser = db.users.find(u => u.id === 'usr-demo-customer-1' || u.phone === '9928055667') || db.users.find(u => u.role === 'customer');
+    } else if (reqRole === 'surya' || reqRole === 'wholesaler') {
+      targetUser = db.users.find(u => u.id === 'usr-demo-merchant-2' || u.phone === '9414122334');
+    } else if (reqRole === 'admin') {
+      targetUser = db.users.find(u => u.role === 'admin' || u.phone === '7240692736');
+    } else {
+      // Default: Marwar Hardware Merchant Desk
+      targetUser = db.users.find(u => u.id === 'usr-demo-merchant-1' || u.phone === '9829011223' || u.role === 'merchant') || db.users[0];
+    }
+
+    if (!targetUser) {
+      return sendJson(res, 500, { error: 'Demo account not initialized.' }, req);
+    }
+
+    const token = createToken({
+      userId: targetUser.id,
+      role: targetUser.role,
+      shopId: targetUser.shopId || ''
+    });
+
+    const { passwordHash, ...safeUser } = targetUser;
+    return sendJson(res, 200, {
+      token,
+      role: targetUser.role,
+      name: targetUser.name,
+      shopId: targetUser.shopId || '',
+      user: safeUser
+    }, req);
+  }
+
+  // --------------------------------------------------------------------------
   // B. ZERO-COST MOBILE + PASSWORD & EMAIL AUTH (`/api/auth/login`, `/api/auth/signup`)
   // --------------------------------------------------------------------------
   if (pathname === '/api/auth/login' && req.method === 'POST') {
@@ -2034,16 +2102,21 @@ async function handleApi(req, res, pathname, query) {
     const identifier = sanitizeString(body.identifier || body.phone || body.email, 100).toLowerCase();
     const password = String(body.password || '');
     const loginRole = sanitizeString(body.role || '', 30);
+    const cleanPhone = identifier.replace(/\D/g, '').slice(-10);
+    const isDemoAccount = ['9829011223', '9414122334', '9928055667', '7240692736'].includes(cleanPhone) || Boolean(body.isDemo);
 
     const lockKey = `${ip}:${identifier}`;
-    const lockInfo = loginLockoutMap.get(lockKey);
-    if (lockInfo && lockInfo.count >= 5 && Date.now() < lockInfo.lockedUntil) {
-      const secs = Math.ceil((lockInfo.lockedUntil - Date.now()) / 1000);
-      return sendJson(res, 429, { error: `Too many failed attempts. Account locked for ${secs}s.` });
+    if (isDemoAccount) {
+      loginLockoutMap.delete(lockKey);
+    } else {
+      const lockInfo = loginLockoutMap.get(lockKey);
+      if (lockInfo && lockInfo.count >= 5 && Date.now() < lockInfo.lockedUntil) {
+        const secs = Math.ceil((lockInfo.lockedUntil - Date.now()) / 1000);
+        return sendJson(res, 429, { error: `Too many failed attempts. Account locked for ${secs}s.` }, req);
+      }
     }
 
     // Check Platform Employees first if logging into Admin/Team or matching phone/email
-    const cleanPhone = identifier.replace(/\D/g, '').slice(-10);
     if (loginRole === 'employee' || loginRole === 'admin') {
       const emp = db.employees.find(
         e => e.status === 'Active' && (e.phone === cleanPhone || e.email.toLowerCase() === identifier)
@@ -4576,12 +4649,20 @@ const MIME_TYPES = {
 
 const server = http.createServer(async (req, res) => {
   try {
+    // 1. Attach security and CORS headers on every response
+    setSecurityHeaders(res, req);
+
+    // 2. Handle HTTP OPTIONS preflight immediately
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      return res.end();
+    }
+
     const parsedUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const pathname = parsedUrl.pathname;
 
     // Fast Health & Uptime Ping for Render keep-alive & monitoring (0ms response)
     if (pathname === '/healthz' || pathname === '/ping' || pathname === '/api/ping') {
-      setSecurityHeaders(res);
       res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-cache' });
       return res.end('OK');
     }
@@ -4597,21 +4678,20 @@ const server = http.createServer(async (req, res) => {
       return res.end('Forbidden');
     }
 
-    // Guard: Prevent 404 MIME-type execution errors for missing assets (.js, .css, .png, etc.)
+    // Guard: Check if requesting an asset with file extension (.js, .css, .png, etc.)
     const reqExt = path.extname(pathname).toLowerCase();
     const isAssetRoute = Boolean(reqExt && reqExt !== '.html');
 
     if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
       if (isAssetRoute) {
-        setSecurityHeaders(res);
         res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
         return res.end(`404 Asset Not Found: ${pathname}`);
       }
+      // SPA Fallback: Any client-side route (/auth, /customer, /merchant, /order, /cart, /admin, etc.) serves index.html
       filePath = path.join(PUBLIC_DIR, 'index.html');
     }
 
     const ext = path.extname(filePath).toLowerCase();
-    setSecurityHeaders(res);
 
     const headers = {
       'Content-Type': MIME_TYPES[ext] || 'text/plain; charset=utf-8'

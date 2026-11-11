@@ -42,4 +42,4 @@ HEALTHCHECK --interval=20s --timeout=3s --start-period=5s --retries=3 \
   CMD curl -fsS http://localhost:${PORT}/healthz || exit 1
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-CMD ["pm2-runtime", "start", "ecosystem.config.js"]
+CMD ["node", "server.js"]
