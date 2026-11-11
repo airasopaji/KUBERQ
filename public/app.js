@@ -836,7 +836,7 @@ function renderHeader() {
           <button class="nav-item ${state.route === '/solutions' ? 'active' : ''}" onclick="navigate('/solutions')">
             ${tr('Features', 'मुख्य फीचर्स')}
           </button>
-          <button class="nav-item ${state.route === '/order' ? 'active' : ''}" onclick="navigate('/order', { shop: state.selectedShopId })">
+          <button class="nav-item ${state.demoModalOpen ? 'active' : ''}" onclick="openDemoModal()">
             ${tr('Live Demo', 'लाइव डेमो')}
           </button>
           <button class="nav-item ${state.route === '/customer' ? 'active' : ''}" onclick="navigate('/customer')">
@@ -1743,44 +1743,57 @@ function renderReportModal() {
 function renderDemoModal() {
   return `
     <div class="modal-backdrop" onclick="closeDemoModal()">
-      <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-box" onclick="event.stopPropagation()" style="max-width:560px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-          <h3>📞 ${tr('Book a 1-on-1 B2B Setup & Demo Call', '1-on-1 सेटअप और डेमो कॉल बुक करें')}</h3>
+          <h3 style="margin:0;font-size:1.3rem">🚀 ${tr('KuberQ Live Interactive Demo', 'KuberQ लाइव इंटरैक्टिव डेमो')}</h3>
           <button class="btn btn-ghost btn-sm" onclick="closeDemoModal()">✕</button>
         </div>
-        <p class="text-muted" style="font-size:1rem;margin-bottom:18px">
-          ${tr('Open to all new and existing traders, wholesalers, and shop owners. Our team will walk you through GST billing & AI catalog setup.', 'सभी नए और मौजूदा व्यापारियों, थोक विक्रेताओं और दुकानदारों के लिए। हमारी टीम आपको फोन पर पूरा डेमो देगी।')}
+        <p class="text-muted" style="font-size:0.92rem;margin-bottom:14px">
+          ${tr('Experience instant 1-click live demo portals without needing passwords, OTPs, or setup:', 'बिना पासवर्ड या OTP के तुरंत 1-क्लिक में लाइव डेमो पोर्टल खोलें:')}
         </p>
-        <form onsubmit="submitDemoRequest(event)">
-          <div class="form-group">
-            <label class="form-label">${tr('Your Shop / Company Name', 'आपकी दुकान / कंपनी का नाम')}</label>
-            <input class="input" id="demo-shop" required placeholder="${tr('e.g. Marwar Sanitary Traders', 'जैसे: मारवाड़ सेनेटरी ट्रेडर्स')}" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">${tr('10-Digit Mobile Number', '10 अंकों का मोबाइल नंबर')}</label>
-            <input class="input" id="demo-phone" required maxlength="10" placeholder="98XXXXXXXX" />
-          </div>
-          <div class="grid grid-2">
-            <div class="form-group">
-              <label class="form-label">${tr('Preferred Time Slot', 'पसंदीदा समय')}</label>
-              <select class="select" id="demo-slot">
-                <option value="Morning 10–12">${tr('Morning 10–12', 'सुबह 10 से 12 बजे')}</option>
-                <option value="Afternoon 12–3">${tr('Afternoon 12–3', 'दोपहर 12 से 3 बजे')}</option>
-                <option value="Evening 4–7">${tr('Evening 4–7', 'शाम 4 से 7 बजे')}</option>
-              </select>
+
+        <!-- 1-Click Interactive Demo Portals -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+          <button type="button" class="btn btn-gold" style="padding:16px 12px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;border-radius:12px" onclick="closeDemoModal();launchDemoPortal('merchant')">
+            <span style="font-size:1.8rem">🏪</span>
+            <span style="font-weight:800;font-size:0.95rem">${tr('Merchant Desk (POS & ERP)', 'दुकानदार POS व ERP')}</span>
+            <span style="font-size:0.75rem;opacity:0.9">${tr('Marwar Hardware (POS Desk)', 'मारवाड़ हार्डवेयर डेस्क')}</span>
+          </button>
+          <button type="button" class="btn btn-primary" style="padding:16px 12px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;border-radius:12px" onclick="closeDemoModal();launchDemoPortal('customer')">
+            <span style="font-size:1.8rem">🛒</span>
+            <span style="font-weight:800;font-size:0.95rem">${tr('Customer / Buyer Portal', 'ग्राहक व खरीदार पोर्टल')}</span>
+            <span style="font-size:0.75rem;opacity:0.9">${tr('Vikram Singh (Contractor)', 'विक्रम सिंह (खरीदार)')}</span>
+          </button>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-bottom:18px">
+          <button type="button" class="btn btn-ghost btn-sm" style="flex:1;border:1px solid #cbd5e1;font-size:0.82rem;padding:8px" onclick="closeDemoModal();launchDemoPortal('surya')">
+            🏭 ${tr('Surya Electricals (Wholesale)', 'सूर्या इलेक्ट्रिकल्स (थोक)')}
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm" style="flex:1;border:1px solid #cbd5e1;font-size:0.82rem;padding:8px" onclick="closeDemoModal();navigate('/order', { shop: 'shp-demo-marwar-01' })">
+            ⚡ ${tr('Live Counter Display', 'लाइव काउंटर डिस्प्ले')}
+          </button>
+        </div>
+
+        <div style="border-top:1px solid #e2e8f0;padding-top:16px">
+          <h4 style="font-size:0.95rem;margin-bottom:6px">📞 ${tr('Or Book a 1-on-1 Guided Setup Call', 'या 1-on-1 सहायता कॉल बुक करें')}</h4>
+          <p class="text-muted" style="font-size:0.82rem;margin-bottom:12px">
+            ${tr('Open to all traders, wholesalers, and shop owners. Our team will walk you through GST billing.', 'सभी व्यापारियों, थोक विक्रेताओं और दुकानदारों के लिए। हमारी टीम आपको पूरा डेमो देगी।')}
+          </p>
+          <form onsubmit="submitDemoRequest(event)">
+            <div class="grid grid-2" style="gap:10px">
+              <div class="form-group" style="margin-bottom:8px">
+                <label class="form-label" style="font-size:0.8rem">${tr('Shop Name', 'दुकान का नाम')}</label>
+                <input class="input" id="demo-shop" required placeholder="${tr('e.g. Marwar Sanitary', 'उदा. मारवाड़ सेनेटरी')}" style="padding:8px 10px;font-size:0.85rem" />
+              </div>
+              <div class="form-group" style="margin-bottom:8px">
+                <label class="form-label" style="font-size:0.8rem">${tr('Mobile Number', 'मोबाइल नंबर')}</label>
+                <input class="input" id="demo-phone" required maxlength="10" placeholder="98XXXXXXXX" style="padding:8px 10px;font-size:0.85rem" />
+              </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">${tr('Topic', 'विषय')}</label>
-              <select class="select" id="demo-topic">
-                <option value="B2B GST & IGST Billing">${tr('B2B GST & IGST Billing', 'B2B GST और IGST बिलिंग')}</option>
-                <option value="AI Photo-to-Catalog Setup">${tr('AI Photo-to-Catalog Setup', 'AI फोटो से कैटलॉग सेटअप')}</option>
-                <option value="QR & Parchi Ordering">${tr('QR & Parchi Ordering', 'QR और पर्ची ऑर्डर सिस्टम')}</option>
-                <option value="Working Capital Finance">${tr('Working Capital Finance', 'व्यापार पूँजी / लोन सहायता')}</option>
-              </select>
-            </div>
-          </div>
-          <button type="submit" class="btn btn-gold" style="width:100%;margin-top:10px">${tr('Confirm Demo Request', 'डेमो कॉल बुक करें')}</button>
-        </form>
+            <button type="submit" class="btn btn-ghost btn-sm" style="width:100%;margin-top:6px;border:1px solid #cbd5e1">${tr('Submit Booking Request', 'कॉल बुक करें')}</button>
+          </form>
+        </div>
       </div>
     </div>
   `;
@@ -8194,12 +8207,49 @@ window.logout = function() {
   bootstrap();
 };
 
+window.launchDemoPortal = async function(type = 'merchant') {
+  try {
+    showToast(tr('Launching live interactive demo...', 'लाइव डेमो शुरू हो रहा है...'));
+    const res = await apiFetch(`/api/auth/demo-login?type=${encodeURIComponent(type)}`);
+    if (res && res.token) {
+      state.token = res.token;
+      localStorage.setItem('kuberq_token', res.token);
+      await bootstrap();
+      showToast(tr(`Welcome to ${res.name} Demo!`, `${res.name} डेमो में स्वागत है!`));
+      if (type === 'customer') {
+        navigate('/customer');
+      } else if (type === 'admin') {
+        navigate('/admin');
+      } else {
+        state.merchantTab = 'pos';
+        navigate('/merchant');
+      }
+    }
+  } catch (err) {
+    showToast(err.message || 'Demo error', 'error');
+  }
+};
+
 window.quickLogin = async function(identifier, password, role) {
   try {
-    const res = await apiFetch('/api/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ identifier, password, role })
-    });
+    const clean = String(identifier || '').replace(/\D/g, '').slice(-10);
+    const isDemo = ['9829011223', '9414122334', '9928055667', '7240692736'].includes(clean);
+    let res = null;
+
+    if (isDemo) {
+      const demoType = clean === '9928055667' ? 'customer' : (clean === '9414122334' ? 'surya' : (clean === '7240692736' ? 'admin' : 'merchant'));
+      try {
+        res = await apiFetch(`/api/auth/demo-login?type=${demoType}`);
+      } catch (_) {}
+    }
+
+    if (!res || !res.token) {
+      res = await apiFetch('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ identifier, password, role, isDemo })
+      });
+    }
+
     state.token = res.token;
     localStorage.setItem('kuberq_token', res.token);
     saveBrowserAccount(identifier, res.name, res.role);
@@ -8207,7 +8257,10 @@ window.quickLogin = async function(identifier, password, role) {
     showToast(`Welcome, ${res.name}!`);
     if (res.role === 'admin' || res.role === 'employee') navigate('/admin');
     else if (res.role === 'customer') navigate('/customer');
-    else navigate('/merchant');
+    else {
+      state.merchantTab = 'pos';
+      navigate('/merchant');
+    }
   } catch (err) {
     showToast(err.message, 'error');
   }
