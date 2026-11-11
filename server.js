@@ -1983,7 +1983,7 @@ async function handleApi(req, res, pathname, query) {
     // Role-Isolated Private Data Injection (Strict Tenant Isolation!)
     if (user) {
       if (user.role === 'merchant' || user.role === 'manufacturer' || user.role === 'staff' || user.role === 'admin') {
-        const myShop = db.merchants.find(m => m.id === user.shopId) || (user.role === 'admin' ? db.merchants[0] : null);
+        const myShop = db.merchants.find(m => m.id === user.shopId) || db.merchants.find(m => m.phone === user.phone) || db.merchants[0];
         payload.myShop = sanitizeShopForClient(myShop);
         payload.myCustomers = (db.proCustomers || []).filter(c => c.shopId === user.shopId);
         payload.myTasks = (db.proTasks || []).filter(t => t.shopId === user.shopId);
@@ -4707,8 +4707,8 @@ const server = http.createServer(async (req, res) => {
     if (ext === '.webp' || ext === '.svg' || ext === '.png' || ext === '.jpg' || ext === '.jpeg' || ext === '.ico' || ext === '.woff' || ext === '.woff2' || ext === '.ttf') {
       headers['Cache-Control'] = 'public, max-age=31536000, immutable';
     } else if (ext === '.js' || ext === '.css') {
-      // Bundled JS & CSS with ETag revalidation and stale-while-revalidate
-      headers['Cache-Control'] = 'public, max-age=86400, stale-while-revalidate=604800';
+      // Bundled JS & CSS: Always revalidate via ETag so updates deploy instantly without stale caching
+      headers['Cache-Control'] = 'no-cache, must-revalidate';
     } else {
       // HTML SPA Bootstrap: Always revalidate so code deployments appear instantaneously
       headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
