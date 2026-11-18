@@ -82,7 +82,7 @@ const state = {
   },
   merchantTab: 'Dashboard',
   merchantMoreSubTab: 'QR Standee',
-  mfgSubTab: 'raw_materials',
+  mfgSubTab: 'raw',
   invoiceDocType: 'Tax Invoice',
   invoiceValidUntil: '',
   udhaarAgeBucket: 'ALL',
@@ -251,7 +251,7 @@ function showToast(msg, type = 'success') {
 async function apiFetch(url, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
   if (state.token) headers['Authorization'] = `Bearer ${state.token}`;
-  const res = await fetch(url, { ...options, headers });
+  const res = await fetch(url, { cache: 'no-store', ...options, headers });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(json.error || `Request failed (${res.status})`);
@@ -1568,7 +1568,7 @@ function renderHome() {
       <section class="container" style="padding:20px 24px 8px">
         <div class="section-heading">
           <span>✦ ${tr('Sponsored Business Spotlight', 'स्पॉन्सर्ड व्यापार स्पॉटलाइट (विशेष ऑफर्स)')}</span>
-          <button class="btn btn-gold btn-sm" onclick="state.merchantTab='Promote Business';navigate('/merchant')">
+          <button class="btn btn-gold btn-sm" onclick="state.merchantTab='Standee';state.merchantMoreSubTab='Promote Business';navigate('/merchant')">
             📢 ${tr('Promote Your Business Here →', 'अपना व्यापार यहाँ प्रमोट करें →')}
           </button>
         </div>
@@ -2391,23 +2391,33 @@ window.submitPasswordReset = async function(e) {
 // ============================================================================
 // 4. PRODUCT PHOTOGRAPHY HELPER & ZERO-LATENCY STOREFRONT (`/order` & `/customer`)
 // ============================================================================
-const PRODUCT_PLACEHOLDER_SVG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 150' fill='%231e293b'%3E%3Crect width='200' height='150' fill='%230f172a'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='32' fill='%2394a3b8'%3E📦%3C/text%3E%3C/svg%3E";
+const PRODUCT_PLACEHOLDER_SVG = "data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 150%22 fill=%22%231e293b%22%3E%3Crect width=%22200%22 height=%22150%22 fill=%22%230f172a%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 font-family=%22sans-serif%22 font-size=%2232%22 fill=%22%2394a3b8%22%3E📦%3C/text%3E%3C/svg%3E";
+
+function makeProductIllustrationSvg(bg1, bg2, icon, label) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 160"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${bg1}"/><stop offset="100%" stop-color="${bg2}"/></linearGradient></defs><rect width="240" height="160" rx="10" fill="url(#g)"/><circle cx="120" cy="64" r="34" fill="rgba(255,255,255,0.16)"/><text x="120" y="76" text-anchor="middle" font-size="34" font-family="Segoe UI Emoji, Apple Color Emoji, sans-serif">${icon}</text><text x="120" y="132" text-anchor="middle" font-size="13" font-weight="800" fill="#ffffff" font-family="Inter, sans-serif">${label}</text></svg>`;
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
 
 function getProductPhotoUrl(prod) {
-  if (prod && prod.imageUrl && String(prod.imageUrl).trim()) return String(prod.imageUrl).trim();
+  const rawUrl = prod && prod.imageUrl ? String(prod.imageUrl).trim() : '';
+  const brokenStockIds = ['1590381105924', '1527061011665', '1544716278', '1504148455328', '1542013936693'];
+  if (rawUrl && !brokenStockIds.some(id => rawUrl.includes(id))) {
+    return rawUrl;
+  }
   const name = ((prod?.name || '') + ' ' + (prod?.category || '')).toLowerCase();
-  if (/pipe|pvc|cpvc|upvc|plumbing/.test(name)) return 'https://images.unsplash.com/photo-1590381105924-c72589b9ef3f?auto=format&fit=crop&w=500&q=80';
+  if (/elbow|tee|coupler|fitting/.test(name)) return makeProductIllustrationSvg('#0f172a', '#0284c7', '🔧', 'PVC / CPVC Fitting');
+  if (/pipe|pvc|cpvc|upvc|plumbing/.test(name)) return makeProductIllustrationSvg('#1e3a8a', '#0ea5e9', '🛠️', 'Industrial PVC Pipe');
+  if (/tank|water|sintex/.test(name)) return makeProductIllustrationSvg('#0369a1', '#38bdf8', '🛢️', 'Water Storage Tank');
   if (/sanitary|tap|faucet|bath|basin|cock|bib/.test(name)) return 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=500&q=80';
-  if (/tank|water|sintex/.test(name)) return 'https://images.unsplash.com/photo-1527061011665-3652c757a4d4?auto=format&fit=crop&w=500&q=80';
   if (/putty|paint|cement|chemical|coating/.test(name)) return 'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?auto=format&fit=crop&w=500&q=80';
-  if (/wire|cable|polycab|havells|switch|socket|electrical/.test(name)) return 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=500&q=80';
+  if (/wire|cable|polycab|havells|switch|socket|electrical/.test(name)) return makeProductIllustrationSvg('#7c2d12', '#ea580c', '⚡', 'FR Copper Wire & Cable');
   if (/butter|milk|cheese|dairy|paneer|ghee/.test(name)) return 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?auto=format&fit=crop&w=500&q=80';
   if (/rice|grain|wheat|flour|dal|atta|grocery/.test(name)) return 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&w=500&q=80';
   if (/bakery|croissant|bread|biscuit|cake|snack/.test(name)) return 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=500&q=80';
   if (/chocolate|dark/.test(name)) return 'https://images.unsplash.com/photo-1548907040-4baa42d10919?auto=format&fit=crop&w=500&q=80';
   if (/soap|dish|detergent/.test(name)) return 'https://images.unsplash.com/photo-1585421514284-efb74c2b69ba?auto=format&fit=crop&w=500&q=80';
   if (/tomato|vegetable|fruit|banana|carrot|lemon/.test(name)) return 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?auto=format&fit=crop&w=500&q=80';
-  return 'https://images.unsplash.com/photo-1581783898377-1c85bf937427?auto=format&fit=crop&w=500&q=80';
+  return makeProductIllustrationSvg('#1e293b', '#475569', '📦', 'B2B Catalog Item');
 }
 
 function renderOrderPage() {
@@ -3285,31 +3295,52 @@ function renderMerchantSupplierPurchasesOnly(shop) {
   `;
 }
 
+function computeOrderFinancials(o, products = []) {
+  const gross = Number(o.totals?.gross ?? o.total ?? o.amount ?? 0);
+  const gst = Number(o.totals?.gst ?? o.tax ?? 0);
+  const disc = Number(o.discount ?? o.totals?.discount ?? 0);
+  const taxable = Number(o.totals?.taxable ?? Math.max(0, Number(o.subtotal || (gross - gst)) - disc)) || Math.max(0, gross - gst);
+  let cost = Number(o.totals?.costTotal || 0);
+  if (!cost) {
+    if (Array.isArray(o.items) && o.items.length > 0 && products.length > 0) {
+      for (const item of o.items) {
+        const p = products.find(pr => pr.id === item.productId || pr.id === item.id || pr.name === item.name);
+        const unitCost = p && p.costPrice ? Number(p.costPrice) : Math.round((Number(item.price) || 0) * 0.84);
+        cost += unitCost * (Number(item.qty) || 1);
+      }
+    }
+    if (!cost) {
+      cost = Math.round(taxable * 0.84);
+    }
+  }
+  return { gross, taxable, gst, disc, cost };
+}
+
 function renderMerchantExpensesOnly(shop) {
-  const expenses = state.data.myExpenses || [];
+  const period = state.accountingPeriod || 'all';
+  const expenses = filterByAccountingPeriod(state.data.myExpenses || [], period);
   const totalExpenses = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
-  const allOrders = state.data.myOrders || [];
+  const allOrders = filterByAccountingPeriod(state.data.myOrders || [], period);
   const validOrders = allOrders.filter(o => o.status !== 'Rejected' && o.status !== 'Sales Return' && o.status !== 'Quotation' && o.docType !== 'Quotation');
-  const grossRevenue = validOrders.reduce((s, o) => s + (Number(o.totals?.gross) || 0), 0);
-  const taxableSales = validOrders.reduce((s, o) => s + (Number(o.totals?.taxable) || Number(o.totals?.gross) || 0), 0);
-
   const products = state.data.products.filter(p => p.shopId === shop.id);
+
+  let grossRevenue = 0;
+  let taxableSales = 0;
   let totalCogs = 0;
   for (const o of validOrders) {
-    for (const item of o.items || []) {
-      const p = products.find(pr => pr.id === item.productId || pr.name === item.name);
-      const unitCost = p && p.costPrice ? Number(p.costPrice) : Math.round((Number(item.price) || 0) * 0.82);
-      totalCogs += unitCost * (Number(item.qty) || 1);
-    }
+    const fin = computeOrderFinancials(o, products);
+    grossRevenue += fin.gross;
+    taxableSales += fin.taxable;
+    totalCogs += fin.cost;
   }
   const grossMargin = Math.max(0, taxableSales - totalCogs);
   const netOperatingProfit = grossMargin - totalExpenses;
 
   const cashSales = validOrders.filter(o => o.paymentMode === 'Cash')
-    .reduce((s, o) => s + (Number(o.totals?.gross) || 0), 0);
+    .reduce((s, o) => s + computeOrderFinancials(o, products).gross, 0);
   const upiSales = validOrders.filter(o => o.paymentMode === 'UPI')
-    .reduce((s, o) => s + (Number(o.totals?.gross) || 0), 0);
+    .reduce((s, o) => s + computeOrderFinancials(o, products).gross, 0);
   const cashExpenses = expenses.filter(e => e.mode === 'Cash').reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const upiExpenses = expenses.filter(e => e.mode === 'UPI').reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const cashInDrawer = Math.max(0, cashSales - cashExpenses);
@@ -3474,22 +3505,23 @@ function renderMerchantExpensesOnly(shop) {
 function computeSixMonthFinancials(orders, expenses) {
   const months = [];
   const now = new Date();
+  const shopId = state.data.myShop?.id || state.selectedShopId;
+  const products = (state.data.products || []).filter(p => !shopId || p.shopId === shopId);
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const label = d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
-    months.push({ ym, label, revenue: 0, cogs: 0, expenses: 0, netProfit: 0, count: 0 });
+    months.push({ ym, label, revenue: 0, taxable: 0, cogs: 0, expenses: 0, netProfit: 0, count: 0 });
   }
   for (const o of orders || []) {
     if (o.status === 'Rejected' || o.status === 'Sales Return' || o.docType === 'Quotation' || o.status === 'Quotation') continue;
     const ym = String(o.date || o.createdAt || '').slice(0, 7);
     const m = months.find(x => x.ym === ym) || months[months.length - 1];
     if (m) {
-      const g = Number(o.totals?.gross || o.amount || 0);
-      const tx = Number(o.totals?.taxable || g);
-      const cost = Number(o.totals?.costTotal) || Math.round(tx * 0.82);
-      m.revenue += g;
-      m.cogs += cost;
+      const fin = computeOrderFinancials(o, products);
+      m.revenue += fin.gross;
+      m.taxable += fin.taxable;
+      m.cogs += fin.cost;
       m.count += 1;
     }
   }
@@ -3501,7 +3533,7 @@ function computeSixMonthFinancials(orders, expenses) {
     }
   }
   for (const m of months) {
-    const grossMargin = Math.max(0, m.revenue - m.cogs);
+    const grossMargin = Math.max(0, m.taxable - m.cogs);
     m.grossMargin = grossMargin;
     m.netProfit = grossMargin - m.expenses;
   }
@@ -3587,9 +3619,10 @@ function renderMerchantReportsOnly(shop) {
   // 6-Month P&L
   const sixMonths = computeSixMonthFinancials(rawOrders, rawExpenses);
   const total6mRev = sixMonths.reduce((s, m) => s + m.revenue, 0);
+  const total6mTaxable = sixMonths.reduce((s, m) => s + (m.taxable || m.revenue), 0);
   const total6mCogs = sixMonths.reduce((s, m) => s + m.cogs, 0);
   const total6mExp = sixMonths.reduce((s, m) => s + m.expenses, 0);
-  const total6mNet = sixMonths.reduce((s, m) => s + m.netProfit, 0);
+  const total6mNet = Math.max(0, total6mTaxable - total6mCogs) - total6mExp;
 
   return `
     <div style="display:grid;gap:18px">
@@ -4553,7 +4586,7 @@ function renderMerchantPortal() {
     bannerTitle = tr('Products & Services Catalog', 'प्रोडक्ट्स, सर्विसेज एवं स्टॉक प्रबंधन');
     bannerSubtitle = tr('Add single or multi-row products/services with blurred popup modal, HSN & AI scanner', 'पॉपअप फॉर्म में हॉरिजॉन्टल व वर्टिकल पंक्तियों के साथ सामान या सर्विस जोड़ें');
     bannerActionHtml = `
-      <button class="btn btn-primary btn-sm" style="background:#0284c7;border-color:#38bdf8" onclick="openProductAddModal()">+ ${tr('Add Product / Service (Popup)', '+ प्रोडक्ट / सर्विस जोड़ें (Popup)')}</button>
+      <button class="btn btn-primary btn-sm" style="background:#0284c7;border-color:#38bdf8" onclick="openProductAddModal()">+ ${tr('Add Product / Service (Popup)', 'प्रोडक्ट / सर्विस जोड़ें (Popup)')}</button>
       <button class="btn btn-gold btn-sm" onclick="openAiScannerModal()">✨ ${tr('AI Stock Scanner', 'AI बिल स्कैनर')}</button>
     `;
     contentHtml = renderMerchantInventory(shop);
@@ -4684,16 +4717,17 @@ function renderMerchantDashboard(shop) {
   const split = { Cash: 0, UPI: 0, Card: 0, Credit: 0, Unmarked: 0 };
 
   for (const o of orders) {
-    if (o.status === 'Rejected') continue;
-    const g = Number(o.totals?.gross) || 0;
+    if (o.status === 'Rejected' || o.docType === 'Quotation' || o.status === 'Quotation') continue;
+    const fin = computeOrderFinancials(o, products);
+    const g = fin.gross;
     if (o.status === 'Sales Return') {
       salesReturnTotal += g;
       continue;
     }
-    const tx = Number(o.totals?.taxable) || 0;
-    const gs = Number(o.totals?.gst) || 0;
-    const cost = Number(o.totals?.costTotal) || Math.round(tx * 0.84);
-    const disc = Number(o.discount || o.totals?.discount) || 0;
+    const tx = fin.taxable;
+    const gs = fin.gst;
+    const cost = fin.cost;
+    const disc = fin.disc;
 
     grossSales += g;
     taxableSales += tx;
@@ -4805,7 +4839,7 @@ function renderMerchantDashboard(shop) {
   const draftDash = Math.max(0, 251 - paidDash - pendDash - overDash);
 
   return `
-    <div style="display:grid;gap:16px">
+    <div style="display:grid;grid-template-columns:minmax(0,1fr);gap:16px;max-width:100%">
       <!-- 1. EXECUTIVE DASHBOARD 4 KPI CARDS (Matching Screenshot 1) -->
       <div class="exec-kpi-grid">
         <div class="exec-kpi-card indigo">
@@ -5829,7 +5863,7 @@ function renderMerchantInventory(shop) {
           </div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
             <button type="button" class="btn btn-primary" style="background:#0284c7;border-color:#0284c7" onclick="openProductAddModal()">
-              ➕ ${tr('+ Add Product / Service (Popup)', '+ नया सामान / सेवा जोड़ें (पॉपअप)')}
+              ➕ ${tr('Add Product / Service (Popup)', 'नया सामान / सेवा जोड़ें (पॉपअप)')}
             </button>
             <select class="select" id="tpl-picker" style="width:auto;min-width:220px">
               ${templates.map(t => `<option value="${t.key}">📦 ${esc(state.lang === 'hi' ? t.labelHi : t.labelEn)} (${t.count} items)</option>`).join('')}
@@ -8383,6 +8417,7 @@ window.handleAdminDirectLogin = async function(e) {
       method: 'POST',
       body: JSON.stringify({ identifier, password, role: 'admin' })
     });
+    state.token = res.token;
     localStorage.setItem('kuberq_token', res.token);
     showToast(tr('✅ Welcome to Admin Command Center!', '✅ एडमिन कमांड सेंटर में स्वागत है!'));
     await bootstrap();
@@ -9602,10 +9637,10 @@ window.submitDemoRequest = async function(e) {
       method: 'POST',
       body: JSON.stringify({
         kind: 'demo',
-        shop: document.getElementById('demo-shop').value.trim(),
-        phone: document.getElementById('demo-phone').value.trim(),
-        slot: document.getElementById('demo-slot').value,
-        topic: document.getElementById('demo-topic').value
+        shop: document.getElementById('demo-shop')?.value.trim() || '',
+        phone: document.getElementById('demo-phone')?.value.trim() || '',
+        slot: document.getElementById('demo-slot')?.value || 'Morning (10 AM - 1 PM)',
+        topic: document.getElementById('demo-topic')?.value || 'Full ERP & GST Billing Setup'
       })
     });
     state.demoModalOpen = false;
@@ -10578,11 +10613,11 @@ function renderMerchantManufacturing(shop) {
                   <tr><td colspan="7" style="text-align:center;padding:24px;color:#64748b">${tr('No raw materials added yet.', 'अभी कोई कच्चा माल नहीं जुड़ा है।')}</td></tr>
                 ` : rawMaterials.map(r => {
                   const val = Number(r.stock || 0) * Number(r.unitCost || 0);
-                  const isLow = Number(r.stock || 0) <= Number(r.minThreshold || 0);
+                  const isLow = Number(r.stock || 0) <= Number(r.minThreshold ?? r.minAlert ?? 0);
                   return `
                     <tr>
-                      <td><b>${esc(r.materialName)}</b></td>
-                      <td><span style="font-family:monospace;font-size:0.8rem">${esc(r.code || '-')}</span></td>
+                      <td><b>${esc(r.materialName || r.name)}</b></td>
+                      <td><span style="font-family:monospace;font-size:0.8rem">${esc(r.code || r.category || '-')}</span></td>
                       <td style="font-family:monospace">${esc(r.hsn || '-')}</td>
                       <td>
                         <b>${r.stock} ${esc(r.unit)}</b>
@@ -10695,8 +10730,8 @@ function renderMerchantManufacturing(shop) {
                     </td>
                     <td><b>${esc(j.partyName)}</b></td>
                     <td>${esc(j.processType)}</td>
-                    <td>${esc(j.materialDesc)} (${j.qty})</td>
-                    <td>${fmtINR(j.processCharges || 0)}</td>
+                    <td>${esc(j.materialDesc || j.inputMaterial || '-')}${j.qty ? ` (${j.qty})` : ''}</td>
+                    <td>${fmtINR(j.processCharges ?? j.totalJobCharges ?? 0)}</td>
                     <td><span class="badge badge-success">${esc(j.status || 'Active')}</span></td>
                   </tr>
                 `).join('')}
@@ -10723,7 +10758,7 @@ function renderMerchantManufacturing(shop) {
                 <select class="select" id="pb-raw-id" required>
                   <option value="">${tr('-- Select Raw Material --', '-- कच्चा माल चुनें --')}</option>
                   ${rawMaterials.map(r => `
-                    <option value="${r.id}">[${esc(r.materialName)}] ${r.stock} ${r.unit} (${fmtINR(r.unitCost)}/${r.unit})</option>
+                    <option value="${r.id}">[${esc(r.materialName || r.name)}] ${r.stock} ${r.unit} (${fmtINR(r.unitCost)}/${r.unit})</option>
                   `).join('')}
                 </select>
               </div>
@@ -10787,9 +10822,9 @@ function renderMerchantManufacturing(shop) {
                     <td><b>${esc(b.productName)}</b></td>
                     <td>${b.outputQty} ${esc(b.unit)}</td>
                     <td>${fmtINR(b.rawMaterialCost || 0)}</td>
-                    <td>${fmtINR(b.laborPowerCost || 0)}</td>
+                    <td>${fmtINR(b.laborPowerCost ?? b.laborJobCost ?? 0)}</td>
                     <td><b>${fmtINR(b.totalBatchCost || 0)}</b></td>
-                    <td style="color:#16a34a;font-weight:800">${fmtINR(b.unitCost || 0)} / ${esc(b.unit)}</td>
+                    <td style="color:#16a34a;font-weight:800">${fmtINR(b.unitCost ?? b.unitProductionCost ?? 0)} / ${esc(b.unit)}</td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -11577,7 +11612,7 @@ window.saveCustomerModalForm = async function(e) {
     });
     state.customerModal = null;
     await bootstrap();
-    if (res.customer && state.merchantTab === 'InvoiceBuilder') {
+    if (res.customer && (state.merchantTab === 'Billing' || state.merchantTab === 'InvoiceBuilder')) {
       window.pickSavedCrmCustomerForInvoice(res.customer.id);
     }
     showToast(tr('✅ Customer profile saved! Available for 1-click auto-fill in all future bills.', '✅ ग्राहक प्रोफाइल सेव हो गया! अब हर बिल में 1-क्लिक में ऑटो-फिल होगा।'));
@@ -11626,7 +11661,7 @@ window.prefillInvoiceFromCustomer = function(customerId) {
     gstin: c.gstin || '',
     address: [c.street, c.city, c.state, c.pincode].filter(Boolean).join(', ')
   };
-  state.merchantTab = 'InvoiceBuilder';
+  state.merchantTab = 'Billing';
   render();
   showToast(tr(`🧾 Ready to bill ${c.companyName || c.contactName}`, `🧾 ${c.companyName || c.contactName} के लिए बिल तैयार है`));
 };
@@ -12355,24 +12390,34 @@ window.saveSystemSettingsTab = async function(e, tab) {
       });
       await bootstrap();
       showToast(tr('✅ Banking & UPI settlement details saved!', '✅ बैंक खाता और UPI विवरण सेव हो गया!'));
-    } else if (tab === 'invoice_defaults') {
+    } else if (tab === 'invoice' || tab === 'invoice_defaults') {
+      const getVal = (id1, id2, def = '') => (document.getElementById(id1) || document.getElementById(id2))?.value ?? def;
+      const getChk = (id1, id2, def = true) => {
+        const el = document.getElementById(id1) || document.getElementById(id2);
+        return el ? Boolean(el.checked) : def;
+      };
       await apiFetch('/api/merchant/pro', {
         method: 'POST',
         body: JSON.stringify({
           action: 'settings_save',
+          section: 'invoice',
           invoiceDefaults: {
-            defaultPaymentMode: document.getElementById('def-pay-mode').value,
-            defaultGstRate: Number(document.getElementById('def-gst-rate').value),
-            defaultTaxMode: document.getElementById('def-tax-mode').value,
-            defaultHsn: document.getElementById('def-hsn').value.trim() || '3917',
-            defaultSupplyType: document.getElementById('def-supply').value,
-            dueDays: Number(document.getElementById('def-due-days').value || 15),
-            quoteValidDays: Number(document.getElementById('def-quote-days').value || 7),
-            printFormat: document.getElementById('def-print-fmt').value,
-            showBankDetails: document.getElementById('def-show-bank').checked,
-            terms: document.getElementById('def-terms').value,
-            signatory: document.getElementById('def-signatory').value.trim(),
-            footerNote: document.getElementById('def-footer').value.trim()
+            defaultPaymentMode: getVal('set-inv-paymode', 'def-pay-mode', 'Cash'),
+            defaultGstRate: Number(getVal('set-inv-gst', 'def-gst-rate', 18)),
+            defaultTaxMode: getVal('set-inv-taxmode', 'def-tax-mode', 'exclusive'),
+            defaultHsn: String(getVal('set-inv-hsn', 'def-hsn', '3917')).trim() || '3917',
+            defaultSupplyType: getVal('set-inv-supply', 'def-supply', 'auto'),
+            dueDays: Number(getVal('set-inv-duedays', 'def-due-days', 15) || 15),
+            quotationValidityDays: Number(getVal('set-inv-quotedays', 'def-quote-days', 7) || 7),
+            quoteValidDays: Number(getVal('set-inv-quotedays', 'def-quote-days', 7) || 7),
+            defaultPrintFormat: getVal('set-inv-print', 'def-print-fmt', 'a4'),
+            printFormat: getVal('set-inv-print', 'def-print-fmt', 'a4'),
+            showBankDetails: getChk('set-inv-showbank', 'def-show-bank', true),
+            termsAndConditions: getVal('set-inv-terms', 'def-terms', ''),
+            terms: getVal('set-inv-terms', 'def-terms', ''),
+            signatoryTitle: String(getVal('set-inv-sign', 'def-signatory', '')).trim(),
+            signatory: String(getVal('set-inv-sign', 'def-signatory', '')).trim(),
+            footerNote: String(getVal('set-inv-footer', 'def-footer', '')).trim()
           }
         })
       });
@@ -12385,51 +12430,69 @@ window.saveSystemSettingsTab = async function(e, tab) {
 };
 
 window.onAiProviderPlatformChange = function(val) {
-  const labelEl = document.getElementById('ai-cfg-label');
-  const modelEl = document.getElementById('ai-cfg-model');
-  const urlEl = document.getElementById('ai-cfg-url');
+  state.aiProviderForm = state.aiProviderForm || {};
+  state.aiProviderForm.provider = val;
   if (val.includes('Google AI Studio')) {
-    if (labelEl) labelEl.value = 'Google AI Studio (Gemini)';
-    if (modelEl) modelEl.value = 'gemini-2.5-flash';
-    if (urlEl) urlEl.value = 'https://generativelanguage.googleapis.com/v1beta';
+    state.aiProviderForm.label = 'Google AI Studio (Gemini)';
+    state.aiProviderForm.modelId = 'gemini-2.5-flash';
+    state.aiProviderForm.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
   } else if (val.includes('OpenRouter')) {
-    if (labelEl) labelEl.value = 'OpenRouter Unified Gateway';
-    if (modelEl) modelEl.value = 'google/gemini-flash-1.5';
-    if (urlEl) urlEl.value = 'https://openrouter.ai/api/v1';
-  } else if (val.includes('OpenAI')) {
-    if (labelEl) labelEl.value = 'OpenAI (ChatGPT)';
-    if (modelEl) modelEl.value = 'gpt-4o-mini';
-    if (urlEl) urlEl.value = 'https://api.openai.com/v1';
+    state.aiProviderForm.label = 'OpenRouter Unified Gateway';
+    state.aiProviderForm.modelId = 'google/gemini-flash-1.5';
+    state.aiProviderForm.baseUrl = 'https://openrouter.ai/api/v1';
+  } else if (val.includes('OpenAI') && !val.includes('Custom')) {
+    state.aiProviderForm.label = 'OpenAI (ChatGPT)';
+    state.aiProviderForm.modelId = 'gpt-4o-mini';
+    state.aiProviderForm.baseUrl = 'https://api.openai.com/v1';
   } else if (val.includes('Anthropic')) {
-    if (labelEl) labelEl.value = 'Anthropic Claude';
-    if (modelEl) modelEl.value = 'claude-3-5-sonnet-latest';
-    if (urlEl) urlEl.value = 'https://api.anthropic.com/v1';
+    state.aiProviderForm.label = 'Anthropic Claude';
+    state.aiProviderForm.modelId = 'claude-3-5-sonnet-latest';
+    state.aiProviderForm.baseUrl = 'https://api.anthropic.com/v1';
   } else {
-    if (labelEl) labelEl.value = 'Custom OpenAI-Compatible API';
-    if (modelEl) modelEl.value = 'llama-3.3-70b-versatile';
-    if (urlEl) urlEl.value = 'https://api.groq.com/openai/v1';
+    state.aiProviderForm.label = 'Custom OpenAI-Compatible API';
+    state.aiProviderForm.modelId = 'llama-3.3-70b-versatile';
+    state.aiProviderForm.baseUrl = 'https://api.groq.com/openai/v1';
   }
+  const labelEl = document.getElementById('aip-label') || document.getElementById('ai-cfg-label');
+  const modelEl = document.getElementById('aip-model') || document.getElementById('ai-cfg-model');
+  const urlEl = document.getElementById('aip-baseurl') || document.getElementById('ai-cfg-url');
+  if (labelEl) labelEl.value = state.aiProviderForm.label;
+  if (modelEl) modelEl.value = state.aiProviderForm.modelId;
+  if (urlEl) urlEl.value = state.aiProviderForm.baseUrl;
+  render();
 };
 
 window.saveAiProviderConfig = async function(e) {
   e.preventDefault();
   try {
+    const f = state.aiProviderForm || {};
+    const platform = (document.getElementById('aip-provider') || document.getElementById('ai-cfg-platform'))?.value || f.provider || 'Google AI Studio (Gemini)';
+    const label = ((document.getElementById('aip-label') || document.getElementById('ai-cfg-label'))?.value || f.label || platform).trim();
+    const apiKey = ((document.getElementById('aip-key') || document.getElementById('ai-cfg-key'))?.value || f.apiKey || '').trim();
+    const modelId = ((document.getElementById('aip-model') || document.getElementById('ai-cfg-model'))?.value || f.modelId || 'gemini-2.5-flash').trim();
+    const baseUrl = ((document.getElementById('aip-baseurl') || document.getElementById('ai-cfg-url'))?.value || f.baseUrl || '').trim();
+    const maxTokens = parseInt((document.getElementById('aip-tokens') || document.getElementById('ai-cfg-tokens'))?.value || f.maxTokens || '4096', 10) || 4096;
+    const enabledEl = document.getElementById('aip-enabled') || document.getElementById('ai-cfg-enabled');
+    const primaryEl = document.getElementById('aip-primary') || document.getElementById('ai-cfg-primary');
     await apiFetch('/api/merchant/pro', {
       method: 'POST',
       body: JSON.stringify({
         action: 'ai_provider_save',
-        platform: document.getElementById('ai-cfg-platform').value,
-        label: document.getElementById('ai-cfg-label').value.trim(),
-        apiKey: document.getElementById('ai-cfg-key').value.trim(),
-        modelId: document.getElementById('ai-cfg-model').value.trim(),
-        baseUrl: document.getElementById('ai-cfg-url').value.trim(),
-        temperature: parseFloat(document.getElementById('ai-cfg-temp').value) || 0.7,
-        maxTokens: parseInt(document.getElementById('ai-cfg-tokens').value, 10) || 4096,
-        enabled: document.getElementById('ai-cfg-enabled').checked,
-        isPrimary: document.getElementById('ai-cfg-primary').checked
+        id: f.id || '',
+        platform,
+        label,
+        apiKey,
+        modelId,
+        baseUrl,
+        temperature: parseFloat(f.temperature ?? 0.7) || 0.7,
+        maxTokens,
+        enabled: enabledEl ? enabledEl.checked : (f.enabled !== false),
+        isPrimary: primaryEl ? primaryEl.checked : (f.isPrimary !== false)
       })
     });
-    document.getElementById('ai-cfg-key').value = '';
+    const keyEl = document.getElementById('aip-key') || document.getElementById('ai-cfg-key');
+    if (keyEl) keyEl.value = '';
+    if (state.aiProviderForm) state.aiProviderForm.apiKey = '';
     await bootstrap();
     showToast(tr('🔐 AI Provider encrypted with AES-256-GCM and saved!', '🔐 AI प्रोवाइडर AES-256-GCM सुरक्षा के साथ सेव हो गया!'));
   } catch (err) {
@@ -12440,14 +12503,15 @@ window.saveAiProviderConfig = async function(e) {
 window.testAiProviderConnection = async function(id = null) {
   try {
     showToast(tr('⏳ Testing AI Provider connection...', '⏳ AI कनेक्शन जाँचा जा रहा है...'));
+    const f = state.aiProviderForm || {};
     const body = id
       ? { action: 'ai_provider_test', id }
       : {
           action: 'ai_provider_test',
-          platform: document.getElementById('ai-cfg-platform')?.value || 'Google AI Studio (Gemini)',
-          apiKey: document.getElementById('ai-cfg-key')?.value.trim() || '',
-          modelId: document.getElementById('ai-cfg-model')?.value.trim() || 'gemini-2.5-flash',
-          baseUrl: document.getElementById('ai-cfg-url')?.value.trim() || ''
+          platform: (document.getElementById('aip-provider') || document.getElementById('ai-cfg-platform'))?.value || f.provider || 'Google AI Studio (Gemini)',
+          apiKey: ((document.getElementById('aip-key') || document.getElementById('ai-cfg-key'))?.value || f.apiKey || '').trim(),
+          modelId: ((document.getElementById('aip-model') || document.getElementById('ai-cfg-model'))?.value || f.modelId || 'gemini-2.5-flash').trim(),
+          baseUrl: ((document.getElementById('aip-baseurl') || document.getElementById('ai-cfg-url'))?.value || f.baseUrl || '').trim()
         };
     const res = await apiFetch('/api/merchant/pro', {
       method: 'POST',
@@ -13166,7 +13230,10 @@ function renderCounterQueueBoard(shop) {
 
 window.updateOrderStatusFromQueue = async function(orderId, newStatus) {
   try {
-    const res = await api('/api/merchant/order-update', 'POST', { orderId, status: newStatus });
+    const res = await apiFetch('/api/merchant/order-update', {
+      method: 'POST',
+      body: JSON.stringify({ orderId, status: newStatus })
+    });
     if (res && res.alertUrl && newStatus === 'Ready for Pickup') {
       window.open(res.alertUrl, '_blank');
     }
@@ -13176,6 +13243,21 @@ window.updateOrderStatusFromQueue = async function(orderId, newStatus) {
   } catch (err) {
     showToast(err.message, 'error');
   }
+};
+
+window.openProductModal = function(id = '') {
+  return window.openProductAddModal(id);
+};
+
+window.openSupplierReturnModal = function(productId) {
+  const prod = (state.data.products || []).find(p => p.id === productId);
+  state.merchantTab = 'Suppliers';
+  render();
+  showToast(
+    prod
+      ? tr(`🚚 Switched to Suppliers Desk to process return for "${prod.name}".`, `🚚 "${prod.name}" की सप्लायर वापसी के लिए सप्लायर डेस्क खोला गया।`)
+      : tr('🚚 Switched to Suppliers Desk.', '🚚 सप्लायर डेस्क खोला गया।')
+  );
 };
 
 window.setPosItemPrice = function(idx, val) {
@@ -13487,7 +13569,7 @@ function renderMerchantExpiryBatches(shop) {
   const totalGood = batches.filter(b => b.status === 'Good').length;
   const totalFinished = batches.filter(b => b.status === 'Finished').length;
 
-  const filtered = filter === 'ALL' ? batches : batches.filter(b => b.status.toUpperCase().replace(/s/g, '_') === filter);
+  const filtered = filter === 'ALL' ? batches : batches.filter(b => b.status.toUpperCase().replace(/\s+/g, '_') === filter);
 
   return `
     <div style="display:grid;gap:18px">
@@ -13500,7 +13582,7 @@ function renderMerchantExpiryBatches(shop) {
           </div>
           <div style="display:flex;gap:8px">
             <button type="button" class="btn btn-gold btn-sm" onclick="state.merchantTab='Suppliers';render()">🚚 ${tr('Supplier Return', 'सप्लायर को वापसी')}</button>
-            <button type="button" class="btn btn-primary btn-sm" onclick="openProductModal()">+ ${tr('Add New Batch', 'नया बैच जोड़ें')}</button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="openProductAddModal()">+ ${tr('Add New Batch', 'नया बैच जोड़ें')}</button>
           </div>
         </div>
 
@@ -13520,14 +13602,6 @@ function renderMerchantExpiryBatches(shop) {
           </button>
           <button type="button" class="subtab-chip ${filter === 'FINISHED' ? 'active' : ''}" onclick="state.expiryBatchFilter='FINISHED';render()">
             🏁 FINISHED (${totalFinished})
-          </button>
-        </div>
-          </button>
-          <button type="button" style="flex:1;padding:10px 14px;border:none;cursor:pointer;font-weight:800;font-size:0.86rem;background:${filter === 'GOOD' ? '#16a34a' : '#dcfce7'};color:${filter === 'GOOD' ? '#ffffff' : '#166534'}" onclick="state.expiryBatchFilter='GOOD';render()">
-            ✓ GOOD (${totalGood})
-          </button>
-          <button type="button" style="flex:1;padding:10px 14px;border:none;cursor:pointer;font-weight:800;font-size:0.86rem;background:${filter === 'FINISHED' ? '#64748b' : '#f1f5f9'};color:${filter === 'FINISHED' ? '#ffffff' : '#475569'}" onclick="state.expiryBatchFilter='FINISHED';render()">
-            FINISHED (${totalFinished})
           </button>
         </div>
 
@@ -13915,7 +13989,7 @@ function renderStorefrontBarcodeSheetModal(shop) {
 
                 <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(180px, 1fr));gap:10px">
                   ${catItems.map(p => {
-                    const barcode = p.barcode || p.sku || ('2000' + String(p.id).replace(/D/g, '').slice(-8));
+                    const barcode = p.barcode || p.sku || ('2000' + String(p.id).replace(/\D/g, '').slice(-8));
                     return `
                       <div class="shelf-tag-card" style="border:1.5px solid #0f172a;border-radius:6px;padding:8px;text-align:center;background:#fff">
                         <strong style="font-size:0.84rem;color:#0f172a;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</strong>
