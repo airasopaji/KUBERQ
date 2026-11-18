@@ -857,6 +857,53 @@ function loadDb() {
         o.merchantRatingForBuyer = 5;
         o.merchantFeedbackForBuyer = 'समय पर भुगतान करने वाला विश्वसनीय ग्राहक (Timely Payer)';
       }
+      if (!o.customer && o.buyerName) o.customer = o.buyerName;
+      if (!o.buyerName && o.customer) o.buyerName = o.customer;
+      if (!o.date && o.createdAt) o.date = o.createdAt;
+      if (!o.totals || (!o.totals.gross && Array.isArray(o.items) && o.items.length > 0)) {
+        let calcTaxable = 0;
+        let calcGst = 0;
+        let calcCost = 0;
+        for (const it of o.items || []) {
+          const p = (parsed.products || []).find(pr => (pr.id === it.productId || pr.id === it.id || pr.name === it.name) && pr.shopId === o.shopId);
+          const qty = Math.max(0, Number(it.qty) || 1);
+          const price = Number(it.price || p?.price || 0);
+          const gstRate = Number(it.gstRate ?? p?.gstRate ?? 18);
+          const unitCost = p && p.costPrice ? Number(p.costPrice) : Math.round(price * 0.84);
+          calcCost += unitCost * qty;
+          const lineAmt = price * qty;
+          if ((it.taxMode || o.taxMode) === 'inclusive' && gstRate > 0) {
+            const lt = lineAmt / (1 + gstRate / 100);
+            calcTaxable += lt;
+            calcGst += (lineAmt - lt);
+          } else {
+            calcTaxable += lineAmt;
+            calcGst += lineAmt * (gstRate / 100);
+          }
+        }
+        const disc = Number(o.discount || 0);
+        const grossVal = Number(o.total || o.amount || Math.max(0, Math.round((calcTaxable + calcGst - disc) * 100) / 100));
+        const taxVal = Number(o.tax || Math.round(calcGst * 100) / 100);
+        const taxableVal = Math.max(0, Number(o.subtotal || Math.round(calcTaxable * 100) / 100 || (grossVal - taxVal)) - disc);
+        o.totals = {
+          taxable: taxableVal || grossVal,
+          discount: disc,
+          gst: taxVal,
+          cgst: o.supplyType === 'inter' ? 0 : Math.round(taxVal * 50) / 100,
+          sgst: o.supplyType === 'inter' ? 0 : Math.round(taxVal * 50) / 100,
+          igst: o.supplyType === 'inter' ? taxVal : 0,
+          gross: grossVal,
+          costTotal: calcCost || Math.round((taxableVal || grossVal) * 0.84)
+        };
+      } else if (!o.totals.costTotal && o.totals.taxable > 0) {
+        let calcCost = 0;
+        for (const it of o.items || []) {
+          const p = (parsed.products || []).find(pr => (pr.id === it.productId || pr.id === it.id || pr.name === it.name) && pr.shopId === o.shopId);
+          const unitCost = p && p.costPrice ? Number(p.costPrice) : Math.round((Number(it.price) || 0) * 0.84);
+          calcCost += unitCost * (Number(it.qty) || 1);
+        }
+        o.totals.costTotal = calcCost || Math.round(Number(o.totals.taxable) * 0.84);
+      }
     }
     for (const p of parsed.providers || []) {
       if (!p.pincode) p.pincode = '342001';
@@ -1038,11 +1085,33 @@ function loadDb() {
           rawMaterialsConsumed: 'Copper 120 Kg + PVC 48 Kg',
           rawMaterialCost: 99120,
           laborJobCost: 3600,
+          laborPowerCost: 3600,
           totalBatchCost: 102720,
           unitProductionCost: 2568,
+          unitCost: 2568,
           createdAt: new Date(Date.now() - 86400000 * 3).toISOString()
         }
       ];
+    }
+    for (const rm of parsed.rawMaterials || []) {
+      if (!rm.materialName) rm.materialName = rm.name || '';
+      if (!rm.name) rm.name = rm.materialName || '';
+      if (!rm.code) rm.code = rm.category || 'GRADE-A';
+      if (rm.minThreshold === undefined) rm.minThreshold = rm.minAlert ?? 20;
+      if (rm.minAlert === undefined) rm.minAlert = rm.minThreshold ?? 20;
+    }
+    for (const jw of parsed.jobWorkOrders || []) {
+      if (!jw.materialDesc) jw.materialDesc = jw.inputMaterial || '';
+      if (!jw.inputMaterial) jw.inputMaterial = jw.materialDesc || '';
+      if (jw.qty === undefined) jw.qty = 1;
+      if (jw.processCharges === undefined) jw.processCharges = jw.totalJobCharges ?? 0;
+      if (jw.totalJobCharges === undefined) jw.totalJobCharges = jw.processCharges ?? 0;
+    }
+    for (const pb of parsed.productionBatches || []) {
+      if (pb.laborPowerCost === undefined) pb.laborPowerCost = pb.laborJobCost ?? 0;
+      if (pb.laborJobCost === undefined) pb.laborJobCost = pb.laborPowerCost ?? 0;
+      if (pb.unitCost === undefined) pb.unitCost = pb.unitProductionCost ?? 0;
+      if (pb.unitProductionCost === undefined) pb.unitProductionCost = pb.unitCost ?? 0;
     }
 
     if (!Array.isArray(parsed.crmLeads) || parsed.crmLeads.length === 0) {
@@ -1226,6 +1295,7 @@ function loadDb() {
 let db = loadDb();
 
 function saveDb() {
+  catalogCache.invalidatePattern('^bootstrap:');
   const tmpFile = DB_FILE + '.tmp';
   fs.writeFileSync(tmpFile, JSON.stringify(db, null, 2));
   fs.renameSync(tmpFile, DB_FILE);
@@ -1921,12 +1991,14 @@ async function handleApi(req, res, pathname, query) {
   // A. PUBLIC & SESSION BOOTSTRAP (`/api/bootstrap`)
   // --------------------------------------------------------------------------
   if (pathname === '/api/bootstrap' && req.method === 'GET') {
+    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Vary', 'Authorization');
     // In-Memory Catalog Cache for 100+ Concurrent Guest Buyers (5-min TTL)
     if (!user) {
       const cached = catalogCache.get('bootstrap:public');
       if (cached) {
         res.setHeader('X-Cache', 'HIT');
-        res.setHeader('Cache-Control', 'public, max-age=300');
         return sendJson(res, 200, cached);
       }
     }
@@ -2044,7 +2116,6 @@ async function handleApi(req, res, pathname, query) {
       // Store in memory cache for 5 minutes (300,000ms) for high concurrency
       catalogCache.set('bootstrap:public', payload, 300000);
       res.setHeader('X-Cache', 'MISS');
-      res.setHeader('Cache-Control', 'public, max-age=300');
     }
 
     return sendJson(res, 200, payload);
@@ -2777,7 +2848,7 @@ async function handleApi(req, res, pathname, query) {
     return sendJson(res, 200, { order, alertMsg, alertUrl });
   }
 
-  if (pathname === '/api/merchant/product-save' && req.method === 'POST') {
+  if ((pathname === '/api/merchant/product-save' || pathname === '/api/merchant/inventory') && req.method === 'POST') {
     if (!user || !user.shopId) return sendJson(res, 403, { error: 'Merchant access required.' });
     const body = await parseBody(req);
 
@@ -2825,7 +2896,7 @@ async function handleApi(req, res, pathname, query) {
         added++;
       }
       saveDb();
-      return sendJson(res, 200, { added });
+      return sendJson(res, 200, { ok: true, added, addedCount: added });
     }
 
     if (body.id) {
@@ -2867,6 +2938,40 @@ async function handleApi(req, res, pathname, query) {
     db.products.push(newProd);
     saveDb();
     return sendJson(res, 200, { product: newProd });
+  }
+
+  if (pathname === '/api/merchant/staff' && req.method === 'POST') {
+    if (!user || !user.shopId) return sendJson(res, 403, { error: 'Merchant access required.' });
+    const body = await parseBody(req);
+    if (!Array.isArray(db.staff)) db.staff = [];
+    if (body.action === 'add') {
+      const name = sanitizeString(body.name, 80);
+      const phone = String(body.phone || '').replace(/\D/g, '').slice(-10);
+      if (!name || phone.length !== 10) {
+        return sendJson(res, 400, { error: 'Enter staff name and valid 10-digit mobile number.' });
+      }
+      const staffMember = {
+        id: 'stf-' + crypto.randomUUID().slice(0, 8),
+        shopId: user.shopId,
+        name,
+        phone,
+        role: sanitizeString(body.role || 'Counter Billing Staff', 60),
+        permissions: Array.isArray(body.permissions) ? body.permissions : ['billing', 'inventory'],
+        active: true,
+        createdAt: new Date().toISOString()
+      };
+      db.staff.unshift(staffMember);
+      saveDb();
+      return sendJson(res, 200, { ok: true, staff: staffMember });
+    }
+    if (body.action === 'toggle') {
+      const stf = db.staff.find(s => s.id === body.staffId && s.shopId === user.shopId);
+      if (!stf) return sendJson(res, 404, { error: 'Staff member not found.' });
+      stf.active = !stf.active;
+      saveDb();
+      return sendJson(res, 200, { ok: true, staff: stf });
+    }
+    return sendJson(res, 400, { error: 'Invalid staff action.' });
   }
 
   if (pathname === '/api/merchant/profile-update' && req.method === 'POST') {
@@ -3645,22 +3750,55 @@ Additional text context: ${rawText}`;
       }
 
       // Record Order / Sale
+      const nowIso = new Date().toISOString();
+      const mappedItems = items.map(it => {
+        const p = db.products.find(prod => (prod.id === it.id || prod.id === it.productId || prod.name === it.name) && prod.shopId === user.shopId);
+        return {
+          productId: p ? p.id : (it.id || it.productId || ''),
+          name: it.name,
+          qty: Number(it.qty || 1),
+          price: Number(it.price || 0),
+          total: Number(it.price || 0) * Number(it.qty || 1),
+          hsn: it.hsn || p?.hsn || '3917',
+          gstRate: Number(it.gstRate ?? p?.gstRate ?? 18)
+        };
+      });
+      const taxableVal = Math.max(0, subtotal - discount);
+      let costTotal = 0;
+      for (const it of mappedItems) {
+        const p = db.products.find(prod => (prod.id === it.productId || prod.name === it.name) && prod.shopId === user.shopId);
+        const unitCost = p && p.costPrice ? Number(p.costPrice) : Math.round((Number(it.price) || 0) * 0.82);
+        costTotal += unitCost * (Number(it.qty) || 1);
+      }
       const newOrder = {
         id: invoiceNo,
         invoiceNo,
         tokenNumber,
         shopId: user.shopId,
+        customer: buyerName,
         buyerName,
         phone: buyerPhone || shop.phone,
-        items: items.map(it => ({ name: it.name, qty: Number(it.qty || 1), price: Number(it.price || 0), total: Number(it.price || 0) * Number(it.qty || 1), hsn: it.hsn || '3917', gstRate: Number(it.gstRate || 18) })),
+        items: mappedItems,
         subtotal,
         discount,
         tax,
         total,
+        totals: {
+          taxable: taxableVal,
+          discount,
+          gst: tax,
+          cgst: Math.round(tax * 50) / 100,
+          sgst: Math.round(tax * 50) / 100,
+          igst: 0,
+          gross: total,
+          costTotal
+        },
         paymentMode,
         status: 'Completed',
         source: 'POS Counter',
-        createdAt: new Date().toISOString(),
+        channel: 'POS Counter',
+        date: nowIso,
+        createdAt: nowIso,
         cashier: user.name || 'Admin'
       };
       db.orders.unshift(newOrder);
@@ -4499,19 +4637,23 @@ Additional text context: ${rawText}`;
       return sendJson(res, 404, { error: 'Raw material not found.' });
     }
 
-    const name = sanitizeString(body.name, 100);
+    const name = sanitizeString(body.name || body.materialName, 100);
     if (!name) return sendJson(res, 400, { error: 'Material name is required.' });
+    const minVal = Math.max(1, Number(body.minAlert || body.minThreshold) || 20);
     const item = {
       id: 'rm-' + crypto.randomUUID().slice(0, 8),
       shopId: targetShopId,
       name,
+      materialName: name,
+      code: sanitizeString(body.code || body.category || 'GRADE-A', 40),
       hsn: sanitizeString(body.hsn || '7408', 12),
       category: sanitizeString(body.category || 'Metals / Polymers', 60),
       stock: Math.max(0, Number(body.stock) || 0),
       unit: sanitizeString(body.unit || 'Kg', 20),
       unitCost: Math.max(0, Number(body.unitCost) || 0),
       supplier: sanitizeString(body.supplier || '', 100),
-      minAlert: Math.max(1, Number(body.minAlert) || 20),
+      minAlert: minVal,
+      minThreshold: minVal,
       date: new Date().toISOString()
     };
     db.rawMaterials.unshift(item);
@@ -4532,13 +4674,17 @@ Additional text context: ${rawText}`;
       if (jw) {
         jw.status = sanitizeString(body.status, 40);
         saveDb();
-        return sendJson(res, 200, { ok: true, item: jw });
+        return sendJson(res, 200, { ok: true, item: jw, challan: jw });
       }
       return sendJson(res, 404, { error: 'Job work order not found.' });
     }
 
     const direction = body.direction === 'Outward' ? 'Outward' : 'Inward';
     const challanNo = `JW-${direction === 'Inward' ? 'IN' : 'OUT'}-2627-${String((db.jobWorkOrders.length + 1)).padStart(2, '0')}`;
+    const matDesc = sanitizeString(body.materialDesc || body.inputMaterial || '', 120);
+    const qtyVal = Math.max(0.01, Number(body.qty) || 1);
+    const chargesVal = Math.max(0, Number(body.processCharges ?? body.totalJobCharges) || 0);
+    const dueStr = body.expectedReturnDate || body.deliveryDueDate;
     const jwOrder = {
       id: 'jw-' + crypto.randomUUID().slice(0, 8),
       shopId: targetShopId,
@@ -4549,18 +4695,22 @@ Additional text context: ${rawText}`;
       partyGstin: sanitizeString(body.partyGstin || '', 15).toUpperCase(),
       processType: sanitizeString(body.processType || 'Cutting & Processing', 120),
       sacCode: sanitizeString(body.sacCode || '9988', 8),
-      inputMaterial: sanitizeString(body.inputMaterial || '', 120),
-      expectedOutput: sanitizeString(body.expectedOutput || '', 120),
-      chargesPerUnit: Math.max(0, Number(body.chargesPerUnit) || 0),
-      totalJobCharges: Math.max(0, Number(body.totalJobCharges) || 0),
+      inputMaterial: matDesc,
+      materialDesc: matDesc,
+      qty: qtyVal,
+      expectedOutput: sanitizeString(body.expectedOutput || body.note || '', 120),
+      note: sanitizeString(body.note || '', 200),
+      chargesPerUnit: Math.max(0, Number(body.chargesPerUnit) || Math.round(chargesVal / qtyVal)),
+      totalJobCharges: chargesVal,
+      processCharges: chargesVal,
       gstRate: [0, 5, 12, 18].includes(Number(body.gstRate)) ? Number(body.gstRate) : 18,
       status: direction === 'Inward' ? 'Under Processing' : 'Material Dispatched',
       inwardDate: new Date().toISOString(),
-      deliveryDueDate: body.deliveryDueDate ? new Date(body.deliveryDueDate).toISOString() : new Date(Date.now() + 86400000 * 3).toISOString()
+      deliveryDueDate: dueStr ? new Date(dueStr).toISOString() : new Date(Date.now() + 86400000 * 3).toISOString()
     };
     db.jobWorkOrders.unshift(jwOrder);
     saveDb();
-    return sendJson(res, 200, { ok: true, item: jwOrder });
+    return sendJson(res, 200, { ok: true, item: jwOrder, challan: jwOrder });
   }
 
   if (pathname === '/api/manufacturer/production-batch' && req.method === 'POST') {
@@ -4573,8 +4723,24 @@ Additional text context: ${rawText}`;
 
     const batchNo = `BATCH-2627-${String(db.productionBatches.length + 1).padStart(3, '0')}`;
     const outputQty = Math.max(1, Number(body.outputQty) || 1);
-    const rawMaterialCost = Math.max(0, Number(body.rawMaterialCost) || 0);
-    const laborJobCost = Math.max(0, Number(body.laborJobCost) || 0);
+    let rawMaterialCost = Math.max(0, Number(body.rawMaterialCost) || 0);
+    let consumedDesc = sanitizeString(body.rawMaterialsConsumed || '', 150);
+
+    if (body.rawMaterialId) {
+      const rm = (db.rawMaterials || []).find(r => r.id === body.rawMaterialId && (r.shopId === targetShopId || user.role === 'admin'));
+      const consumedQty = Math.max(0, Number(body.rawMaterialQty) || 0);
+      if (rm && consumedQty > 0) {
+        rm.stock = Math.max(0, Number(rm.stock || 0) - consumedQty);
+        if (!rawMaterialCost) {
+          rawMaterialCost = Math.round(consumedQty * (Number(rm.unitCost) || 0));
+        }
+        if (!consumedDesc) {
+          consumedDesc = `${rm.materialName || rm.name} (${consumedQty} ${rm.unit || 'Kg'})`;
+        }
+      }
+    }
+
+    const laborJobCost = Math.max(0, Number(body.laborJobCost ?? body.laborPowerCost) || 0);
     const totalBatchCost = rawMaterialCost + laborJobCost;
     const unitProductionCost = Math.round(totalBatchCost / outputQty);
 
@@ -4585,11 +4751,13 @@ Additional text context: ${rawText}`;
       productName: sanitizeString(body.productName, 120),
       outputQty,
       unit: sanitizeString(body.unit || 'Pcs', 20),
-      rawMaterialsConsumed: sanitizeString(body.rawMaterialsConsumed || '', 150),
+      rawMaterialsConsumed: consumedDesc,
       rawMaterialCost,
       laborJobCost,
+      laborPowerCost: laborJobCost,
       totalBatchCost,
       unitProductionCost,
+      unitCost: unitProductionCost,
       createdAt: new Date().toISOString()
     };
     db.productionBatches.unshift(batchItem);
